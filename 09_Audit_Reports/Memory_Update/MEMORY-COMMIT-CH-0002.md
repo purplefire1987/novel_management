@@ -5,21 +5,20 @@ report_type: Memory_Commit
 target: CH-0002
 verdict: COMMITTED
 generated_by: memory_manager/offline
-created_at: '2026-11-03T04:33:43+08:00'
-operation_id: OP-20261103-043342-2e3e
-applied: 6
+created_at: '2026-11-03T04:34:07+08:00'
+operation_id: OP-20261103-043406-b6e6
+applied: 5
 ---
 
 # 记忆提交｜CH-0002
 
-- operation_id：`OP-20261103-043342-2e3e`
-- 已应用：6 条
+- operation_id：`OP-20261103-043406-b6e6`
+- 已应用：5 条
 - 被阻断：0 条
 - 待审批：0 条
-- Git：{'status': 'skipped', 'reason': 'Vault 不是 Git 仓库'}
+- Git：{'status': 'ok', 'detail': '[main 0eba70d] novel-system: memory commit CH-0002 [OP-20261103-043406-b6e6]'}
 
 ## 已应用提案
-- PROP-CH-0002-01
 - PROP-CH-0002-02
 - PROP-CH-0002-03
 - PROP-CH-0002-04
@@ -33,9 +32,11 @@ applied: 6
 - FORESHADOW-0002 伏笔状态 → hinted
 
 ## 校验问题
-无
+| 严重度 | 类别 | 描述 | 引用 | 阻断 |
+|---|---|---|---|---|
+| MINOR | idempotency | PROP-CH-0002-01 的事件 EVT-CH-0002-001 已存在，将按幂等跳过 | EVT-CH-0002-001 | 否 |
 
 ## 回滚
 ```bash
-novel rollback OP-20261103-043342-2e3e
+novel rollback OP-20261103-043406-b6e6
 ```
