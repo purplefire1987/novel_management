@@ -1,0 +1,61 @@
+# ID 规则：前缀、位宽、可配对文档类型（PRD 7.2）
+version: 1
+format: "{prefix}-{serial}"
+serial_width: 4
+
+prefixes:
+  character: CHAR
+  character_state: STATE-CHAR     # STATE-CHAR-0001，与人物同序号
+  location: LOC
+  faction: FAC
+  item: ITEM
+  enemy: ENEMY
+  foreshadowing: FORESHADOW
+  event: EVT
+  chapter: CH
+  scene: SCENE
+  mission: MISSION
+  story_asset: ASSET
+  relationship: REL
+  volume: VOL
+  world: WORLD
+
+# 子编号类型：EVT-CH-0001-001 / SCENE-CH-0001-001 / STATE-CHAR-0001
+composite:
+  event:
+    parent: chapter
+    width: 3
+  scene:
+    parent: chapter
+    width: 3
+  character_state:
+    parent: character
+    width: 4
+
+# 同一 ID 允许出现在多类文档中（大纲与正文共享章号）
+allow_shared_id_types:
+  - [chapter_outline, manuscript]
+
+id_patterns:
+  character: '^CHAR-\d{4}$'
+  character_state: '^STATE-CHAR-\d{4}$'
+  location: '^LOC-\d{4}$'
+  faction: '^FAC-\d{4}$'
+  item: '^ITEM-\d{4}$'
+  enemy: '^ENEMY-\d{4}$'
+  foreshadowing: '^FORESHADOW-\d{4}$'
+  event: '^EVT-CH-\d{4}-\d{3}$'
+  chapter_outline: '^CH-\d{4}$'
+  manuscript: '^CH-\d{4}$'
+  scene_beat: '^SCENE-CH-\d{4}-\d{3}$'
+  mission: '^MISSION-\d{4}$'
+  story_asset: '^ASSET-\d{4}$'
+  relationship: '^REL-\d{4}$'
+  volume: '^VOL-\d{4}$'
+  world: '^WORLD-\d{4}$'
+
+rules:
+  immutable: true                  # ID 不随名称变化
+  filename_must_contain_id: true
+  agent_cannot_create_id: true     # 由 Python ID 服务统一生成
+  numeric_chapter_sort: true       # CH-10 必须排在 CH-2 之后

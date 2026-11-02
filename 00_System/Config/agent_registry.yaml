@@ -1,0 +1,77 @@
+# Agent 注册表：角色、Prompt、可读路径、可写区域、可用工具（PRD 9.1）
+version: 1
+
+agents:
+  chief_editor:
+    name: 总编 Agent
+    prompt: 00_System/Prompts/chief_editor.md
+    read:
+      - 01_Core_Memory/**
+      - 02_Hot_Memory/**
+      - 03_Short_Term_Memory/**
+      - 04_Outline/**
+      - 05_Story_Assets/**
+      - 06_Plot_Ledger/**
+      - 07_Entity_Graph/**
+      - 08_Manuscripts/**
+      - 09_Audit_Reports/**
+    write:
+      - 09_Audit_Reports/**        # 仅报告
+    can_propose_canon_change: true
+    can_write_formal_canon: false
+
+  lore_keeper:
+    name: 资料官 Agent
+    prompt: 00_System/Prompts/lore_keeper.md
+    read:
+      - 01_Core_Memory/**
+      - 02_Hot_Memory/**
+      - 03_Short_Term_Memory/**
+      - 04_Outline/**
+      - 06_Plot_Ledger/**
+      - 07_Entity_Graph/**
+      - 08_Manuscripts/**
+    write: []                      # 只读
+    can_propose_canon_change: false
+    can_write_formal_canon: false
+
+  story_editor:
+    name: 编辑 Agent
+    prompt: 00_System/Prompts/story_editor.md
+    read:
+      - 01_Core_Memory/**
+      - 02_Hot_Memory/**
+      - 04_Outline/**
+      - 06_Plot_Ledger/**
+      - 07_Entity_Graph/**
+    write:
+      - .novel_system/staging/outline/**   # 仅提案区
+    can_propose_canon_change: true
+    can_write_formal_canon: false
+
+  writer:
+    name: 主笔 Agent
+    prompt: 00_System/Prompts/writer.md
+    read:
+      - .novel_system/staging/preflight/** # 只读批准的 Preflight Pack
+      - 04_Outline/**
+      - 05_Story_Assets/**
+      - 03_Short_Term_Memory/Style_Reference/**
+    write:
+      - .novel_system/staging/draft/**     # 仅草稿区
+    can_propose_canon_change: false
+    can_write_formal_canon: false
+
+  memory_manager:
+    name: 记忆管理员 Agent
+    prompt: 00_System/Prompts/memory_manager.md
+    read:
+      - 08_Manuscripts/**
+      - 01_Core_Memory/**
+      - 02_Hot_Memory/**
+      - 06_Plot_Ledger/**
+      - 07_Entity_Graph/**
+    write:
+      - .novel_system/staging/memory/**     # 仅提案区
+    can_propose_canon_change: true
+    can_write_formal_canon: false

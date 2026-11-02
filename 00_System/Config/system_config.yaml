@@ -1,0 +1,69 @@
+# 系统主配置：路径、模型、上下文预算、事务与 Git 行为
+version: 1
+novel:
+  title: 白骨渡（示例项目）
+  author: 作者
+  language: zh-CN
+  pov_default: third_limited
+
+paths:
+  vault_root: "."
+  core_memory: "01_Core_Memory"
+  hot_memory: "02_Hot_Memory"
+  short_term_memory: "03_Short_Term_Memory"
+  outline: "04_Outline"
+  story_assets: "05_Story_Assets"
+  plot_ledger: "06_Plot_Ledger"
+  entity_graph: "07_Entity_Graph"
+  manuscripts: "08_Manuscripts"
+  audit_reports: "09_Audit_Reports"
+  change_log: "10_Change_Log"
+  templates: "11_Templates"
+  dashboard: "12_Dashboard"
+  archive: "99_Archive"
+  system_dir: ".novel_system"
+
+workflow:
+  # MVP 固定工作流：不允许 Agent 自由跳步
+  require_outline_approved: true
+  require_preflight_before_write: true
+  require_author_approval_before_publish: true
+  require_published_before_memory_commit: true
+  allow_auto_publish: false
+
+llm:
+  provider: openai_compatible
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  temperature: 0.7
+  max_tokens: 4096
+  timeout_seconds: 120
+  # API Key 只从环境变量读取，绝不写入 Vault
+  api_key_env: "NOVEL_LLM_API_KEY"
+  offline_fallback: true   # 无 Key 时降级为确定性离线模式，并在报告中显式标注
+
+context_budget:
+  # PRD 11.4 初始预算占比，按字符预算换算
+  total_chars: 24000
+  ratios:
+    task_and_outline: 0.20
+    canon_and_state: 0.20
+    recent_text: 0.25
+    foreshadow_and_events: 0.15
+    style_reference: 0.10
+    output_reserve: 0.10
+  recent_chapter_count: 3
+
+transactions:
+  backup_dir: ".novel_system/backups"
+  staging_dir: ".novel_system/staging"
+  require_git: true
+  git_commit_prefix: "novel-system"
+
+guardrails:
+  # 出现以下情况直接阻断自动推进
+  block_on_conflict: true
+  block_on_unknown_entity: false      # 记录为待确认，不直接阻断
+  block_on_dead_character: true
+  block_on_overdue_foreshadow: false  # 提示，不阻断
+  max_unresolved_issues: 5

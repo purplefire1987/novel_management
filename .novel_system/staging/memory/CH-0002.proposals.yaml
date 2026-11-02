@@ -1,0 +1,154 @@
+chapter_id: CH-0002
+operation_id: OP-20261103-043342-3a0a
+generated_by: memory_manager/offline
+mode: offline
+proposals:
+- proposal_id: PROP-CH-0002-01
+  kind: event
+  op: create
+  target_id: EVT-CH-0002-001
+  chapter_id: CH-0002
+  payload:
+    name: 河心灭灯
+    objective_fact: 沈砚与苏未晞夜渡白骨渡，船至河心灯符燃尽熄灭，三人困于河心，雾中出现一盏正在靠近的灯
+    participants:
+    - CHAR-0001
+    - CHAR-0002
+    - CHAR-0003
+    location_id: LOC-0002
+    results: 三人未登西岸，备用灯符耗尽，船停在河心
+    state_changes: []
+    knowledge:
+      knows:
+      - CHAR-0001
+      - CHAR-0002
+      - CHAR-0003
+      unaware:
+      - ENEMY-0001
+  evidence:
+  - 沈砚看了一眼那线红，又看了一眼石阶下面的河。
+  - 苏未晞站在他身后半步，没有出声。
+  confidence: CONFIRMED
+  approval_class: auto
+  status: approved
+  origin: memory_manager_offline
+  target_path: null
+  note: null
+- proposal_id: PROP-CH-0002-02
+  kind: character_state
+  op: update
+  target_id: STATE-CHAR-0001
+  chapter_id: CH-0002
+  payload:
+    location: 白骨渡河心船上
+    injury: 左肩旧伤渗血至手腕，未处理
+    objective_status: 存活
+    mind: ''
+    ability: 断水刀已六裂，再承载一次将断裂
+    holdings: ''
+    awareness:
+    - 西岸方向有一盏灯正在向船靠近
+    unknown:
+    - 老陆断指的真正原因
+    goal: ''
+    as_of_event: EVT-CH-0002-001
+  evidence:
+  - 沈砚看了一眼那线红，又看了一眼石阶下面的河。
+  - 沈砚把灯符收进袖里。
+  confidence: CONFIRMED
+  approval_class: author
+  status: approved
+  origin: memory_manager_offline
+  target_path: null
+  note: null
+- proposal_id: PROP-CH-0002-03
+  kind: character_state
+  op: update
+  target_id: STATE-CHAR-0002
+  chapter_id: CH-0002
+  payload:
+    location: 白骨渡河心船上
+    injury: 右腕擦伤已结
+    objective_status: 存活
+    mind: ''
+    ability: ''
+    holdings: ''
+    awareness:
+    - 灯在移动说明有人持灯
+    unknown:
+    - 沈砚对师父之死的判断
+    goal: ''
+    as_of_event: EVT-CH-0002-001
+  evidence:
+  - 苏未晞站在他身后半步，没有出声。
+  - 苏未晞忽然开口："灯在动，说明撑灯的人还活着。
+  confidence: CONFIRMED
+  approval_class: author
+  status: approved
+  origin: memory_manager_offline
+  target_path: null
+  note: null
+- proposal_id: PROP-CH-0002-04
+  kind: character_state
+  op: update
+  target_id: STATE-CHAR-0003
+  chapter_id: CH-0002
+  payload:
+    location: 白骨渡河心船上
+    injury: 无新伤
+    objective_status: 存活
+    mind: ''
+    ability: ''
+    holdings: ''
+    awareness:
+    - 河心的灯昨夜转了一夜
+    unknown:
+    - 沈砚已怀疑师父上过西岸
+    goal: ''
+    as_of_event: EVT-CH-0002-001
+  evidence:
+  - '"老陆说。'
+  - 老陆的手停了一下。
+  confidence: CONFIRMED
+  approval_class: author
+  status: approved
+  origin: memory_manager_offline
+  target_path: null
+  note: null
+- proposal_id: PROP-CH-0002-05
+  kind: foreshadowing
+  op: update
+  target_id: FORESHADOW-0002
+  chapter_id: CH-0002
+  payload:
+    status: hinted
+    note: 老陆说出「那晚我自己砍的」，未解释原因
+  evidence:
+  - '"那晚我自己砍的。'
+  confidence: CONFIRMED
+  approval_class: author
+  status: approved
+  origin: memory_manager_offline
+  target_path: null
+  note: null
+- proposal_id: PROP-CH-0002-06
+  kind: summary
+  op: update
+  target_id: SUMMARY-CH-0002
+  chapter_id: CH-0002
+  payload:
+    one_line: 沈砚用左肩的血换来老陆开船，船到河心灯符燃尽，雾里一盏灯正朝他们的船移动。
+    facts:
+    - ''
+  evidence:
+  - CH-0002（作者备注标注，正文对应句段需人工确认）
+  confidence: CONFIRMED
+  approval_class: auto
+  status: approved
+  origin: memory_manager_offline
+  target_path: null
+  note: null
+conflicts: []
+unknowns: []
+sources:
+- CH-0002（作者备注）

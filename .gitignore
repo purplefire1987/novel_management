@@ -1,0 +1,12 @@
+# 索引可随时从 Markdown 重建，不入版本库
+.novel_system/index.sqlite
+.novel_system/index.sqlite-wal
+.novel_system/index.sqlite-shm
+# 运行时产物
+.novel_system/locks/
+.novel_system/backups/
+.novel_system/staging/txn/
+.novel_system/logs/*.log
+.DS_Store
+.obsidian/workspace.json
+.obsidian/cache

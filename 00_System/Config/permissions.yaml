@@ -1,0 +1,91 @@
+# 权限矩阵：由 Python 执行层强制实施，Prompt 只是说明（PRD 10.1）
+version: 1
+
+# 操作级权限：allow / propose / deny
+matrix:
+  chief_editor:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    modify_core_memory: propose
+    modify_outline: propose
+    write_draft: deny
+    write_formal_memory: deny
+    modify_config: deny
+  lore_keeper:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    modify_core_memory: deny
+    modify_outline: deny
+    write_draft: deny
+    write_formal_memory: deny
+    modify_config: deny
+  story_editor:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    modify_core_memory: propose
+    modify_outline: propose
+    write_draft: deny
+    write_formal_memory: deny
+    modify_config: deny
+  writer:
+    read_core_memory: scoped        # 仅限批准的 Preflight Pack
+    read_hot_memory: allow
+    read_manuscript: scoped
+    modify_core_memory: deny
+    modify_outline: deny
+    write_draft: allow
+    write_formal_memory: deny
+    modify_config: deny
+  memory_manager:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    modify_core_memory: propose
+    modify_outline: deny
+    write_draft: deny
+    write_formal_memory: propose
+    modify_config: deny
+  author:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    modify_core_memory: allow
+    modify_outline: allow
+    write_draft: allow
+    write_formal_memory: allow
+    modify_config: allow
+
+# 路径级硬锁：任何 Agent 都不得直接写正式事实源
+path_locks:
+  agent_denied_paths:
+    - 01_Core_Memory/**
+    - 02_Hot_Memory/**
+    - 03_Short_Term_Memory/**
+    - 04_Outline/**
+    - 06_Plot_Ledger/**
+    - 07_Entity_Graph/**
+    - 08_Manuscripts/**
+    - 00_System/Config/**
+  agent_allowed_prefixes:
+    - .novel_system/staging/
+    - 09_Audit_Reports/
+
+# 更新类型的默认审批级别（PRD 12.3）
+approval_classes:
+  event: auto                 # 普通事件可批量确认
+  summary: auto               # 正文批准后可自动提交
+  character_location: author
+  character_injury: author
+  character_ability: author
+  item_ownership: author
+  character_awareness: author
+  relationship: author
+  mission: author
+  foreshadowing_status: author
+  character_death: blocking   # 人物死亡/复活：必须作者确认
+  world_rule: blocking        # 新世界规则
+  foreshadow_payoff: blocking # 伏笔回收
+  new_entity: author

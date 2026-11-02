@@ -1,0 +1,78 @@
+# 工作流与文件状态机（PRD 10.2 / 16）
+version: 1
+
+states:
+  - outline
+  - preflight_passed
+  - draft
+  - revision
+  - editor_approved
+  - author_approved
+  - published
+  - memory_committed
+
+initial_state: outline
+
+transitions:
+  outline: [preflight_passed]
+  preflight_passed: [draft, revision]
+  draft: [revision, editor_approved]
+  revision: [draft, editor_approved]
+  editor_approved: [author_approved, revision]
+  author_approved: [published, revision]
+  published: [memory_committed]
+  memory_committed: []
+
+# 每个阶段由谁触发
+stage_owner:
+  preflight_passed: system
+  draft: writer
+  revision: chief_editor
+  editor_approved: chief_editor
+  author_approved: author
+  published: author
+  memory_committed: system
+
+quality_gates:
+  preflight:
+    - outline_exists
+    - outline_approved
+    - entities_resolvable
+    - no_blocking_conflict
+    - foreshadowing_checked
+    - awareness_boundary_checked
+    - pack_generated
+  writing:
+    - approved_outline_used
+    - chapter_goal_defined
+    - pov_time_location_defined
+    - state_consistent_with_pack
+    - draft_in_staging
+    - not_published_directly
+  post_write:
+    - author_confirmed
+    - proposal_has_evidence
+    - schema_valid
+    - entity_refs_valid
+    - state_transition_valid
+    - canon_change_approved
+    - continuity_checked
+    - index_consistent
+    - audit_logged
+    - git_committed
+
+# 记忆提交阶段顺序（失败即回滚，不跳过）
+commit_pipeline:
+  - validate_schema
+  - validate_entity_refs
+  - validate_state_transitions
+  - validate_permissions
+  - validate_idempotency
+  - write_staging
+  - validate_staged
+  - backup_targets
+  - atomic_apply
+  - update_index
+  - write_audit
+  - git_commit
+  - regression_audit
