@@ -1,0 +1,36 @@
+---
+id: ENEMY-0071
+type: enemy
+name: 夔牛
+title: 夔牛
+aliases: []
+subtype: 生物
+world: 九州
+canon_status: confirmed
+created_at: '2026-11-03'
+updated_at: '2026-11-03'
+source_refs:
+- 10_Change_Log/Ingest/ASSETS-20261103-224145
+import_batch: ASSETS-20261103-224145
+tags:
+- legacy
+- 九州
+- world-asset
+- 生物库
+---
+
+# 夔牛
+
+> 来源：`九州-世界观资产.xlsx` · 工作表「生物库」｜录入批次 `ASSETS-20261103-224145`｜旧稿资产，如与新正文冲突，以正文为准。
+
+## 概要
+
+青色的身体，没有角，只有一只脚的牛状怪物
+
+## 档案
+
+- **种族**：神兽
+- **AI等级**：正常智力
+- **栖息地**：水域/沧渊
+- **技能**：雷击
+- **能力**：信诺

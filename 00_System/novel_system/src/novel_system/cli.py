@@ -98,6 +98,7 @@ def cmd_rebuild(args: argparse.Namespace) -> int:
                 ("数据库", result["db"]),
                 ("扫描文件", result["files"]),
                 ("错误", len(result["errors"])),
+                ("清理临时文件", result.get("cleaned_temp", 0)),
             ]
         )
         for key, value in result["indexed"].items():

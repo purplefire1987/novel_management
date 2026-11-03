@@ -418,7 +418,8 @@ class Orchestrator:
         for key in ("core_memory", "hot_memory", "outline", "manuscripts"):
             add(f"目录 {key}", cfg.dir(key).is_dir(), str(cfg.dir(key)))
         add("SQLite 索引", cfg.index_db.exists(), str(cfg.index_db))
-        add("提示词 5 份", len(list((cfg.vault / "00_System" / "Prompts").glob("*.md"))) >= 5, "00_System/Prompts")
+        prompt_count = len(list((cfg.vault / "00_System" / "Prompts").glob("*.md")))
+        add(f"提示词 {prompt_count} 份", prompt_count >= 5, "00_System/Prompts")
         add("模板数量", len(list(cfg.dir("templates").glob("*.md"))) >= 10, "11_Templates")
 
         from .agents.base import LLMClient

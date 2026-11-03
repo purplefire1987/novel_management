@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Config
+from .. import vault
 from .indexer import index_vault
 from .sqlite import Index
 
@@ -13,13 +14,14 @@ from .sqlite import Index
 def rebuild(cfg: Config) -> dict[str, Any]:
     cfg.ensure_dirs()
     db = cfg.index_db
+    cleaned = vault.cleanup_stale_temp(cfg.vault)
     index = Index.open(db, create=True)
     try:
         index.reset()
         result = index_vault(cfg, index)
     finally:
         index.close()
-    return {"db": str(db), **result}
+    return {"db": str(db), "cleaned_temp": len(cleaned), **result}
 
 
 def open_index(cfg: Config) -> Index:

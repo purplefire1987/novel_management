@@ -10,6 +10,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -164,6 +165,31 @@ def iter_markdown(root: Path, skip_dirs: tuple[str, ...] = (".obsidian", ".git",
         for name in filenames:
             if name.endswith(".md") and not name.startswith("."):
                 yield Path(dirpath) / name
+
+
+def cleanup_stale_temp(root: Path, min_age_seconds: int = 300) -> list[Path]:
+    """删除遗留的 `.tmp_*` 半成品（写入降级、进程中断留下的残骸）。
+
+    只在索引重建这类维护动作里调用，并且只删「超过 min_age_seconds 没被修改」的文件，
+    避免和正在进行的写入抢同一个临时文件。删除失败不报错：受限环境可能禁止 unlink，
+    但残留文件已被索引器和 .gitignore 双重隔离，不影响事实源正确性。
+    """
+    removed: list[Path] = []
+    now = time.time()
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in (".git", ".obsidian", ".novel_system")]
+        for name in filenames:
+            if not name.startswith(".tmp_"):
+                continue
+            target = Path(dirpath) / name
+            try:
+                if now - target.stat().st_mtime < min_age_seconds:
+                    continue
+                target.unlink()
+                removed.append(target)
+            except OSError:
+                continue
+    return removed
 
 
 def extract_section(body: str, heading: str) -> str:
