@@ -27,6 +27,33 @@ def new_operation_id(prefix: str = "OP") -> str:
     return f"{prefix}-{stamp}-{secrets.token_hex(2)}"
 
 
+def git_guard(vault_root: Path) -> tuple[bool, str]:
+    """确认 Vault 自身就是 Git 仓库根，才允许提交。
+
+    只查 `--is-inside-work-tree` 是不够的：当 Vault 是某个仓库的子目录时（例如
+    测试把 Vault 复制到仓库内的临时目录），`git -C` 会向上找到父仓库，把测试
+    产物提交进真实仓库。这里强制要求 toplevel 与 Vault 根一致。
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(vault_root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Git 调用失败：{type(exc).__name__}: {exc}"
+    if proc.returncode != 0:
+        return False, "Vault 不是 Git 仓库"
+    top = Path(proc.stdout.strip())
+    try:
+        if top.resolve() != Path(vault_root).resolve():
+            return False, f"Vault 位于仓库 {top} 内但不是仓库根，已跳过提交以避免污染父仓库"
+    except OSError:
+        return False, f"无法比较路径：{top}"
+    return True, ""
+
+
 @dataclass
 class StagedChange:
     rel_path: str
@@ -211,14 +238,9 @@ class Transaction:
         if not self.cfg.system.get("transactions", {}).get("require_git", True):
             return {"status": "skipped", "reason": "配置关闭 Git"}
         try:
-            inside = subprocess.run(
-                ["git", "-C", str(self.cfg.vault), "rev-parse", "--is-inside-work-tree"],
-                capture_output=True,
-                text=True,
-                timeout=20,
-            )
-            if inside.returncode != 0:
-                return {"status": "skipped", "reason": "Vault 不是 Git 仓库"}
+            ok, reason = git_guard(self.cfg.vault)
+            if not ok:
+                return {"status": "skipped", "reason": reason}
             subprocess.run(
                 ["git", "-C", str(self.cfg.vault), "add", "-A"],
                 capture_output=True,
@@ -278,14 +300,9 @@ def commit_artifacts(cfg: Config, message: str) -> dict[str, Any]:
     if not cfg.system.get("transactions", {}).get("require_git", True):
         return {"status": "skipped", "reason": "配置关闭 Git"}
     try:
-        inside = subprocess.run(
-            ["git", "-C", str(cfg.vault), "rev-parse", "--is-inside-work-tree"],
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-        if inside.returncode != 0:
-            return {"status": "skipped", "reason": "Vault 不是 Git 仓库"}
+        ok, reason = git_guard(cfg.vault)
+        if not ok:
+            return {"status": "skipped", "reason": reason}
         status = subprocess.run(
             ["git", "-C", str(cfg.vault), "status", "--porcelain"],
             capture_output=True,
