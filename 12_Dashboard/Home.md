@@ -5,9 +5,10 @@ type: dashboard
 # 九州·工作台
 
 ## 当前进度
-- 当前卷：[[02_Hot_Memory/Current_Volume|未开卷]]
+- 当前卷：[[VOL-0001_工坊疑云|卷一：工坊疑云]]（大纲已录，待批准写作）
 - 当前剧情状态：[[02_Hot_Memory/Current_Story_State|查看]]
-- 总纲：[[04_Outline/Series_Outline|待填写]]
+- 总纲：[[04_Outline/Series_Outline|九州·总纲]]
+- 章节大纲：[[CH-0001_雨夜的血案|CH-0001]] · [[CH-0002_石季崇的试探|CH-0002]]
 
 ## 世界底座
 - 底层架构：[[WORLD-0002_三质_物质灵力魂魄|三质]] · [[WORLD-0003_三重循环_灵力总纲|三重循环]] · [[WORLD-0004_第一因_扩张与失衡|第一因]]

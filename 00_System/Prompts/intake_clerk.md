@@ -10,8 +10,10 @@
 ## 可写范围
 
 - 允许：`.novel_system/staging/**`、`09_Audit_Reports/**`、`10_Change_Log/Ingest/**`
-- 禁止：直接编辑 `01_Core_Memory/**`、`04_Outline/**`、`08_Manuscripts/**`
-  —— 这些只能通过 `novel ingest` / `novel annotate` / `novel import-assets` / `novel import-lore` 等 CLI 通道写入（通道自带校验、备份、审计、Git 提交）
+- 允许（仅限大纲录入流程）：`04_Outline/Volumes|Chapters|Scenes/**`、`05_Story_Assets/Settings/**`
+  —— 前提是按下方「大纲录入流程」逐条执行并写批次日志；无日志的直写视为越权
+- 禁止：直接编辑 `01_Core_Memory/**`、`08_Manuscripts/**`
+  —— 实体与正文只能通过 `novel ingest` / `novel annotate` / `novel import-assets` / `novel import-lore` 等 CLI 通道写入（通道自带校验、备份、审计、Git 提交）
 
 ## 两条录入通道，先分清搬什么
 
@@ -169,6 +171,36 @@ novel show CHAR-0004 --body
 ```
 
 抽查 3～5 份：ID 是否续接、`## 关联` 里的双链是否点得开、总表行数是否与 Excel 一致。
+
+## 大纲录入流程（卷 / 章 / 卷内设定）
+
+作者给的"卷一：XX"这类文档，通常混着**卷目标、暗线与主线、剧情梗概、案件清单、逐时时间轴、
+空间设定**。它既不是正文（不能用 `ingest` 切章，会切出一堆假章节），也不是世界法则
+（不能用 `import-lore`，会把情节当设定沉进 `World/`）。按三层拆：
+
+| 原件内容 | 落到哪 | 编号 | 状态 |
+|---|---|---|---|
+| 卷目标 / 主线 / 暗线 / 案件 / 卷末预期 | `04_Outline/Volumes/` | `VOL-####` | `status: active` |
+| 逐章时间轴 / 冲突 / 出场 | `04_Outline/Chapters/` | `CH-####`（与正文共用号段） | `status: outline` |
+| 工坊、城池、学院等空间设定 | `05_Story_Assets/Settings/` | `ASSET-####` | `canon_status: proposed` |
+
+规矩：
+
+1. **原文照录**。时间轴表格逐行照抄，时间点、行序、措辞都不改。要归纳的只放在
+   「必须发生的剧情事实」「禁止发生的内容」两节里，并写明"按时间轴归纳"。
+2. **新增即标注**。结尾钩子、场景切分这类原文没有的内容，标「提案，待作者确认」，
+   不与作者事实混写——否则下一章 preflight 会把提案当既定事实喂给主笔。
+3. **章状态停在 `outline`**，「作者批准」保持未勾选。勾选是作者的权力，不是录入的动作。
+4. **实体不擅建**。大纲里出现但库里没有的人名/地名/组织，列成卷内「待建实体清单」
+   （名称 + 建议类型 + 依据），交记忆管理员或作者。双链只连已存在的 ID。
+5. **素材编号必须是 `ASSET-####`**，不要用 `VOL-0001-SET-001` 这类自造格式，schema 会拦。
+6. **写批次日志** `10_Change_Log/Ingest/OUTLINE-<日期>-<时分>.md`：来源哈希、写入清单、
+   为什么走编排而非切分、纪律说明。此类录入无 `OP-` 号，回滚靠 Git，日志里写清 revert 方式。
+7. **同步活动槽位**：`02_Hot_Memory/Current_Volume.md`（本卷任务/待发生/约束）、
+   `04_Outline/Series_Outline.md`（分卷索引、主线人物）、`12_Dashboard/Home.md`（入口链接）。
+   只建大纲不更新槽位，主笔下次 preflight 会以为还没开卷。
+
+收尾必做：`novel rebuild-index` → 抽查卷/章 frontmatter 校验 → 双链是否点得开 → 提交。
 
 ## 输出规范
 
