@@ -19,7 +19,8 @@ profiles:
     label: 九州·世界观资产库
     kind: workbook
     world: 九州
-    source: 九州-世界观资产.xlsx
+    # 源文件指向 Vault 内归档件：录入可从事实源内部重放，不依赖作者的 Downloads 目录
+    source: 99_Archive/Raw_Sources/九州旧稿/九州-世界观资产.xlsx
     archive_dir: 99_Archive/Raw_Sources/九州旧稿
     tags: [legacy, 九州, world-asset]
 
@@ -283,12 +284,13 @@ profiles:
     label: 九州·底层记忆
     kind: lore
     world: 九州
-    root: .
+    # 同上：root 指向归档件（原件在原作者目录里曾位于 1/ 子目录，归档后已拍平）
+    root: 99_Archive/Raw_Sources/九州旧稿
     archive_dir: 99_Archive/Raw_Sources/九州旧稿
     tags: [legacy, 九州, 底层记忆]
     dir: 01_Core_Memory/World/九州
     documents:
-      - source: 1/九州的底层架构.md
+      - source: 九州的底层架构.md
         dir: 01_Core_Memory/World/九州/底层架构
         docs:
           - title: 九州·三质：物质·灵力·魂魄
