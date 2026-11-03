@@ -60,6 +60,14 @@ transactions:
   require_git: true
   git_commit_prefix: "novel-system"
 
+ingest:
+  # 录入既有稿件（novel ingest）：正文视作作者已定稿
+  default_volume: "VOL-0001"
+  default_split: "auto"          # auto / chapter / heading / number / single
+  manuscript_status: "published"  # 录入后的正文状态，允许直接进入 commit-memory
+  tag_by_default: false          # 是否为每批次自动打 ingest/<批次> 标签
+  log_dir: "10_Change_Log/Ingest"
+
 guardrails:
   # 出现以下情况直接阻断自动推进
   block_on_conflict: true

@@ -48,6 +48,30 @@ matrix:
     write_draft: deny
     write_formal_memory: propose
     modify_config: deny
+  intake_clerk:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    read_archive: allow
+    modify_core_memory: deny
+    modify_outline: deny
+    ingest_raw_source: allow        # 只经 novel ingest 通道
+    annotate_published: allow       # 只经 novel annotate 通道
+    write_draft: deny
+    write_formal_memory: deny
+    modify_config: deny
+  version_steward:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: allow
+    modify_core_memory: deny
+    modify_outline: deny
+    write_draft: deny
+    write_formal_memory: deny
+    git_tag: allow
+    rollback_transaction: allow     # 只经 novel rollback 通道
+    git_rewrite_history: deny
+    modify_config: deny
   author:
     read_core_memory: allow
     read_hot_memory: allow

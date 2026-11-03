@@ -75,3 +75,45 @@ agents:
       - .novel_system/staging/memory/**     # 仅提案区
     can_propose_canon_change: true
     can_write_formal_canon: false
+
+  intake_clerk:
+    name: 录入员 Agent
+    prompt: 00_System/Prompts/intake_clerk.md
+    read:
+      - 99_Archive/**
+      - 01_Core_Memory/**          # 需要查已有实体 ID，避免造 ID
+      - 02_Hot_Memory/**
+      - 04_Outline/**
+      - 07_Entity_Graph/**
+      - 08_Manuscripts/**
+      - 10_Change_Log/**
+    write:
+      - 09_Audit_Reports/**        # 录入回执与问题清单
+    # 正式写入只能经 CLI 通道：novel ingest / novel annotate
+    # 这两个命令以 author 身份走事务（校验/备份/审计/Git 一并完成）
+    write_channels:
+      - "novel ingest"
+      - "novel annotate"
+    can_propose_canon_change: false
+    can_write_formal_canon: false
+
+  version_steward:
+    name: 版本管理员 Agent
+    prompt: 00_System/Prompts/version_steward.md
+    read:
+      - 10_Change_Log/**
+      - 09_Audit_Reports/**
+      - .novel_system/logs/**
+    write:
+      - 09_Audit_Reports/**        # 版本体检报告
+    write_channels:
+      - "novel snapshot"
+      - "novel rollback"
+      - "git tag"
+    can_propose_canon_change: false
+    can_write_formal_canon: false
+    forbidden:
+      - "git push --force"
+      - "git reset --hard"
+      - "改写已推送历史"
+      - "删除分支"

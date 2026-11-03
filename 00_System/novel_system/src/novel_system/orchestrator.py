@@ -123,6 +123,67 @@ class Orchestrator:
             self.cfg, self.index, chapter_id, approve=approve, ids=ids or []
         )
 
+    def ingest(
+        self,
+        source: str,
+        *,
+        volume_id: str = "VOL-0001",
+        mode: str = "auto",
+        title: str = "",
+        dry_run: bool = False,
+        tag: bool = False,
+        force: bool = False,
+    ):
+        """原始稿件录入：切章、定 ID、建大纲与正文、批次提交。"""
+        from .workflow import ingest as ingest_flow
+
+        result = ingest_flow.run(
+            self.cfg,
+            self.index,
+            source,
+            volume_id=volume_id,
+            mode=mode,
+            title=title,
+            dry_run=dry_run,
+            tag=tag,
+            force=force,
+        )
+        return result
+
+    # ------------------------------------------------------------- 录入标注
+    def annotate(
+        self,
+        chapter_id: str,
+        lines: list[str],
+        *,
+        replace: bool = False,
+    ):
+        """给已发布章节补写「作者备注」结构化标注，供记忆抽取使用。"""
+        from .workflow import ingest as ingest_flow
+
+        return ingest_flow.annotate(self.cfg, self.index, chapter_id, lines, replace=replace)
+
+    # ------------------------------------------------------------- 版本控制
+    def git_state(self) -> dict[str, Any]:
+        from . import gitops
+
+        return gitops.repo_state(self.cfg)
+
+    def git_history(self, limit: int = 15, path: str | None = None) -> list[dict[str, Any]]:
+        from . import gitops
+
+        return gitops.history(self.cfg, limit=limit, path=path)
+
+    def git_tags(self, pattern: str = "") -> list[dict[str, str]]:
+        from . import gitops
+
+        return gitops.list_tags(self.cfg, pattern=pattern)
+
+    def snapshot(self, name: str, message: str = "") -> dict[str, Any]:
+        from . import gitops
+
+        return gitops.create_tag(self.cfg, name, message)
+
     def audit_chapter(self, chapter_id: str) -> dict[str, Any]:
         outline = retrieval.outline_doc(self.cfg, self.index, chapter_id)
         if not outline:

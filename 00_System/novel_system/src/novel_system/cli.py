@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from .config import Config, ConfigError
+from .gitops import GitError
 from .orchestrator import Orchestrator
 from .transaction import TransactionError
 from .validators.permissions import PermissionDenied
@@ -359,6 +360,115 @@ def cmd_log(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_ingest(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        result = orch.ingest(
+            args.source,
+            volume_id=args.volume,
+            mode=args.split,
+            title=args.title or "",
+            dry_run=args.dry_run,
+            tag=args.tag,
+            force=args.force,
+        )
+        head(f"录入{'（预演）' if args.dry_run else ''}｜{Path(args.source).name}")
+        kv_block(
+            [
+                ("批次", result.batch_id),
+                ("编码", result.encoding),
+                ("切分模式", result.mode),
+                ("目标卷", result.volume_id),
+                ("章节数", len(result.chapters)),
+                ("总字数", result.total_words),
+                ("跳过文件头", f"{result.preamble_chars} 字" if result.preamble_chars else "-"),
+            ]
+        )
+        head("章节清单")
+        table(
+            ["章节", "标题", "字数", "源文件行"],
+            [[c["chapter_id"], c["title"][:20], c["word_count"], c["source_line"]] for c in result.chapters],
+        )
+        if args.dry_run:
+            print("\n  预演模式：未写入任何文件。去掉 --dry-run 即可正式录入。")
+            return 0
+        head("落盘结果")
+        kv_block(
+            [
+                ("操作", result.operation_id),
+                ("批次日志", result.log_path),
+                ("Git", result.git.get("status") or "-"),
+                ("快照标签", result.tag or "-"),
+            ]
+        )
+        print(f"\n  回滚：novel rollback {result.operation_id}")
+        if result.warnings:
+            head("提示")
+            for warning in result.warnings:
+                print(f"  - {warning}")
+        return 0
+
+
+def cmd_annotate(args: argparse.Namespace) -> int:
+    lines: list[str] = list(args.line or [])
+    if args.from_file:
+        source = Path(args.from_file).expanduser()
+        if not source.exists():
+            raise FileNotFoundError(f"找不到标注文件：{source}")
+        lines.extend(source.read_text(encoding="utf-8").splitlines())
+    if not lines:
+        raise ValueError("请用 --line 或 --from 提供标注内容（格式：`- 事件: 名称 | 键:值`）")
+
+    with Orchestrator(Config.load(args.vault)) as orch:
+        result = orch.annotate(args.chapter, lines, replace=args.replace)
+        head(f"记忆标注｜{args.chapter}")
+        kv_block(
+            [
+                ("文件", result.path),
+                ("新增", result.added),
+                ("标注总数", result.total),
+                ("覆盖原标注", "是" if result.replaced else "否"),
+                ("操作", result.operation_id),
+                ("Git", result.git.get("status") or "-"),
+            ]
+        )
+        print(f"\n  下一步：novel commit-memory {args.chapter} --approve auto")
+        return 0
+
+
+def cmd_history(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        state = orch.git_state()
+        head("仓库状态")
+        kv_block(
+            [
+                ("分支", state["branch"]),
+                ("HEAD", state["head"]),
+                ("未提交", state["dirty"]),
+                ("上游", state["upstream"] or "（未配置）"),
+                ("领先/落后", f"{state['ahead']} / {state['behind']}"),
+            ]
+        )
+        head(f"提交历史（最近 {args.limit} 条）")
+        table(
+            ["提交", "时间", "作者", "说明"],
+            [[r["hash"], r["time"], r["author"], r["subject"][:44]] for r in orch.git_history(args.limit)],
+        )
+        tags = orch.git_tags()
+        if tags:
+            head("快照标签")
+            table(["标签", "日期", "说明"], [[t["tag"], t["date"], (t["subject"] or "")[:34]] for t in tags[:args.limit]])
+        return 0
+
+
+def cmd_snapshot(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        result = orch.snapshot(args.name, args.message or "")
+        head("快照已创建")
+        kv_block([("标签", result["tag"]), ("提交", result["head"])])
+        print(f"\n  回到此快照：git -C {args.vault or '.'} checkout {result['tag']}")
+        return 0
+
+
 def cmd_export_schemas(args: argparse.Namespace) -> int:
     from .validators.schema import MODEL_BY_TYPE
 
@@ -449,6 +559,37 @@ def build_parser() -> argparse.ArgumentParser:
     p_new.add_argument("--set", action="append", help="附加字段，如 --set volume_id=VOL-0001")
     p_new.set_defaults(func=cmd_new)
 
+    p_ingest = sub.add_parser("ingest", help="录入原始 txt/md 稿件（切章 + 建大纲 + 建正文 + 批次提交）")
+    p_ingest.add_argument("source", help="原始文件路径")
+    p_ingest.add_argument("--volume", default="VOL-0001", help="目标卷 ID，默认 VOL-0001")
+    p_ingest.add_argument(
+        "--split",
+        choices=("auto", "chapter", "heading", "number", "single"),
+        default="auto",
+        help="切章方式：auto(默认) / chapter(第X章) / heading(Markdown 标题) / number(1、) / single(整篇一章)",
+    )
+    p_ingest.add_argument("--title", help="整篇一章时的标题（single 模式）")
+    p_ingest.add_argument("--dry-run", action="store_true", help="只预演切章结果，不写文件")
+    p_ingest.add_argument("--tag", action="store_true", help="录入成功后打 ingest/<批次> 快照标签")
+    p_ingest.add_argument("--force", action="store_true", help="忽略「内容已录入过」的重复检测")
+    p_ingest.set_defaults(func=cmd_ingest)
+
+    p_ann = sub.add_parser("annotate", help="给已发布章节补写「作者备注」结构化标注")
+    p_ann.add_argument("chapter")
+    p_ann.add_argument("--line", action="append", help="一条标注，可重复，如 --line \"- 摘要: ...\"")
+    p_ann.add_argument("--from", dest="from_file", help="从文本文件读取标注行（每行一条）")
+    p_ann.add_argument("--replace", action="store_true", help="覆盖原有标注而不是追加")
+    p_ann.set_defaults(func=cmd_annotate)
+
+    p_hist = sub.add_parser("history", help="查看仓库状态、提交历史与快照标签")
+    p_hist.add_argument("--limit", type=int, default=15)
+    p_hist.set_defaults(func=cmd_history)
+
+    p_snap = sub.add_parser("snapshot", help="给当前提交打快照标签")
+    p_snap.add_argument("name", help="标签名，如 vol01-complete")
+    p_snap.add_argument("--message", help="标签说明")
+    p_snap.set_defaults(func=cmd_snapshot)
+
     p_log = sub.add_parser("log", help="查看审计日志")
     p_log.add_argument("--limit", type=int, default=15)
     p_log.set_defaults(func=cmd_log)
@@ -473,6 +614,9 @@ def main(argv: list[str] | None = None) -> int:
     except TransactionError as exc:
         print(f"\n[事务失败] {exc}", file=sys.stderr)
         return 5
+    except GitError as exc:
+        print(f"\n[版本控制错误] {exc}", file=sys.stderr)
+        return 6
     except (ConfigError, VaultError, FileNotFoundError, ValueError) as exc:
         print(f"\n[错误] {exc}", file=sys.stderr)
         return 1

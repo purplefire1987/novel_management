@@ -20,5 +20,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --basetemp=.pytest_tmp"
-# 说明：部分沙箱环境下默认临时目录不可写，统一把 basetemp 放到项目内
+addopts = "-q"
+# 不使用 --basetemp 固定到项目内：basetemp 若落在 Vault 里，
+# 测试复制 Vault 时会把临时目录一起复制（无限递归），
+# 且部分沙箱环境会拦截 .novel_system 下文件的删除导致全部用例 setup 失败。
+# 需要指定时用：pytest tests -q --basetemp=/tmp/nv_pytest

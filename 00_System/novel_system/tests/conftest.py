@@ -40,6 +40,18 @@ COPY_IGNORE = (
     "*.egg-info",
 )
 
+# 本机环境注意：系统临时目录（/private/var/folders/...）在沙箱下不可写，
+# 而 basetemp 若落在 Vault 内（项目目录内跑测试时就会这样），复制 Vault 会递归、
+# 且清理时会被安全策略拦住 .novel_system 下的文件删除。
+# 这里统一把 basetemp 指到系统 /tmp（不受上述限制），用户显式传 --basetemp 时不覆盖。
+DEFAULT_BASETEMP = Path("/tmp/nv_pytest")
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if getattr(config.option, "basetemp", None) or not DEFAULT_BASETEMP.parent.exists():
+        return
+    config.option.basetemp = str(DEFAULT_BASETEMP)
+
 
 @pytest.fixture(scope="session")
 def vault_template(tmp_path_factory) -> Path:

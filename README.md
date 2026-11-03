@@ -37,11 +37,15 @@ NovelVault/
 ├── 07_Entity_Graph/            # 关系、事件、实体索引
 ├── 08_Manuscripts/             # 正式正文
 ├── 09_Audit_Reports/           # Preflight / 审核 / 连续性 / 伏笔 / 记忆更新报告
-├── 10_Change_Log/              # Canon 变更、状态事件、回滚记录
+├── 10_Change_Log/              # Canon 变更、状态事件、回滚记录、Ingest 录入批次
 ├── 11_Templates/               # 14 份文档模板
 ├── 12_Dashboard/               # Obsidian Dataview 看板
+├── 99_Archive/Raw_Sources/     # 待录入的原始旧稿（不参与索引，但受 Git 管理）
 └── .novel_system/              # 运行时：index.sqlite / staging / logs / backups
 ```
+
+> 录入新稿时，把 txt/md 放进 `99_Archive/Raw_Sources/`，再执行 `novel ingest`。
+> 该目录不参与实体索引，但会随 Git 一起版本化——原始底稿是唯一能对账的东西，不要删。
 
 ## 快速开始
 
@@ -74,10 +78,50 @@ novel audit CH-0002          # 写后连续性回归
 novel rollback <op_id>       # 出问题时整体回退
 ```
 
+## 录入既有旧稿
+
+已有的 txt / md 稿件不必手动抄进 Vault，走录入通道：
+
+```bash
+# 1. 先预演，确认切章正确
+novel ingest 99_Archive/Raw_Sources/old_draft.txt --dry-run
+
+# 2. 正式入库：切章 → 分配 CH 号 → 建大纲 + 正式正文 → 批次日志 → Git 提交 → 快照标签
+novel ingest 99_Archive/Raw_Sources/old_draft.txt --split chapter --volume VOL-0001 --tag
+
+# 3. 补记忆标注（原始稿没有标注，不补则抽不出任何事实）
+novel annotate CH-0003 --from /tmp/ann-CH-0003.txt
+
+# 4. 抽取并提交记忆
+novel commit-memory CH-0003 --approve auto
+```
+
+- 切分方式：`auto` / `chapter`（第X章）/ `heading`（Markdown 标题）/ `number`（1、）/ `single`（整篇一章）
+- 首个标题前的书名、作者行会自动跳过，并在输出里提示跳过字数
+- 整批录入是**一个事务**：失败全不写，成功可整体 `novel rollback <操作号>` 撤回
+- 同一文件按内容哈希判重，重复录入会被拒绝（`--force` 可强制重录，续接章号）
+
+## 版本控制
+
+系统把 Git 做进了事务里，每次正式写入自动提交（`novel-system: <动作> [OP-...]`）。在此之上：
+
+```bash
+novel history --limit 20                              # 仓库状态 + 提交历史 + 快照标签
+novel snapshot vol01-complete --message "第一卷完稿"    # 给当前提交立路标
+novel rollback OP-20261103-202623-f525                # 按操作号精确回退
+```
+
+## 编务团（WorkBuddy 专家团）
+
+`novel-kb-team`「小说知识库编务团」把上述流程角色化：知识库总管 + 录入员 / 资料官 / 主笔 /
+责编 / 记忆管理员 / 版本管理员，共 7 人，配套技能 `novel-vault-ops`（全部命令与纪律）。
+装在 `~/.workbuddy/plugins/marketplaces/my-experts/plugins/novel-kb-team/`。
+
 ## 状态
 
-- 验收测试 `AC-01 ~ AC-14`（20 个用例）全绿：`pytest NovelVault/00_System/novel_system/tests`
+- 验收测试 `AC-01 ~ AC-19`（28 个用例）全绿：`pytest NovelVault/00_System/novel_system/tests`
 - 示例故事《白骨渡》CH-0001、CH-0002 已跑完整闭环至 `memory_committed`
+- 录入通道已实跑验证：切章 / 标注 / 抽取 / 批次回滚 / 快照标签均可用
 - 规则引擎只管可判定事实；叙事质量由审核 Agent 给建议，不阻断
 
 ## 许可

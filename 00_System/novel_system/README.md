@@ -22,14 +22,14 @@ NovelVault/                       # 唯一 Git 仓库：事实源 + 执行层代
 │   ├── Schemas/                # `novel export-schemas` 导出的 JSON Schema
 │   └── novel_system/           # Python 包（src 布局）
 │       ├── src/novel_system/
-│       │   ├── cli.py orchestrator.py config.py vault.py transaction.py ids.py
+│       │   ├── cli.py orchestrator.py config.py vault.py transaction.py ids.py gitops.py
 │       │   ├── agents/         # base + 5 个 Agent
-│       │   ├── workflow/       # state_machine / preflight / writing / review / memory_commit
+│       │   ├── workflow/       # state_machine / preflight / writing / review / memory_commit / ingest
 │       │   ├── memory/         # entity_resolver / retrieval / context_builder / summarizer
 │       │   ├── validators/     # schema / canon / continuity / foreshadowing / permissions
 │       │   ├── database/       # sqlite / indexer / rebuild
 │       │   └── audit/          # logger / reports
-│       └── tests/              # AC-01 ~ AC-14 验收测试
+│       └── tests/              # AC-01 ~ AC-19 验收测试
 ├── 01_Core_Memory/             # 世界观、人物、势力、地点、物品、敌人
 ├── 02_Hot_Memory/              # 当前卷、当前剧情状态、人物当前状态
 ├── 03_Short_Term_Memory/       # 滚动摘要、活跃上下文、风格参考
@@ -94,9 +94,19 @@ novel search "刀鞘"              # 章节全文检索（中文二元组 FTS）
 novel new character 新人物 --set aliases='[别名]'
 novel log --limit 20             # 审计日志
 novel export-schemas             # 导出 Pydantic JSON Schema 到 00_System/Schemas
+
+# 录入既有旧稿（txt / md）
+novel ingest <文件> --dry-run     # 只预演切章结果，不写任何文件
+novel ingest <文件> --split chapter --volume VOL-0001 --tag
+                                 # 切章 + 分配 CH 号 + 建大纲与正文 + 批次日志 + Git + 快照标签
+novel annotate CH-0003 --from ann.txt   # 给已发布章节补记忆标注（事件/状态/关系/伏笔/摘要）
+
+# 版本控制
+novel history --limit 20         # 仓库状态 + 提交历史 + 快照标签
+novel snapshot vol01-complete --message "第一卷完稿"   # 给当前提交打标签
 ```
 
-命令行退出码：`3` 工作流拒绝、`4` 权限拒绝、`5` 事务失败、`1` 配置/文件错误。
+命令行退出码：`3` 工作流拒绝、`4` 权限拒绝、`5` 事务失败、`6` 版本控制错误、`1` 配置/文件错误。
 
 ---
 
