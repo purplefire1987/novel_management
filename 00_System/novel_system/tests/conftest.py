@@ -26,15 +26,25 @@ def _find_vault_root(start: Path) -> Path:
 
 VAULT_SRC = _find_vault_root(Path(__file__).resolve())
 
+# 复制 Vault 时必须排除的东西：运行产物 + 环境 + 本测试自己的临时目录。
+# 尤其 .pytest_tmp：若 basetemp 落在 Vault 内（在代码目录跑测试时会这样），
+# 不排除就会把临时目录复制进自身，导致无限递归。
+COPY_IGNORE = (
+    ".novel_system",
+    ".git",
+    ".obsidian",
+    "__pycache__",
+    ".pytest_tmp",
+    ".pytest_cache",
+    ".venv",
+    "*.egg-info",
+)
+
 
 @pytest.fixture(scope="session")
 def vault_template(tmp_path_factory) -> Path:
     dst = tmp_path_factory.mktemp("template") / "NovelVault"
-    shutil.copytree(
-        VAULT_SRC,
-        dst,
-        ignore=shutil.ignore_patterns(".novel_system", ".git", ".obsidian", "__pycache__"),
-    )
+    shutil.copytree(VAULT_SRC, dst, ignore=shutil.ignore_patterns(*COPY_IGNORE))
     return dst
 
 
