@@ -6,7 +6,24 @@
 .novel_system/locks/
 .novel_system/backups/
 .novel_system/staging/txn/
+.novel_system/staging/draft/
+.novel_system/staging/preflight/
 .novel_system/logs/*.log
+
+# Obsidian 与系统噪音
 .DS_Store
 .obsidian/workspace.json
 .obsidian/cache
+.vscode/
+.idea/
+
+# Python 代码产物（代码位于 00_System/novel_system）
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pytest_tmp/
+.venv/
+venv/
+build/
+dist/

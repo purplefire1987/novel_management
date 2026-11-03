@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "novel-system"
+version = "0.1.0"
+description = "超长篇小说个人知识库与受控 AI 写作工作流（MVP）"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.6",
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+novel = "novel_system.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --basetemp=.pytest_tmp"
+# 说明：部分沙箱环境下默认临时目录不可写，统一把 basetemp 放到项目内
