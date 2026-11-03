@@ -57,13 +57,16 @@ def test_ac15_ingest_splits_chapters_and_marks_published(orch):
 def test_ac16_ingest_dry_run_writes_nothing(orch):
     """AC-16 预演模式只算不写。"""
     raw = _raw_file(Path(orch.cfg.vault).parent)
+    log_dir = orch.cfg.abs("10_Change_Log/Ingest")
+    # 库里可能已有历史批次日志，只能比对「预演前后有没有新增」
+    before = {p.name for p in log_dir.glob("*.md")} if log_dir.is_dir() else set()
+
     result = orch.ingest(str(raw), dry_run=True)
 
     assert result.chapters, "预演也要给出切章结果"
     assert not orch.cfg.abs(result.chapters[0]["manuscript"]).exists()
-    assert not orch.cfg.abs("10_Change_Log/Ingest").exists() or not list(
-        orch.cfg.abs("10_Change_Log/Ingest").glob("*.md")
-    )
+    after = {p.name for p in log_dir.glob("*.md")} if log_dir.is_dir() else set()
+    assert after == before, "预演不得写入批次日志"
 
 
 def test_ac17_duplicate_source_is_refused(orch):

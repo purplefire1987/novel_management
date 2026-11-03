@@ -103,6 +103,50 @@ def entity_path(root: Path, prefix: str = "CHAR") -> Path:
     raise AssertionError(f"临时 Vault 里找不到 {prefix} 实体，测试夹具失效")
 
 
+def ensure_states(root: Path, ids: tuple[str, ...] = ("CHAR-0001", "CHAR-0002")) -> None:
+    """给测试用人物补一份「当前状态」记录。
+
+    连续性审计要求出场人物有状态底账；示例项目归档后这些 STATE 文件随之移走，
+    完整闭环用例会因此从 CLEAN 掉到 NEEDS_ATTENTION。这里按需补，已存在则不动。
+    """
+    for cid in ids:
+        path = root / f"02_Hot_Memory/Characters/STATE-{cid}.md"
+        if path.exists():
+            continue
+        text = f"""---
+id: STATE-{cid}
+type: character_state
+name: 当前状态
+character_id: {cid}
+as_of_event: ""
+canon_status: confirmed
+updated_at: 2026-02-01
+---
+
+# 当前状态
+
+## 客观状态
+- 位置：白骨渡西岸
+- 身体状态：正常
+- 伤势：无
+- 精神状态：清醒
+- 能力状态：正常
+- 持有物：无
+- 客观生死：存活
+
+## 认知边界（角色以为的世界，不等于事实）
+- 已知信息：无
+- 未知信息：祠内是否有人
+
+## 当前目标
+- 查清西岸废祠
+
+## 与其他角色关系状态
+- 与 CHAR-0002 同行
+"""
+        write_file(root, f"02_Hot_Memory/Characters/STATE-{cid}.md", text)
+
+
 def make_chapter(root: Path, chapter_id: str = "CH-0003", title: str = "废祠") -> str:
     """在临时 Vault 里造一章可写的大纲 + 场景细纲。"""
     scene_id = f"SCENE-{chapter_id}-001"
@@ -184,6 +228,7 @@ canon_status: confirmed
 - 禁止擅自扩展：不得让邢咎出场
 """
     write_file(root, f"04_Outline/Scenes/{scene_id}.md", scene)
+    ensure_states(root)
     return chapter_id
 
 

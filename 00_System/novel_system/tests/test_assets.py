@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,16 @@ from novel_system.workflow import assets
 from novel_system.workflow.state_machine import WorkflowError
 
 openpyxl = pytest.importorskip("openpyxl", reason="需要 openpyxl 才能测 Excel 录入")
+
+
+def max_serial(root: Path, rel_dir: str, prefix: str) -> int:
+    """现有最大序号。测试不假设库里只有几号实体：换作品、加实体都不会挂。"""
+    numbers = [
+        int(match.group(1))
+        for path in (root / rel_dir).rglob(f"{prefix}-*.md")
+        if (match := re.match(rf"{prefix}-(\d{{4}})_", path.name))
+    ]
+    return max(numbers, default=0)
 
 PROFILE = """
 version: 1
@@ -117,28 +128,32 @@ def test_import_workbook_classifies_entities_and_tables(cfg: Config):
     source = _make_workbook(cfg.vault / "assets.xlsx")
     index = ensure_index(cfg)
 
+    char_base = max_serial(cfg.vault, "01_Core_Memory/Characters", "CHAR")
+    fac_base = max_serial(cfg.vault, "01_Core_Memory/Factions", "FAC")
+
     result = assets.import_workbook(cfg, index, "test-assets", source=str(source))
     index.commit()
 
-    # 续接既有最大号：CHAR-0003 / FAC-0002 / WORLD-0001
-    char = cfg.vault / "01_Core_Memory/Characters/CHAR-0004_甲一.md"
+    # 续接既有最大号，而不是从 0001 重来
+    char = cfg.vault / f"01_Core_Memory/Characters/CHAR-{char_base + 1:04d}_甲一.md"
     assert char.exists(), "人物应落到 Characters 目录并续接 CHAR 序号"
     meta, body = vault.split_frontmatter(char.read_text(encoding="utf-8"))
-    assert meta["id"] == "CHAR-0004"
+    assert meta["id"] == f"CHAR-{char_base + 1:04d}"
     assert meta["type"] == "character"
     assert meta["world"] == "测试世界"
     assert "legacy" in meta["tags"]
     assert "第一行简介" in body
-    assert "[[FAC-0003_天家|天家]]" in body, "关联列应渲染成 Obsidian 双链"
+    assert f"[[FAC-{fac_base + 1:04d}_天家|天家]]" in body, "关联列应渲染成 Obsidian 双链"
 
     # 多值关联逐项建链
     meta2, body2 = vault.split_frontmatter(
-        (cfg.vault / "01_Core_Memory/Characters/CHAR-0005_甲二.md").read_text(encoding="utf-8")
+        (cfg.vault / f"01_Core_Memory/Characters/CHAR-{char_base + 2:04d}_甲二.md").read_text(encoding="utf-8")
     )
-    assert "[[FAC-0003_天家|天家]]" in body2 and "[[FAC-0004_散人|散人]]" in body2
+    assert f"[[FAC-{fac_base + 1:04d}_天家|天家]]" in body2
+    assert f"[[FAC-{fac_base + 2:04d}_散人|散人]]" in body2
 
     # 同名重复行单独建档并提示
-    dedup = cfg.vault / "01_Core_Memory/Characters/CHAR-0006_甲二_2.md"
+    dedup = cfg.vault / f"01_Core_Memory/Characters/CHAR-{char_base + 3:04d}_甲二_2.md"
     assert dedup.exists()
     assert any("同名" in warning for warning in result.warnings)
 
@@ -186,11 +201,12 @@ def test_dry_run_writes_nothing(cfg: Config):
     _write_profile(cfg.vault)
     source = _make_workbook(cfg.vault / "assets.xlsx")
     index = ensure_index(cfg)
+    char_base = max_serial(cfg.vault, "01_Core_Memory/Characters", "CHAR")
 
     result = assets.import_workbook(cfg, index, "test-assets", source=str(source), dry_run=True)
 
     assert result.files > 0
-    assert not (cfg.vault / "01_Core_Memory/Characters/CHAR-0004_甲一.md").exists()
+    assert not (cfg.vault / f"01_Core_Memory/Characters/CHAR-{char_base + 1:04d}_甲一.md").exists()
     assert not (cfg.vault / "99_Archive/Raw_Sources/test/assets.xlsx").exists()
     assert len(result.samples) == 5
 
@@ -206,13 +222,14 @@ def test_import_lore_slices_by_heading(cfg: Config):
     )
     (cfg.vault / "lore.md").write_text(lore, encoding="utf-8")
     index = ensure_index(cfg)
+    world_base = max_serial(cfg.vault, "01_Core_Memory/World", "WORLD")
 
     result = assets.import_lore(cfg, index, "test-lore")
     index.commit()
 
     assert result.counts["底层记忆"] == 2
-    first = cfg.vault / "01_Core_Memory/World/测试/底层架构/WORLD-0002_总纲.md"
-    second = cfg.vault / "01_Core_Memory/World/测试/底层架构/WORLD-0003_第二条.md"
+    first = cfg.vault / f"01_Core_Memory/World/测试/底层架构/WORLD-{world_base + 1:04d}_总纲.md"
+    second = cfg.vault / f"01_Core_Memory/World/测试/底层架构/WORLD-{world_base + 2:04d}_第二条.md"
     assert first.exists() and second.exists()
 
     meta, body = vault.split_frontmatter(first.read_text(encoding="utf-8"))
