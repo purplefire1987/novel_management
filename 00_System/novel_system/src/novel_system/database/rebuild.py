@@ -1,4 +1,4 @@
-"""索引重建：删除并重建 index.sqlite（PRD 8.3 / AC-12）。"""
+"""索引重建：清空并重建 index.sqlite（PRD 8.3 / AC-12）。"""
 
 from __future__ import annotations
 
@@ -13,12 +13,9 @@ from .sqlite import Index
 def rebuild(cfg: Config) -> dict[str, Any]:
     cfg.ensure_dirs()
     db = cfg.index_db
-    for suffix in ("", "-wal", "-shm"):
-        candidate = Path(str(db) + suffix)
-        if candidate.exists():
-            candidate.unlink()
     index = Index.open(db, create=True)
     try:
+        index.reset()
         result = index_vault(cfg, index)
     finally:
         index.close()

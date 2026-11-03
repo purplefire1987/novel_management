@@ -159,6 +159,27 @@ class Index:
         self.conn.executescript(SCHEMA_SQL)
         self.conn.commit()
 
+    def reset(self) -> None:
+        """清空派生数据，保留表结构与审计流水。
+
+        重建索引不再删除 index.sqlite 文件：删文件在 Windows 上会被占用、
+        在受限沙箱里会被安全策略拦截，而索引本来就是可丢弃的派生层。
+
+        `audit_log` 有意不清空：它没有对应的 Markdown 事实源，
+        重建后仍要能 `novel log` 查到历史操作（同时留有 logs/audit.jsonl）。
+        """
+        for table in (
+            "entities",
+            "relationships",
+            "events",
+            "foreshadowing",
+            "chapter_index",
+            "files",
+        ):
+            self.conn.execute(f"DELETE FROM {table}")
+        self.conn.execute("DELETE FROM fts_chapters")
+        self.conn.commit()
+
     def close(self) -> None:
         self.conn.close()
 

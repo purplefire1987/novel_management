@@ -6,6 +6,8 @@
 .novel_system/index.sqlite
 .novel_system/index.sqlite-wal
 .novel_system/index.sqlite-shm
+# 原子写入残留：rename 被环境拒绝时会留下 .tmp_* 半成品，永远不该入库
+.tmp_*
 # 运行时产物
 .novel_system/locks/
 .novel_system/backups/

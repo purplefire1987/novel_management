@@ -5,11 +5,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import shutil
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -95,8 +97,27 @@ def file_hash(path: Path) -> str:
     return sha256_text(path.read_text(encoding="utf-8"))
 
 
+def _log_atomic_fallback(path: Path) -> None:
+    """把「降级直写」记进 `.novel_system/logs/atomic_fallback.log`，便于事后排查。"""
+    for parent in path.parents:
+        logs = parent / ".novel_system" / "logs"
+        if logs.parent.is_dir():
+            try:
+                logs.mkdir(parents=True, exist_ok=True)
+                with (logs / "atomic_fallback.log").open("a", encoding="utf-8") as fh:
+                    fh.write(f"{datetime.now().isoformat(timespec='seconds')} {path}\n")
+            except OSError:
+                pass
+            return
+
+
 def write_atomic(path: Path, text: str) -> None:
-    """同目录临时文件 + os.replace，避免半截文件。"""
+    """同目录临时文件 + os.replace，避免半截文件。
+
+    受限环境（容器/沙箱/某些挂载）会禁止 rename，此时退化为直接写入并记一条
+    `logs/atomic_fallback.log`：宁可少一层原子性，也不要整套工作流不可用。
+    清理临时文件失败同样不能掩盖原始错误——否则会留下 `.tmp_*` 半成品。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp_", suffix=path.suffix)
     try:
@@ -104,10 +125,19 @@ def write_atomic(path: Path, text: str) -> None:
             fh.write(text)
             fh.flush()
             os.fsync(fh.fileno())
-        os.replace(tmp, path)
+        try:
+            os.replace(tmp, path)
+        except PermissionError:
+            # rename 被环境拒绝：直接覆盖写入，并留下可追溯的降级记录
+            with path.open("w", encoding="utf-8") as fh:
+                fh.write(text)
+                fh.flush()
+                os.fsync(fh.fileno())
+            _log_atomic_fallback(path)
     finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        with contextlib.suppress(OSError):
+            if os.path.exists(tmp):
+                os.unlink(tmp)
 
 
 def backup_file(path: Path, backup_dir: Path, op_id: str) -> Path | None:
@@ -128,10 +158,11 @@ def restore_file(backup_path: Path, target: Path) -> None:
 
 
 def iter_markdown(root: Path, skip_dirs: tuple[str, ...] = (".obsidian", ".git", ".novel_system")) -> Iterator[Path]:
+    """遍历 Markdown。跳过隐藏文件：`.tmp_*` 是原子写入的半成品，不是事实源。"""
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in skip_dirs]
         for name in filenames:
-            if name.endswith(".md"):
+            if name.endswith(".md") and not name.startswith("."):
                 yield Path(dirpath) / name
 
 
