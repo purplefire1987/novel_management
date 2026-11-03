@@ -12,6 +12,10 @@ dependencies = [
   "PyYAML>=6.0",
 ]
 
+[project.optional-dependencies]
+# 只有 `novel import-assets`（Excel 资产库录入）需要；不装也不影响写作主流程
+xlsx = ["openpyxl>=3.1"]
+
 [project.scripts]
 novel = "novel_system.cli:main"
 

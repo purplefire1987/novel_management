@@ -11,7 +11,19 @@
 
 - 允许：`.novel_system/staging/**`、`09_Audit_Reports/**`、`10_Change_Log/Ingest/**`
 - 禁止：直接编辑 `01_Core_Memory/**`、`04_Outline/**`、`08_Manuscripts/**`
-  —— 这些只能通过 `novel ingest` / `novel annotate` 等 CLI 通道写入（通道自带校验、备份、审计、Git 提交）
+  —— 这些只能通过 `novel ingest` / `novel annotate` / `novel import-assets` / `novel import-lore` 等 CLI 通道写入（通道自带校验、备份、审计、Git 提交）
+
+## 两条录入通道，先分清搬什么
+
+| 你手上的东西 | 用什么命令 | 落到哪 |
+|---|---|---|
+| 小说稿件（txt/md，一章一章的正文） | `novel ingest` | `04_Outline/Chapters` + `08_Manuscripts` |
+| 设定稿（世界法则、规则书、TRPG 手册） | `novel import-lore` | `01_Core_Memory/World/<作品>/底层架构|规则书` |
+| 资产表（Excel：人物/势力/物品/地图/生物/军团 + 各种总表） | `novel import-assets` | `01_Core_Memory/Characters|Factions|Items|Locations|Enemies|World` |
+| 单个人物/地点/物品 | `novel new <类型> <名称>` | 同上 |
+
+**素材录入（import-*）与稿件录入（ingest）是两套东西**：前者搬"世界"，后者搬"章节"。
+不要把设定稿当稿件切章（会切出一堆假章节），也不要把小说正文塞进资产表。
 
 ## 标准流程
 
@@ -108,6 +120,55 @@ novel history --limit 5
 ```
 
 `audit` 出现 BLOCKER 必须停下报告，不要继续录入下一章。
+
+## 素材录入流程（设定稿 / 资产表）
+
+### 1. 先看 profile，再看数据
+
+分类规则写在 `00_System/Config/import_profiles.yaml`：哪张工作表进哪个目录、用什么
+ID 前缀、哪些列渲染成双链、哪些表合并成一份总表。**新增一部作品时复制一份 profile，
+不要临时手写目录映射**，否则下次再录同一批数据就会分叉。
+
+```bash
+sed -n '1,80p' 00_System/Config/import_profiles.yaml
+```
+
+### 2. 预演，核对分类
+
+```bash
+novel import-assets jiuzhou-assets --source <资产.xlsx> --dry-run
+novel import-lore jiuzhou-lore --root <设定稿目录> --dry-run
+```
+
+预演会打印：分类条目数、每个类别的条数、前 5 份文档的正文开头。必须核对三件事：
+
+1. **类别数量对不对**（86 个人物却只出 80 份 → 有行缺名称被跳过，看「跳过项」）
+2. **归类对不对**（军团进了 Factions、生物进了 Enemies 是设计如此；设定稿进了 World）
+3. **同名冲突**（同名不同实体已按 `_2` 分开建档，必须回执给作者决定是否合并）
+
+### 3. 正式录入
+
+```bash
+novel import-lore jiuzhou-lore --root <设定稿目录> --tag
+novel import-assets jiuzhou-assets --source <资产.xlsx> --tag
+```
+
+- 顺序很重要：**先底层记忆，再资产**——世界观总表会因底层记忆先占号而顺延，
+  反之则号段交错，日后对账费劲。
+- 整批一个事务：任一文档校验失败，全批不落盘。操作号即回滚凭据。
+- 原件自动复制到 `99_Archive/Raw_Sources/<作品>旧稿/`，不要删，那是对账底稿。
+- 同一文件同一 profile 重复录入会被拒绝；确需重录加 `--force`（会再生成一套新 ID，
+  旧的一套要手动清理或回滚，慎用）。
+
+### 4. 收尾
+
+```bash
+novel rebuild-index
+novel status
+novel show CHAR-0004 --body
+```
+
+抽查 3～5 份：ID 是否续接、`## 关联` 里的双链是否点得开、总表行数是否与 Excel 一致。
 
 ## 输出规范
 

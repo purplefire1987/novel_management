@@ -163,6 +163,55 @@ class Orchestrator:
 
         return ingest_flow.annotate(self.cfg, self.index, chapter_id, lines, replace=replace)
 
+    # ------------------------------------------------------------- 素材录入
+    def import_assets(
+        self,
+        profile: str,
+        *,
+        source: str | None = None,
+        dry_run: bool = False,
+        force: bool = False,
+        archive: bool = True,
+        tag: bool = False,
+    ):
+        """Excel 资产库 → 分类实体文档（人物 / 势力 / 物品 / 地点 / 生物 / 总表）。"""
+        from .workflow import assets as assets_flow
+
+        return assets_flow.import_workbook(
+            self.cfg,
+            self.index,
+            profile,
+            source=source,
+            dry_run=dry_run,
+            force=force,
+            archive=archive,
+            tag=tag,
+        )
+
+    def import_lore(
+        self,
+        profile: str,
+        *,
+        root: str | None = None,
+        dry_run: bool = False,
+        force: bool = False,
+        archive: bool = True,
+        tag: bool = False,
+    ):
+        """Markdown 设定稿 → 底层记忆（world）文档。"""
+        from .workflow import assets as assets_flow
+
+        return assets_flow.import_lore(
+            self.cfg,
+            self.index,
+            profile,
+            root=root,
+            dry_run=dry_run,
+            force=force,
+            archive=archive,
+            tag=tag,
+        )
+
     # ------------------------------------------------------------- 版本控制
     def git_state(self) -> dict[str, Any]:
         from . import gitops

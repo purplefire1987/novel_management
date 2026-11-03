@@ -435,6 +435,85 @@ def cmd_annotate(args: argparse.Namespace) -> int:
         return 0
 
 
+def _print_import(result: Any, *, title: str, dry_run: bool) -> None:
+    head(f"{title}{'（预演）' if dry_run else ''}｜{result.profile}")
+    kv_block(
+        [
+            ("批次", result.batch_id),
+            ("作品", result.world or "-"),
+            ("来源", "、".join(source["name"] for source in result.sources) or "-"),
+            ("分类条目", result.total()),
+            ("文件数", result.files),
+        ]
+    )
+    if result.counts:
+        head("分类结果")
+        table(
+            ["类别", "数量"],
+            [[label, count] for label, count in result.counts.items()],
+        )
+    if dry_run and result.samples:
+        head("样例（前 5 份）")
+        for sample in result.samples:
+            print(f"\n  · {sample['path']}")
+            for line in sample["head"].splitlines()[:8]:
+                print(f"    {line}")
+    if not dry_run:
+        head("落盘结果")
+        kv_block(
+            [
+                ("操作", result.operation_id),
+                ("批次日志", result.log_path),
+                ("归档原件", "；".join(s.get("archived_as", "-") for s in result.sources)),
+                ("Git", result.git.get("status") or "-"),
+                ("快照标签", result.tag or "-"),
+            ]
+        )
+        print(f"\n  回滚：novel rollback {result.operation_id}")
+    if result.skipped:
+        head("跳过项")
+        for item in result.skipped:
+            print(f"  - {item}")
+    if result.warnings:
+        head("提示")
+        for item in result.warnings:
+            print(f"  - {item}")
+    if dry_run:
+        print("\n  预演模式：未写入任何文件。去掉 --dry-run 即可正式录入。")
+
+
+def cmd_import_assets(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        result = orch.import_assets(
+            args.profile,
+            source=args.source,
+            dry_run=args.dry_run,
+            force=args.force,
+            archive=not args.no_archive,
+            tag=args.tag,
+        )
+        _print_import(result, title="资产录入", dry_run=args.dry_run)
+        if not args.dry_run:
+            print("\n  下一步：novel rebuild-index && novel status")
+        return 0
+
+
+def cmd_import_lore(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        result = orch.import_lore(
+            args.profile,
+            root=args.root,
+            dry_run=args.dry_run,
+            force=args.force,
+            archive=not args.no_archive,
+            tag=args.tag,
+        )
+        _print_import(result, title="底层记忆录入", dry_run=args.dry_run)
+        if not args.dry_run:
+            print("\n  下一步：novel rebuild-index && novel show WORLD-0002")
+        return 0
+
+
 def cmd_history(args: argparse.Namespace) -> int:
     with Orchestrator(Config.load(args.vault)) as orch:
         state = orch.git_state()
@@ -580,6 +659,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_ann.add_argument("--from", dest="from_file", help="从文本文件读取标注行（每行一条）")
     p_ann.add_argument("--replace", action="store_true", help="覆盖原有标注而不是追加")
     p_ann.set_defaults(func=cmd_annotate)
+
+    p_import = sub.add_parser(
+        "import-assets",
+        help="分类录入 Excel 资产库（人物/势力/物品/地点/生物 + 总表）",
+    )
+    p_import.add_argument("profile", help="00_System/Config/import_profiles.yaml 中的 profile 名，如 jiuzhou-assets")
+    p_import.add_argument("--source", help="资产文件路径；默认取 profile 里配置的 source")
+    p_import.add_argument("--dry-run", action="store_true", help="只预演分类与 ID，不写文件")
+    p_import.add_argument("--no-archive", action="store_true", help="不把原件复制到 99_Archive/Raw_Sources")
+    p_import.add_argument("--tag", action="store_true", help="录入成功后打 import/<批次> 快照标签")
+    p_import.add_argument("--force", action="store_true", help="忽略「同一文件已录入过」的重复检测")
+    p_import.set_defaults(func=cmd_import_assets)
+
+    p_lore = sub.add_parser(
+        "import-lore",
+        help="录入 Markdown 设定稿为底层记忆（按标题区间切分）",
+    )
+    p_lore.add_argument("profile", help="profile 名，如 jiuzhou-lore")
+    p_lore.add_argument("--root", help="设定稿所在目录；默认取 profile 里的 root")
+    p_lore.add_argument("--dry-run", action="store_true", help="只预演切分与 ID，不写文件")
+    p_lore.add_argument("--no-archive", action="store_true", help="不把原件复制到 99_Archive/Raw_Sources")
+    p_lore.add_argument("--tag", action="store_true", help="录入成功后打 import/<批次> 快照标签")
+    p_lore.add_argument("--force", action="store_true", help="忽略「同一文件已录入过」的重复检测")
+    p_lore.set_defaults(func=cmd_import_lore)
 
     p_hist = sub.add_parser("history", help="查看仓库状态、提交历史与快照标签")
     p_hist.add_argument("--limit", type=int, default=15)

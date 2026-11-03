@@ -89,11 +89,15 @@ agents:
       - 10_Change_Log/**
     write:
       - 09_Audit_Reports/**        # 录入回执与问题清单
-    # 正式写入只能经 CLI 通道：novel ingest / novel annotate
-    # 这两个命令以 author 身份走事务（校验/备份/审计/Git 一并完成）
+    # 正式写入只能经 CLI 通道：
+    #   novel ingest / novel annotate        —— 稿件（章节正文）
+    #   novel import-assets / import-lore    —— 素材（资产库 / 设定稿）
+    # 这些命令以 author 身份走事务（校验/备份/审计/Git 一并完成）
     write_channels:
       - "novel ingest"
       - "novel annotate"
+      - "novel import-assets"
+      - "novel import-lore"
     can_propose_canon_change: false
     can_write_formal_canon: false
 

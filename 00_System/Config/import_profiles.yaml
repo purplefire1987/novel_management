@@ -1,0 +1,347 @@
+# 旧稿录入 profile：把「已有素材」按管理系统分类搬进 Vault
+#
+# 两种 kind：
+#   workbook —— Excel 资产表：按工作表映射到实体目录（entity）或总表（table）
+#   lore     —— Markdown 设定稿：按标题区间切分成底层记忆文档（world）
+#
+# 约定：
+#   1. 只做「搬运 + 分类 + 建索引」，不改写原文、不编造设定。
+#   2. 所有文档由 CLI 事务写入（校验 / 备份 / 审计 / Git 提交 / 可回滚）。
+#   3. 新增一部作品时复制一份 profile 即可，不要改代码。
+
+version: 1
+
+profiles:
+  # ==========================================================================
+  # 九州 · 世界观资产库（15 张工作表，约 900 条记录）
+  # ==========================================================================
+  jiuzhou-assets:
+    label: 九州·世界观资产库
+    kind: workbook
+    world: 九州
+    source: 九州-世界观资产.xlsx
+    archive_dir: 99_Archive/Raw_Sources/九州旧稿
+    tags: [legacy, 九州, world-asset]
+
+    # ---------------------------------------------------------------- 实体表
+    # 一行 = 一个实体文档。name_column 取名称，summary_column 放入「概要」，
+    # fields 按顺序写成「档案」条目；links 里的列在「关联」区渲染为 Obsidian 双链。
+    entities:
+      - sheet: 角色库
+        name_column: 人物
+        type: character
+        dir: 01_Core_Memory/Characters
+        subtype: 人物
+        summary_column: 基本故事
+        fields:
+          - 人物级别
+          - 年龄
+          - 性别
+          - 种族
+          - 故乡
+          - 命格
+          - 等级
+          - 境界
+          - 形象概述
+          - 特殊标识
+          - 特色动作
+          - 角色性格
+          - 信念
+          - 牵绊
+          - 恐惧
+          - 初次出场
+          - 帝国爵位
+          - 帝国官职
+          - 技能
+          - 备注
+        links:
+          势力: faction
+          物品: item
+          关联：九州军团库: faction
+
+      - sheet: 势力库
+        name_column: 势力名称
+        type: faction
+        dir: 01_Core_Memory/Factions
+        subtype: 势力
+        summary_column: 简介
+        fields:
+          - 势力所属
+          - 阵营
+          - 据点
+          - 信物
+          - 信物简介
+          - 势力特色
+          - 势力仪式
+          - 核心利益
+          - 关联技能
+        links:
+          关联角色: character
+          关联：军团库: faction
+          关联：物品库: item
+
+      - sheet: 九州军团库
+        name_column: 名称
+        type: faction
+        dir: 01_Core_Memory/Factions
+        subtype: 军团
+        summary_column: 简介
+        fields:
+          - 战号
+          - 战阵
+          - 军队标签
+          - 军团类型
+          - 军团人数
+          - 战力评价
+          - 驻扎地
+          - 所属势力
+        links:
+          关联：物品库: item
+          关联：地图库: location
+          关联：角色库: character
+
+      - sheet: 物品库
+        name_column: 名称
+        type: item
+        dir: 01_Core_Memory/Items
+        subtype: 物品
+        summary_column: 简介
+        fields:
+          - 类型
+          - 品级
+          - 命格
+          - 使用方式及效果
+          - 备注
+        links:
+          关联：角色: character
+          关联：军团库: faction
+          关联：势力库: faction
+
+      - sheet: 地图库
+        name_column: 地名
+        type: location
+        dir: 01_Core_Memory/Locations
+        subtype: 地点
+        summary_column: 简介
+        fields:
+          - 州属
+          - 府属
+          - 郡属
+          - 备注
+        links:
+          关联：势力库: faction
+          关联：角色库: character
+          关联：军团库: faction
+
+      - sheet: 生物库
+        name_column: 名称
+        type: enemy
+        dir: 01_Core_Memory/Enemies
+        subtype: 生物
+        summary_column: 简介
+        fields:
+          - 种族
+          - 最小等级
+          - 对应境界
+          - 最大等级
+          - 对应境界2
+          - AI等级
+          - 栖息地
+          - 技能
+          - 能力
+          - 备注
+
+    # ---------------------------------------------------------------- 总表
+    # layout: table    → 整表渲染为一张 Markdown 表格
+    # layout: sections → 每行一个二级标题，字段写成条目（适合长文本）
+    # group_by         → 按该列拆成多份文档（技能库按体系拆）
+    tables:
+      - sheet: 境界表
+        filename: 境界表
+        title: 九州·境界表
+        dir: 01_Core_Memory/World/九州/总表
+        layout: sections
+        name_column: 名称
+        lead: 九重境界的等级区间、单属性上限、成长值与晋升难点——判定人物强度的唯一标尺。
+        fields:
+          - 等级下限
+          - 等级上限
+          - 固定属性最低成长值
+          - 固定属性成长最高值
+          - 自由属性成长值
+          - 晋升难点
+          - 战力对标
+          - 境界特征
+          - 美术表现
+          - 文本说明
+
+      - sheet: 推金册挑战等级表
+        filename: 推金册挑战等级表
+        title: 九州·推金册挑战等级
+        dir: 01_Core_Memory/World/九州/总表
+        layout: table
+        lead: 遭遇难度的官方刻度：挑战等级 → 境界、人数与装备要求。
+        columns: [挑战等级, 难度, 境界, 推荐人数, 推荐境界, 推荐装备]
+
+      - sheet: 技能体系表
+        filename: 技能体系表
+        title: 九州·修行体系总纲
+        dir: 01_Core_Memory/World/九州/总表
+        layout: sections
+        name_column: 名称
+        lead: 十一门修行体系的来源、TRPG 定位、风格基调与代价——决定角色「怎么变强、要付出什么」。
+        fields:
+          - 体系来源
+          - TRPG定位
+          - 特殊资源
+          - 典型应用
+          - 应用技艺
+          - 强化侧重
+          - 风格与美术基调
+          - 代价说明
+          - 简介
+
+      - sheet: 技能库
+        filename: 技能库
+        title: 九州·技能库
+        dir: 01_Core_Memory/World/九州/总表
+        layout: table
+        group_by: 体系标签
+        lead: 按修行体系归档的技艺/法术清单，含品级、系别、咒语与效果。
+        columns: [名称, 品级, 能力系别, 咒语, 效果, 备注]
+
+      - sheet: 种族表
+        filename: 种族表
+        title: 九州·种族志
+        dir: 01_Core_Memory/World/九州/总表
+        layout: sections
+        name_column: 名称
+        lead: 九州诸族的天赋、弱点、寿命与风俗——跨种族角色卡的外挂修正来源。
+        fields:
+          - 类别
+          - 语言
+          - 文字
+          - 平均寿命
+          - 天赋
+          - 特殊弱点
+          - 种族特色
+          - 特色简介
+          - 种族风俗
+          - 说明
+          - 简介
+
+      - sheet: 命格表
+        filename: 命格表
+        title: 九州·命格志
+        dir: 01_Core_Memory/World/九州/总表
+        layout: sections
+        name_column: 命格
+        lead: 命格是角色「命运烙印」，提供属性修正与叙事走向；写人物前先定命格。
+        fields:
+          - 简介（命运烙印）
+          - 突破条件
+
+      - sheet: 帝国官职表
+        filename: 帝国官职表
+        title: 九州·帝国官职表
+        dir: 01_Core_Memory/World/九州/总表
+        layout: table
+        lead: 帝国文官武职的品级、阶级、印信与所属衙门，用于校验人物的权柄是否越界。
+        columns: [官职, 品级, 阶级, 标志, 官制, 管辖/所属, 备注, 相关人物]
+
+      - sheet: 帝国爵位表
+        filename: 帝国爵位表
+        title: 九州·帝国爵位表
+        dir: 01_Core_Memory/World/九州/总表
+        layout: sections
+        name_column: 爵位
+        lead: 爵位对应品级、特权与封地规模，是「谁能使唤谁」的硬约束。
+        fields:
+          - 品级
+          - 标志
+          - 特权
+          - 封地规模
+          - 简介
+          - 备注
+
+      - sheet: 九州表
+        filename: 九州表
+        title: 九州·州域志
+        dir: 01_Core_Memory/World/九州/总表
+        layout: sections
+        name_column: 州名
+        lead: 九州各州的地貌、气候与口语习惯——写场景与写对话的地域底色。
+        fields:
+          - 主要地貌
+          - 特色口语
+          - 简介
+
+  # ==========================================================================
+  # 九州 · 底层记忆（世界法则 + TRPG 规则书）
+  # ==========================================================================
+  jiuzhou-lore:
+    label: 九州·底层记忆
+    kind: lore
+    world: 九州
+    root: .
+    archive_dir: 99_Archive/Raw_Sources/九州旧稿
+    tags: [legacy, 九州, 底层记忆]
+    dir: 01_Core_Memory/World/九州
+    documents:
+      - source: 1/九州的底层架构.md
+        dir: 01_Core_Memory/World/九州/底层架构
+        docs:
+          - title: 九州·三质：物质·灵力·魂魄
+            filename: 三质_物质灵力魂魄
+            start: "# 九州的底层架构"
+            end: "# 独立循环：奈河、灵川与物质"
+            lead: 九州一切存在由物质（载体）、灵力（介质）、魂魄（意识）三个维度构成，三者互为循环，是整个世界的底层结构。
+          - title: 九州·三重循环与灵力总纲
+            filename: 三重循环_灵力总纲
+            start: "# 独立循环：奈河、灵川与物质"
+            end: "# 终极规则——第一因「扩张」"
+            lead: 奈河（魂）、灵川（灵）、九州（物）三个维度各自闭环又互相咬合；灵力受五条定律与守恒灵锁约束，溢出则形成秘境、灵蜉与灵石。
+          - title: 九州·第一因：扩张与失衡
+            filename: 第一因_扩张与失衡
+            start: "# 终极规则——第一因「扩张」"
+            end: null
+            lead: 「扩张」是世界的元法则：物质占据空间、灵力扩展变化、魂魄蔓延意义；三者扩张失衡，就是九州一切冲突与悲剧的总根源。
+
+      - source: 九州TRPG规则书.md
+        dir: 01_Core_Memory/World/九州/规则书
+        docs:
+          - title: 九州·TRPG规则总览
+            filename: 规则书_总览
+            start: "# 九州TRPG规则书"
+            end: "# 一 · 角色创建系统"
+            lead: 本规则书把设定层的境界 / 门类 / 道途，换算成结算层的属性 / 技艺 / 神通与骰子公式；写作用它保证人物强度、代价与战斗结果不自相矛盾。
+          - title: 九州·角色创建
+            filename: 规则书_01_角色创建
+            start: "# 一 · 角色创建系统"
+            end: "# 二 · 行动系统"
+            lead: 角色卡五项：属性（体质 / 魂魄 / 灵元，初始 30 点）、五行值、门类与道途、技艺、境界与等级。
+          - title: 九州·行动裁决
+            filename: 规则书_02_行动裁决
+            start: "# 二 · 行动系统"
+            end: "# 三· 成长系统"
+            lead: 所有检定统一 d100：属性 + 技艺 + 调整值 对 DC；优势劣势、对抗检定、大成功 / 大失败与极值规则决定结果。
+          - title: 九州·成长与灾劫
+            filename: 规则书_03_成长与灾劫
+            start: "# 三· 成长系统"
+            end: "# 四· 战斗系统"
+            lead: 升级给属性点与技艺点；突破境界要历劫，代价体系（灾劫）是「变强必须付出」的结算出口。
+          - title: 九州·战斗系统
+            filename: 规则书_04_战斗
+            start: "# 四· 战斗系统"
+            end: "# 五 · 长期冒险系统"
+            lead: 派生数值、调整值（ADJ / LB / SKB）、先攻、命中 vs AC、伤害与灵膜、状态伤势、休息恢复与敌人构建。
+          - title: 九州·长期冒险
+            filename: 规则书_05_长期冒险
+            start: "# 五 · 长期冒险系统"
+            end: "# 六· 附属系统"
+            lead: 时间推进、旅行、补给、休整日与事件时钟（天意值驱动）——长篇连载的节奏控制工具。
+          - title: 九州·神通·仪式·气运
+            filename: 规则书_06_神通仪式气运
+            start: "# 六· 附属系统"
+            end: null
+            lead: 神通（天赋能力）的获取 / 进阶 / 融合与反噬代价，仪式系统，气运与天意值、冒险规模表。
