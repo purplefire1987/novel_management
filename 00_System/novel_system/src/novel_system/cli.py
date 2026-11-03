@@ -565,6 +565,137 @@ def cmd_export_schemas(args: argparse.Namespace) -> int:
     return 0
 
 
+# --------------------------------------------------------------------- 骰子娘
+
+
+def _print_dice_result(result: dict[str, Any]) -> None:
+    head(f"掷骰 · {result['label']}")
+    mode_note = {"normal": "普通", "advantage": "优势", "disadvantage": "劣势"}.get(result["mode"], result["mode"])
+    kv_block(
+        [
+            ("编号", result["roll_id"]),
+            ("表达式", f"{result['expression']}（{mode_note}）"),
+            ("见证", "、".join(result["witnesses"]) or "无（仅系统熵）"),
+            ("承诺", result["commitment"]),
+            ("骰值", " ".join(str(d) for d in result["draws"]) + f" → {result['raw']}"),
+            ("合计", f"{result['total']}（点数 {result['raw']}，加值 {result['bonus']:+d}）"),
+            ("DC", result["dc"] if result["dc"] is not None else "—"),
+            ("判定", result["text"]),
+        ]
+    )
+    if result["refs"]:
+        print("\n  依据：")
+        for ref in result["refs"]:
+            print(f"    · {ref}")
+    print(f"\n  种子已落账，任何人可复算：novel dice verify（server_seed={result['server_seed'][:16]}…）")
+
+
+def cmd_dice_roll(args: argparse.Namespace) -> int:
+    from . import dice
+
+    cfg = Config.load(args.vault)
+    result = dice.roll(
+        cfg,
+        args.expression,
+        bonus=args.bonus,
+        dc=args.dc,
+        witnesses=args.witness or [],
+        label=args.label or "",
+        mode=args.mode,
+        character=args.character,
+        note=args.note or "",
+    )
+    _print_dice_result(result)
+    return 0
+
+
+def cmd_dice_check(args: argparse.Namespace) -> int:
+    from . import dice
+
+    cfg = Config.load(args.vault)
+    result = dice.roll(
+        cfg,
+        "1d100",
+        bonus=args.bonus,
+        dc=args.dc,
+        witnesses=args.witness or [],
+        label=args.label or "",
+        mode=args.mode,
+        character=args.character,
+        note=args.note or "",
+    )
+    _print_dice_result(result)
+    return 0
+
+
+def cmd_dice_duel(args: argparse.Namespace) -> int:
+    from . import dice
+
+    cfg = Config.load(args.vault)
+    result = dice.duel(
+        cfg,
+        bonus_a=args.a,
+        bonus_b=args.b,
+        name_a=args.name_a,
+        name_b=args.name_b,
+        label=args.label or "",
+        witnesses=args.witness or [],
+        note=args.note or "",
+    )
+    head(f"对抗检定 · {args.label or '未命名对抗'}")
+    kv_block(
+        [
+            ("甲方", f"{args.name_a} d100{args.a:+d} → {result['a']['draws']} + {args.a} = {result['a']['total']}（{result['a']['band']}）"),
+            ("乙方", f"{args.name_b} d100{args.b:+d} → {result['b']['draws']} + {args.b} = {result['b']['total']}（{result['b']['band']}）"),
+            ("胜者", result["winner"]),
+            ("结论", result["verdict"]),
+            ("碾压", "触发（差 > 20，可追加暴击/终结效果）" if result["crush"] else "未触发"),
+        ]
+    )
+    print("\n  依据：")
+    for ref in result["refs"]:
+        print(f"    · {ref}")
+    return 0
+
+
+def cmd_dice_verify(args: argparse.Namespace) -> int:
+    from . import dice
+
+    cfg = Config.load(args.vault)
+    report = dice.verify(cfg)
+    head("骰子台账校验")
+    kv_block([("台账", dice.LEDGER_FILE), ("条数", report["checked"]), ("结论", "通过" if report["ok"] else "存在异常")])
+    for problem in report["problems"]:
+        print(f"  [!] {problem}")
+    return 0 if report["ok"] else 1
+
+
+def cmd_dice_log(args: argparse.Namespace) -> int:
+    from . import dice
+
+    cfg = Config.load(args.vault)
+    rows = dice.recent(cfg, args.limit)
+    head("最近掷骰")
+    if not rows:
+        print("  台账为空（还没有人要求掷骰）")
+        return 0
+    table(
+        ["编号", "时间", "检定", "骰值", "合计", "判定"],
+        [
+            [
+                row.get("roll_id", ""),
+                str(row.get("at", ""))[5:19],
+                row.get("label", ""),
+                " ".join(str(d) for d in row.get("draws") or []),
+                row.get("total", ""),
+                row.get("band", ""),
+            ]
+            for row in rows
+        ],
+    )
+    return 0
+
+
 # --------------------------------------------------------------------- 解析器
 
 
@@ -701,6 +832,50 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("export-schemas", help="把 Pydantic 模型导出为 JSON Schema").set_defaults(
         func=cmd_export_schemas
     )
+
+    # ---------------------------------------------------------------- 骰子娘
+    p_dice = sub.add_parser("dice", help="骰子娘：玩家可验证的掷骰与规则裁决")
+    dsub = p_dice.add_subparsers(dest="dice_command", required=True)
+
+    def _dice_common(p: argparse.ArgumentParser, *, with_bonus: bool = True) -> None:
+        if with_bonus:
+            p.add_argument("--bonus", type=int, default=0, help="加值（ADJ+LB+SKB+神通×2+情境）")
+        p.add_argument("--dc", type=int, help="难度（5/30/55/80/100/105）")
+        p.add_argument("--label", default="", help="这次检定在做什么")
+        p.add_argument("--witness", action="append", default=[], help="玩家见证值，如 甲=37（可多次）")
+        p.add_argument("--char", dest="character", help="相关人物 ID，仅用于追溯")
+        p.add_argument("--note", default="", help="备注")
+        p.add_argument(
+            "--mode",
+            choices=("normal", "advantage", "disadvantage"),
+            default="normal",
+            help="普通 / 优势（取高）/ 劣势（取低）",
+        )
+
+    p_droll = dsub.add_parser("roll", help="掷任意骰子并裁决（如 1d100+11、3d6）")
+    p_droll.add_argument("expression", nargs="?", default="1d100", help="骰子表达式")
+    _dice_common(p_droll)
+    p_droll.set_defaults(func=cmd_dice_roll)
+
+    p_dcheck = dsub.add_parser("check", help="d100 检定（等价于 roll 1d100）")
+    _dice_common(p_dcheck)
+    p_dcheck.set_defaults(func=cmd_dice_check)
+
+    p_dduel = dsub.add_parser("duel", help="对抗检定：双方各掷 d100+加值，高者胜")
+    p_dduel.add_argument("--a", type=int, required=True, help="甲方加值")
+    p_dduel.add_argument("--b", type=int, required=True, help="乙方加值")
+    p_dduel.add_argument("--name-a", default="甲方")
+    p_dduel.add_argument("--name-b", default="乙方")
+    p_dduel.add_argument("--label", default="")
+    p_dduel.add_argument("--witness", action="append", default=[])
+    p_dduel.add_argument("--note", default="")
+    p_dduel.set_defaults(func=cmd_dice_duel)
+
+    dsub.add_parser("verify", help="校验台账哈希链并复算全部骰值").set_defaults(func=cmd_dice_verify)
+
+    p_dlog = dsub.add_parser("log", help="查看最近掷骰")
+    p_dlog.add_argument("--limit", type=int, default=10)
+    p_dlog.set_defaults(func=cmd_dice_log)
     return parser
 
 

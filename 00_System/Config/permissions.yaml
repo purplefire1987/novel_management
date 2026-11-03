@@ -72,6 +72,17 @@ matrix:
     rollback_transaction: allow     # 只经 novel rollback 通道
     git_rewrite_history: deny
     modify_config: deny
+  dice_maiden:
+    read_core_memory: allow
+    read_hot_memory: allow
+    read_manuscript: deny           # 只按规则书裁决，不被正文牵着走
+    modify_core_memory: deny
+    modify_outline: deny
+    write_draft: deny
+    write_formal_memory: deny
+    roll_dice: allow                # 只经 novel dice 通道
+    modify_dice_ledger: append_only # 台账只追加，不可改写或删除
+    modify_config: deny
   author:
     read_core_memory: allow
     read_hot_memory: allow
@@ -96,6 +107,7 @@ path_locks:
   agent_allowed_prefixes:
     - .novel_system/staging/
     - 09_Audit_Reports/
+    - 06_Plot_Ledger/Dice/      # 骰子娘台账：只追加，哈希链保证不可篡改
 
 # 更新类型的默认审批级别（PRD 12.3）
 approval_classes:

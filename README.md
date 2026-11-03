@@ -111,16 +111,36 @@ novel snapshot vol01-complete --message "第一卷完稿"    # 给当前提交�
 novel rollback OP-20261103-202623-f525                # 按操作号精确回退
 ```
 
+## 骰子与规则裁决（骰子娘）
+
+写到"这一刀砍不砍得中"的地方，随机数必须是真的、且能被桌上所有人复核。`novel dice` 就是那个通道：
+
+```bash
+novel dice check --bonus 11 --dc 55 --label "辨识机关图纸" --witness 甲=37 --witness 乙=08
+novel dice check --bonus 11 --dc 55 --label "夹击" --mode advantage      # 优势取高 / 劣势取低
+novel dice duel --a 30 --b 40 --name-a 陈默 --name-b 邢咎 --label "斗剑"  # 差 > 20 触发碾压
+novel dice roll 3d6 --label "断水刀伤害"                                  # 非 d100 骰型
+novel dice verify                                                        # 任何人复算 + 验链
+```
+
+- **承诺—开奖**：掷骰前记录 `sha256(server_seed)`，开奖后公开种子，任何人可重算。
+- **玩家见证值进熵池**：`--witness 甲=37` 与种子一起合成 entropy，主持人无法单方面决定结果。
+- **哈希链台账**：`06_Plot_Ledger/Dice/rolls.jsonl` 追加式记录，改任何一条历史链就断。
+- **规则来自事实源**：DC 表、优势劣势、对抗、大成功 96–100 / 大失败 01–05、极值 10 倍，
+  全部引自 `01_Core_Memory/World/九州/规则书/`，不自创。
+- 掷骰是"发生过的事"，**不参与 `novel rollback`**。
+
 ## 编务团（WorkBuddy 专家团）
 
 `novel-kb-team`「小说知识库编务团」把上述流程角色化：知识库总管 + 录入员 / 资料官 / 主笔 /
-责编 / 记忆管理员 / 版本管理员，共 7 人，配套技能 `novel-vault-ops`（全部命令与纪律）。
+责编 / 记忆管理员 / 版本管理员 / 骰子娘，共 8 人，配套技能 `novel-vault-ops`（全部命令与纪律）。
 装在 `~/.workbuddy/plugins/marketplaces/my-experts/plugins/novel-kb-team/`。
 
 ## 状态
 
-- 验收测试 `AC-01 ~ AC-19`（28 个用例）全绿：`pytest NovelVault/00_System/novel_system/tests`
-- 示例故事《白骨渡》CH-0001、CH-0002 已跑完整闭环至 `memory_committed`
+- 验收测试 `AC-01 ~ AC-24`（33 个用例）+ 骰子娘 `tests/test_dice.py`（21 个用例）
+- 示例故事《白骨渡》已整体归档至 `99_Archive/Legacy_Example_白骨渡/`，不参与索引
+- 九州旧稿已录入：底层记忆 10 篇 + 世界观资产 684 个文档 / 1125 条记录
 - 录入通道已实跑验证：切章 / 标注 / 抽取 / 批次回滚 / 快照标签均可用
 - 规则引擎只管可判定事实；叙事质量由审核 Agent 给建议，不阻断
 

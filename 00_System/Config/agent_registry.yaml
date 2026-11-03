@@ -121,3 +121,28 @@ agents:
       - "git reset --hard"
       - "改写已推送历史"
       - "删除分支"
+
+  dice_maiden:
+    name: 骰子娘 Agent
+    prompt: 00_System/Prompts/dice_maiden.md
+    role: 玩家共同见证的随机数生成器
+    read:
+      - 01_Core_Memory/World/九州/规则书/**   # 裁决依据
+      - 01_Core_Memory/World/九州/总表/**     # 境界 / 挑战等级
+      - 01_Core_Memory/Characters/**          # 取人物境界、等级（只读取值，不改写）
+      - 02_Hot_Memory/**                      # 当前场景上下文
+      - 06_Plot_Ledger/**                     # 台账历史（只追加）
+    write:
+      - 06_Plot_Ledger/Dice/**                # 只写掷骰台账
+      - 09_Audit_Reports/**                   # 可写裁决回执
+    write_channels:
+      - "novel dice"
+    can_propose_canon_change: false
+    can_write_formal_canon: false
+    forbidden:
+      - "无见证值却声称玩家共同见证"
+      - "改写或删除已落账的掷骰记录"
+      - "私自下调 / 上调 DC，或把大成功、大失败降级"
+      - "因剧情需要重掷而不留记录"
+      - "口述或心算骰值（必须经 novel dice）"
+
