@@ -91,6 +91,18 @@ def write_file(root: Path, rel: str, text: str) -> Path:
     return path
 
 
+def entity_path(root: Path, prefix: str = "CHAR") -> Path:
+    """取一份现存的实体文件。
+
+    测试不该假设某个具体人物一定在库里：示例项目「白骨渡」归档后，
+    原先硬编码的 `CHAR-0001_沈砚.md` 就不存在了，用例会连带全挂。
+    """
+    for path in sorted((root / "01_Core_Memory").rglob(f"{prefix}-[0-9][0-9][0-9][0-9]_*.md")):
+        if ".tmp_" not in path.name:
+            return path
+    raise AssertionError(f"临时 Vault 里找不到 {prefix} 实体，测试夹具失效")
+
+
 def make_chapter(root: Path, chapter_id: str = "CH-0003", title: str = "废祠") -> str:
     """在临时 Vault 里造一章可写的大纲 + 场景细纲。"""
     scene_id = f"SCENE-{chapter_id}-001"

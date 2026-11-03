@@ -14,6 +14,9 @@
 .novel_system/staging/txn/
 .novel_system/staging/draft/
 .novel_system/staging/preflight/
+# 记忆提案与大纲暂存同样是派生工作区，正文与账本才是事实
+.novel_system/staging/memory/
+.novel_system/staging/outline/
 .novel_system/logs/*.log
 
 # Obsidian 与系统噪音

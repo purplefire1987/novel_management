@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import compose_draft, make_chapter, write_file
+from conftest import compose_draft, entity_path, make_chapter, write_file
 from novel_system import vault
 from novel_system.agents.memory_manager import MemoryManagerAgent
 from novel_system.database.rebuild import rebuild
@@ -26,8 +26,8 @@ ALIVE_STATE = {
 
 def test_ac01_duplicate_entity_id_rejected(cfg, vault_dir):
     """AC-01 创建重复实体 ID：系统拒绝。"""
-    src = vault_dir / "01_Core_Memory/Characters/CHAR-0001_沈砚.md"
-    dup = vault_dir / "01_Core_Memory/Characters/CHAR-0001_沈砚_副本.md"
+    src = entity_path(vault_dir, "CHAR")
+    dup = src.with_name(f"{src.stem}_副本{src.suffix}")
     dup.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
 
     docs = [{"meta": vault.read_doc(p).meta, "path": str(p)} for p in (src, dup)]
@@ -131,8 +131,9 @@ def test_ac07_unknown_entity_reference(cfg):
 def test_ac08_agent_cannot_modify_core_memory(cfg):
     """AC-08 Agent 尝试改核心设定：权限系统拒绝。"""
     with pytest.raises(permissions.PermissionDenied):
+        # 路径只是被检查的对象，实体库换作品也不影响这条断言
         permissions.check_agent_write(
-            cfg, "writer", "01_Core_Memory/Characters/CHAR-0001_沈砚.md"
+            cfg, "writer", "01_Core_Memory/Characters/CHAR-0001_任意角色.md"
         )
 
 
@@ -148,7 +149,7 @@ def test_ac13_agent_cannot_write_manuscript(cfg):
 
 def test_ac09_write_failure_keeps_files_intact(cfg, orch, monkeypatch):
     """AC-09 正式写入失败：原文件保持不变并记录日志。"""
-    existing = vault_dir_file(cfg, "01_Core_Memory/Characters/CHAR-0001_沈砚.md")
+    existing = entity_path(cfg.vault, "CHAR")
     before = existing.read_text(encoding="utf-8")
 
     tx = Transaction(
