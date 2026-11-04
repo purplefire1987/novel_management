@@ -716,27 +716,57 @@ def _norm_heading(text: str) -> str:
     return _NORM_RE.sub("", text.strip())
 
 
+_ANCHOR_NORM_RE = re.compile(r"[\s\u3000#*·“”「」『』\"'`]+")
+_BOLD_LINE_RE = re.compile(r"^\*\*(.+?)\*\*$")
+
+
+def _anchor_text(text: str) -> str:
+    """锚点归一：去掉 #、*、空白与引号，让 `# **政治**` 与 `**政治**` 都能对齐。"""
+    return _ANCHOR_NORM_RE.sub("", text.strip())
+
+
+def _anchor_key(line: str) -> str | None:
+    """一行的锚点文本；不是锚点返回 None。
+
+    锚点有两种：Markdown 标题行，以及独占一行的加粗小标题（`**帝国的科技**`）。
+    后者在设定稿里承担二级标题的作用，但语法上不是标题，只按 `#` 切会切不开。
+    """
+    stripped = line.strip()
+    if not stripped:
+        return None
+    if stripped.startswith("#"):
+        return _anchor_text(stripped)
+    match = _BOLD_LINE_RE.match(stripped)
+    if match:
+        return _anchor_text(match.group(1))
+    return None
+
+
+def _find_anchor(lines: list[str], target: str, begin: int = 0) -> int | None:
+    """先找完全相同的锚点，再退回前缀匹配（锚点只给前半截时用）。"""
+    for i in range(begin, len(lines)):
+        key = _anchor_key(lines[i])
+        if key is not None and key == target:
+            return i
+    for i in range(begin, len(lines)):
+        key = _anchor_key(lines[i])
+        if key is not None and key.startswith(target):
+            return i
+    return None
+
+
 def _slice(text: str, start: str, end: str | None) -> tuple[str, int, int]:
     lines = text.splitlines()
-    start_idx = None
-    target = _norm_heading(start)
-    for i, line in enumerate(lines):
-        if line.lstrip().startswith("#") and _norm_heading(line).startswith(target):
-            start_idx = i
-            break
+    start_idx = _find_anchor(lines, _anchor_text(start))
     if start_idx is None:
         raise WorkflowError(f"在原文中找不到起始标题：{start}")
 
     end_idx = len(lines)
     if end:
-        end_target = _norm_heading(end)
-        for j in range(start_idx + 1, len(lines)):
-            line = lines[j]
-            if line.lstrip().startswith("#") and _norm_heading(line).startswith(end_target):
-                end_idx = j
-                break
-        else:
+        found = _find_anchor(lines, _anchor_text(end), begin=start_idx + 1)
+        if found is None:
             raise WorkflowError(f"在原文中找不到结束标题：{end}")
+        end_idx = found
 
     return "\n".join(lines[start_idx + 1 : end_idx]).strip("\n"), start_idx + 1, end_idx
 

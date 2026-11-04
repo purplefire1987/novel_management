@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -53,17 +54,36 @@ def pytest_configure(config: pytest.Config) -> None:
     config.option.basetemp = str(DEFAULT_BASETEMP)
 
 
+def _copy_tree(src: Path, dst: Path) -> None:
+    """复制 Vault：优先走系统 rsync，回落到 shutil。
+
+    Vault 现在有近千个 Markdown；Python 逐文件复制在受限宿主里每个 `open` 都要过一次
+    中间层，整棵树要 20 秒以上，夹具直接超时。rsync 是原生进程，0.2 秒完成同样的活，
+    且 `--exclude` 与 `shutil.ignore_patterns` 语义一致。
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    rsync = shutil.which("rsync")
+    if rsync:
+        args = [rsync, "-a"]
+        for pattern in COPY_IGNORE:
+            args += ["--exclude", pattern]
+        args += [f"{src}/", f"{dst}/"]
+        subprocess.run(args, check=True, capture_output=True)
+        return
+    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*COPY_IGNORE))
+
+
 @pytest.fixture(scope="session")
 def vault_template(tmp_path_factory) -> Path:
     dst = tmp_path_factory.mktemp("template") / "NovelVault"
-    shutil.copytree(VAULT_SRC, dst, ignore=shutil.ignore_patterns(*COPY_IGNORE))
+    _copy_tree(VAULT_SRC, dst)
     return dst
 
 
 @pytest.fixture
 def vault_dir(tmp_path, vault_template) -> Path:
     dst = tmp_path / "NovelVault"
-    shutil.copytree(vault_template, dst)
+    _copy_tree(vault_template, dst)
     return dst
 
 

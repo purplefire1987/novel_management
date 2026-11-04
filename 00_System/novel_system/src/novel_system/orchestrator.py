@@ -87,6 +87,10 @@ class Orchestrator:
     def search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         return retrieval.search(self.cfg, self.index, query, limit)
 
+    def find_entities(self, keyword: str, limit: int = 30) -> list[dict[str, Any]]:
+        """按名称/别名/概要查实体档案：录入选名前的必查步骤。"""
+        return self.index.search_entities(keyword, limit)
+
     def audit_log(self, limit: int = 20) -> list[dict[str, Any]]:
         return self.index.recent_audits(limit)
 

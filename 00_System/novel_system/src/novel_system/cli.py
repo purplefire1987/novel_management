@@ -325,6 +325,31 @@ def cmd_search(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_find(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        rows = orch.find_entities(args.keyword, args.limit)
+        head(f"查档案：{args.keyword}")
+        if not rows:
+            print("  无命中。若确认是新实体，再走 novel new / 待建实体清单。")
+            return 1
+        table(
+            ["ID", "类型", "名称", "别名", "状态", "文件"],
+            [
+                [
+                    r["id"],
+                    r["type"],
+                    r.get("name"),
+                    "、".join(json.loads(r.get("aliases") or "[]") or []) or "—",
+                    r.get("canon_status"),
+                    r.get("file_path"),
+                ]
+                for r in rows
+            ],
+        )
+        print(f"\n  共 {len(rows)} 条。看正文：novel show <ID> --body")
+        return 0
+
+
 def cmd_show(args: argparse.Namespace) -> int:
     with Orchestrator(Config.load(args.vault)) as orch:
         data = orch.show(args.doc_id)
@@ -757,6 +782,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("query")
     p_search.add_argument("--limit", type=int, default=10)
     p_search.set_defaults(func=cmd_search)
+
+    p_find = sub.add_parser("find", help="按名称/别名/概要查实体档案（录入前必查）")
+    p_find.add_argument("keyword")
+    p_find.add_argument("--limit", type=int, default=30)
+    p_find.set_defaults(func=cmd_find)
 
     p_show = sub.add_parser("show", help="查看实体详情")
     p_show.add_argument("doc_id")

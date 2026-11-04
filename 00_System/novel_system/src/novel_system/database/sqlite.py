@@ -242,6 +242,35 @@ class Index:
         )
         return [dict(r) for r in cur.fetchall()]
 
+    def search_entities(self, keyword: str, limit: int = 30) -> list[dict[str, Any]]:
+        """按名称 / 别名 / 概要做子串检索，按「名称命中 > 别名命中 > 概要命中」排序。
+
+        录入员判「库里有没有这个实体」必须走这里：只比名称会漏掉简称（环教 vs 环之教派）、
+        职务称呼（老坊主）与亲属指称（老坊主孙女）。
+        """
+        needle = keyword.strip()
+        if not needle:
+            return []
+        like = f"%{needle}%"
+        cur = self.conn.execute(
+            """
+            SELECT *,
+                   CASE
+                       WHEN name = ? THEN 0
+                       WHEN name LIKE ? THEN 1
+                       WHEN aliases LIKE ? THEN 2
+                       WHEN summary LIKE ? THEN 3
+                       ELSE 4
+                   END AS rank
+            FROM entities
+            WHERE name LIKE ? OR aliases LIKE ? OR summary LIKE ?
+            ORDER BY rank, type, id
+            LIMIT ?
+            """,
+            (needle, like, like, like, like, like, like, limit),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
     # ------------------------------------------------------------ 关系 / 事件
     def upsert_relationship(self, row: dict[str, Any]) -> None:
         self.conn.execute(

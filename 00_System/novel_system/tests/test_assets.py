@@ -251,3 +251,22 @@ def test_import_lore_missing_heading_fails_loudly(cfg: Config):
 
     with pytest.raises(WorkflowError, match="找不到起始标题"):
         assets.import_lore(cfg, index, "test-lore")
+
+
+def test_slice_accepts_bold_anchors_and_prefers_exact(cfg: Config):
+    """设定稿常用「整行加粗」当二级标题；锚点须先精确再前缀，避免「政治」吞掉「政治体制」。"""
+    text = (
+        "# 设定稿\n\n"
+        "**政治体制**\n\n体制正文\n\n"
+        "**政治**\n\n政治正文\n\n"
+        "**语言**\n\n语言正文\n"
+    )
+    section, start, _ = assets._slice(text, "政治", "**语言**")
+    assert "政治正文" in section
+    assert "体制正文" not in section, "精确命中「政治」后不应再把「政治体制」当起点"
+    assert "语言正文" not in section
+    assert start == 7
+
+    # 加粗锚点也能当结束锚
+    only_politics, _, _ = assets._slice(text, "**政治**", "**语言**")
+    assert only_politics.strip() == "政治正文"
