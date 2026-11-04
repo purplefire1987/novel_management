@@ -161,7 +161,9 @@ def restore_file(backup_path: Path, target: Path) -> None:
 def iter_markdown(root: Path, skip_dirs: tuple[str, ...] = (".obsidian", ".git", ".novel_system")) -> Iterator[Path]:
     """遍历 Markdown。跳过隐藏文件：`.tmp_*` 是原子写入的半成品，不是事实源。"""
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        # 隐藏目录（.trash、.workbuddy…）与 .git/.obsidian 一样不是事实源：
+        # 把它们排除在外，否则归档/回收站里的旧档案会以同名 ID 覆盖真档案
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
         for name in filenames:
             if name.endswith(".md") and not name.startswith("."):
                 yield Path(dirpath) / name
@@ -177,7 +179,11 @@ def cleanup_stale_temp(root: Path, min_age_seconds: int = 300) -> list[Path]:
     removed: list[Path] = []
     now = time.time()
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in (".git", ".obsidian", ".novel_system")]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in (".git", ".obsidian", ".novel_system") and not d.startswith(".")
+        ]
         for name in filenames:
             if not name.startswith(".tmp_"):
                 continue

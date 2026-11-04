@@ -17,6 +17,7 @@ views:
     filters:
       and:
         - type == "character"
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
@@ -28,6 +29,7 @@ views:
     filters:
       and:
         - type == "faction"
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
@@ -39,6 +41,7 @@ views:
     filters:
       and:
         - type == "location"
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
@@ -50,6 +53,7 @@ views:
     filters:
       and:
         - type == "item"
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
@@ -60,6 +64,7 @@ views:
     filters:
       and:
         - type == "enemy"
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
@@ -70,6 +75,7 @@ views:
     filters:
       and:
         - type == "world"
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
@@ -77,9 +83,11 @@ views:
   - type: table
     name: 大纲与卷
     filters:
-      or:
-        - type == "volume"
-        - type == "chapter_outline"
+      and:
+        - '!file.inFolder("99_Archive")'
+        - or:
+            - type == "volume"
+            - type == "chapter_outline"
     order:
       - file.name
       - id
@@ -87,6 +95,9 @@ views:
       - updated_at
   - type: cards
     name: 全部实体卡片
+    filters:
+      and:
+        - '!file.inFolder("99_Archive")'
     order:
       - file.name
       - id
