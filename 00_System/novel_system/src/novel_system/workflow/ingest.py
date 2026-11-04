@@ -242,13 +242,17 @@ def _volume_dir(volume_id: str) -> str:
     return f"08_Manuscripts/Volume_{number:02d}"
 
 
-def _next_chapter_serial(index: Index) -> int:
+def _next_chapter_serial(index: Index, band: int = 0) -> int:
+    """下一个章号。band 是保留号段上限：CH-1xxx 留给旧稿存档，不算「下一章」。"""
     serials: list[int] = []
     for doc_type in ("chapter_outline", "manuscript"):
         for row in index.entities_by_type(doc_type):
             match = re.search(r"CH-(\d{4})", str(row["id"]))
             if match:
-                serials.append(int(match.group(1)))
+                serial = int(match.group(1))
+                if band and serial >= band:
+                    continue
+                serials.append(serial)
     return (max(serials) if serials else 0) + 1
 
 
@@ -377,7 +381,8 @@ def run(
         raise WorkflowError(warnings[0])
 
     batch_id = f"INGEST-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    serial = _next_chapter_serial(index)
+    band = int((cfg.id_rules.get("reserved_bands") or {}).get("CH") or 0)
+    serial = _next_chapter_serial(index, band)
     today = date.today().isoformat()
     manuscript_dir = _volume_dir(volume_id)
 

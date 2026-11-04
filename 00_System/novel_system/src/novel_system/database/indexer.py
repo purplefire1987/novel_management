@@ -166,9 +166,15 @@ def index_vault(cfg: Config, index: Index) -> dict[str, Any]:
         cfg.rel(cfg.vault / "00_System"),
     }
 
+    # 归档整棵不索引，只有一个例外：旧稿正文存档。作者的上一版全稿要「入库」——
+    # 可检索、可引用、能进上下文，所以它留在 99_Archive 下（视图里排除），但参与索引。
+    archive_exceptions = {"99_Archive/Original_Draft"}
+
     for path in vault.iter_markdown(cfg.vault):
         rel = cfg.rel(path)
-        if any(rel.startswith(prefix + "/") for prefix in excluded if prefix):
+        if any(rel.startswith(prefix + "/") for prefix in excluded if prefix) and not any(
+            rel.startswith(prefix + "/") for prefix in archive_exceptions
+        ):
             continue
         total += 1
         try:

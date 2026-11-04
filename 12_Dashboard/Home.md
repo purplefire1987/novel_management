@@ -5,14 +5,20 @@ type: dashboard
 # 九州·工作台
 
 ## 当前进度
-- 当前卷：[[VOL-0001_工坊疑云|卷一：工坊疑云]]（两章 preflight 已通过，可进正文）
-- 当前剧情状态：[[02_Hot_Memory/Current_Story_State|查看]]
+- 当前卷：[[VOL-0001_工坊疑云|卷一：工坊疑云]]（**已开卷**：CH-0001／CH-0002 已发布，正文 10021 字）
+- 已发布正文：[[CH-0001_雨夜的血案|CH-0001 雨夜的血案]]（5845 字）· [[CH-0002_石季崇的试探|CH-0002 石季崇的试探]]（4176 字）
+- 当前剧情状态：[[02_Hot_Memory/Current_Story_State|当前剧情状态]]（兴元十二年七月初九 凌晨，六号暂审间）
 - 总纲：[[04_Outline/Series_Outline|九州·总纲]]
-- 章节大纲：[[CH-0001_雨夜的血案|CH-0001]] · [[CH-0002_石季崇的试探|CH-0002]]
+- 章节大纲：[[CH-0001_雨夜的血案|CH-0001]] · [[CH-0002_石季崇的试探|CH-0002]]；CH-0003 起待续编
+
+## 旧稿（上一版全稿，5.5 万字）
+- 总索引：[[旧稿章节对照表|旧稿章节对照表]]（28 节，`CH-1001..CH-1028`，含字数与新旧编号对照）
+- 卷：[[VOL-0009_旧稿存档|旧稿存档]]（旧稿编号 `CH-10xx`，与新版主序列 `CH-00xx` 不共用）
+- 原件：`99_Archive/Raw_Sources/原文/九州.md`
+- 用法：**是材料，不是底稿**——语感与细节可取，情节按新版细纲重排；`canon_status: deprecated`，冲突时以实体档案为准。
 
 ## 索引
-- 地图：[[01_Core_Memory/Maps/九州地图|九州地图]]（11 大区 / 72 城邑，州→城层级）· [[01_Core_Memory/Maps/九州地图.canvas|Canvas 方位图]]
-- 全量实体索引：[[07_Entity_Graph/Entity_Index|实体总索引]]（708 条，按类型分组，`novel rebuild-index` 自动刷新）
+- 地图：[[01_Core_Memory/Maps/九州地图|九州地图]]（11 大区 / 72 城邑，州→城层级）· [[01_Core_Memory/Maps/九州地图.canvas|Canvas 方位图]]- 全量实体索引：[[07_Entity_Graph/Entity_Index|实体总索引]]（708 条，按类型分组，`novel rebuild-index` 自动刷新）
 - 动态表格视图：[[12_Dashboard/九州视图.base|九州视图]]（人物 / 势力 / 地点 / 物品 / 敌人 / 设定 / 大纲）
 - 待裁定事项：[[12_Dashboard/待裁定事项|待裁定事项]]（镜像自 WorkBuddy 项目任务）
 
@@ -41,10 +47,12 @@ novel history                # 版本状态与提交历史
 ```
 
 ## 地图与地理
-- 总图：[[01_Core_Memory/Maps/九州地图|九州地图]]（州 → 城 层级，含地貌与口语）
+- 总图：[[01_Core_Memory/Maps/九州地图|九州地图]]（州 → 府 → 郡 三层，含地貌与口语）
 - 方位图：[[01_Core_Memory/Maps/九州地图.canvas|九州地图.canvas]]（中州居中，八州环列）
-- 卷一舞台：[[LOC-0057_武安都|武安都]]（湖州·江陵府·江陵郡；四区：武、光、楚、汉）
-- 重生成：改 [[WORLD-0029_九州表|九州表]] → `python 00_System/scripts/build_jiuzhou_map.py`
+- 层级树：[[01_Core_Memory/Maps/九州行政层级.canvas|九州行政层级.canvas]]（州 › 府 › 郡 全量 111 节点）
+- 行政区划总表：[[WORLD-0040_行政区划表|九州·行政区划表]]（28 府 / 71 郡，照录「地图库」）
+- 卷一舞台：[[LOC-0057_武安都|武安都]]（湖州 › 江陵府 › 江陵郡；四区：武、光、楚、汉）
+- 重生成：改 [[WORLD-0029_九州表|九州表]] / [[WORLD-0040_行政区划表|行政区划表]] → `python 00_System/scripts/build_jiuzhou_map.py`
 
 ## 快速入口
 - [[12_Dashboard/Characters|人物总览]]

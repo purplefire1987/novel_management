@@ -45,9 +45,43 @@ views:
     order:
       - file.name
       - id
+      - subtype
       - aliases
       - canon_status
       - updated_at
+    sort:
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 州域
+    filters:
+      and:
+        - type == "location"
+        - subtype == "州域"
+        - '!file.inFolder("99_Archive")'
+    order:
+      - file.name
+      - id
+      - tags
+      - updated_at
+    sort:
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 府级
+    filters:
+      and:
+        - type == "location"
+        - subtype == "府"
+        - '!file.inFolder("99_Archive")'
+    order:
+      - file.name
+      - id
+      - aliases
+      - updated_at
+    sort:
+      - property: file.name
+        direction: ASC
   - type: table
     name: 物品
     filters:
@@ -59,6 +93,9 @@ views:
       - id
       - canon_status
       - updated_at
+    sort:
+      - property: file.name
+        direction: ASC
   - type: table
     name: 敌人
     filters:
@@ -70,6 +107,9 @@ views:
       - id
       - canon_status
       - updated_at
+    sort:
+      - property: file.name
+        direction: ASC
   - type: table
     name: 世界设定
     filters:
@@ -80,6 +120,8 @@ views:
       - file.name
       - id
       - updated_at
+    columnSize:
+      file.name: 184
   - type: table
     name: 大纲与卷
     filters:
@@ -103,3 +145,14 @@ views:
       - id
       - canon_status
     limit: 60
+  - type: table
+    name: 旧稿存档（CH-10xx）
+    filters:
+      and:
+        - file.inFolder("99_Archive/Original_Draft")
+        - type == "manuscript"
+    order:
+      - file.name
+      - id
+      - word_count
+      - canon_status

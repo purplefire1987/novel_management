@@ -1,0 +1,23 @@
+chore: 大纲/正文/归档退出 Git 追踪，仅留本地
+novel-system: create foreshadowing FORESHADOW-0008 [OP-20261104-175258-8686]
+novel-system: create foreshadowing FORESHADOW-0007 [OP-20261104-175257-3375]
+novel-system: create foreshadowing FORESHADOW-0006 [OP-20261104-175257-7275]
+novel-system: create foreshadowing FORESHADOW-0005 [OP-20261104-175215-9449]
+novel-system: create foreshadowing FORESHADOW-0004 [OP-20261104-175213-1709]
+novel-system: create foreshadowing FORESHADOW-0003 [OP-20261104-175212-8786]
+novel-system: create foreshadowing FORESHADOW-0002 [OP-20261104-175139-631f]
+novel-system: create foreshadowing FORESHADOW-0001 [OP-20261104-175132-4ded]
+novel-system: publish CH-0002 [OP-20261104-175009-fdf3]
+novel-system: review report CH-0002
+novel-system: publish CH-0002 [OP-20261104-175007-32d6]
+novel-system: review report CH-0002
+novel-system: publish CH-0001 [OP-20261104-174713-1b13]
+novel-system: review report CH-0001
+novel-system: publish CH-0001 [OP-20261104-174638-f1de]
+novel-system: review report CH-0001
+novel-system: review report CH-0001
+novel-system: review report CH-0001
+novel-system: review report CH-0001
+novel-system: review report CH-0001
+novel-system: ingest log INGEST-20261104-144536
+novel-system: ingest INGEST-20261104-144536（28 章 / 55180 字） [OP-20261104-144536-207e]

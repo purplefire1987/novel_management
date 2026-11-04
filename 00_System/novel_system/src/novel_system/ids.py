@@ -39,7 +39,16 @@ def next_id(cfg: Config, index: Index, doc_type: str) -> str:
     if doc_type in ("character_state", "event", "scene"):
         raise ValueError(f"{doc_type} 需要父级 ID，请用 next_child_id")
 
-    serial = next_serial(_numbers(_existing_ids(index, doc_type), str(prefix)))
+    numbers = _numbers(_existing_ids(index, doc_type), str(prefix))
+
+    # 号段保留：CH-1xxx 是旧稿存档，不参与新号计算，
+    # 否则新章会被推到 CH-1029 这种号上（旧稿不是「下一章」）。
+    bands = cfg.id_rules.get("reserved_bands") or {}
+    band = int(bands.get(doc_type) or bands.get(prefix) or 0)
+    if band:
+        numbers = [n for n in numbers if n < band]
+
+    serial = next_serial(numbers)
     return f"{prefix}-{serial:0{width}d}"
 
 

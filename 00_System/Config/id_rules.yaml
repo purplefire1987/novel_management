@@ -54,6 +54,12 @@ id_patterns:
   volume: '^VOL-\d{4}$'
   world: '^WORLD-\d{4}$'
 
+# 号段保留：按前缀划分互不干扰的数字区间
+#   CH   → 0xxx 给新版正文主序列；1xxx 留给旧稿存档（见 99_Archive/Original_Draft）
+# 分配新号时只看下限以下的号，避免旧稿把新章的号推到一千开外。
+reserved_bands:
+  CH: 1000
+
 rules:
   immutable: true                  # ID 不随名称变化
   filename_must_contain_id: true

@@ -1,173 +1,1874 @@
 {
-	"nodes":[
-		{"id":"center","type":"text","text":"# 九州\n大陆居中，八州环列","x":-150,"y":-60,"width":300,"height":120,"color":"1"},
-		{"id":"region-凉州","type":"file","file":"01_Core_Memory/Locations/LOC-0074_凉州.md","x":-130,"y":-1735,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0053_幽云都","type":"file","file":"01_Core_Memory/Locations/LOC-0053_幽云都.md","x":-527.6160312144672,"y":-2183.647098701769,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0051_凛冬城","type":"file","file":"01_Core_Memory/Locations/LOC-0051_凛冬城.md","x":-435.64765759233245,"y":-2254.473189523262,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0052_铁穹城","type":"file","file":"01_Core_Memory/Locations/LOC-0052_铁穹城.md","x":-332.0889680333495,"y":-2306.914725585635,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0049_饮马城","type":"file","file":"01_Core_Memory/Locations/LOC-0049_饮马城.md","x":-220.57004399260728,"y":-2339.1334541227784,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0048_鹰扬城","type":"file","file":"01_Core_Memory/Locations/LOC-0048_鹰扬城.md","x":-104.99999999999996,"y":-2350,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0047_碧血城","type":"file","file":"01_Core_Memory/Locations/LOC-0047_碧血城.md","x":10.570043992607367,"y":-2339.1334541227784,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0045_太平城","type":"file","file":"01_Core_Memory/Locations/LOC-0045_太平城.md","x":122.08896803334952,"y":-2306.914725585635,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0050_龙渊城","type":"file","file":"01_Core_Memory/Locations/LOC-0050_龙渊城.md","x":225.64765759233256,"y":-2254.473189523262,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0046_牧野城","type":"file","file":"01_Core_Memory/Locations/LOC-0046_牧野城.md","x":317.6160312144672,"y":-2183.647098701769,"width":210,"height":60,"color":"5"},
-		{"id":"region-海州","type":"file","file":"01_Core_Memory/Locations/LOC-0075_海州.md","x":1072.07,"y":-1237.07,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0066_临丘城","type":"file","file":"01_Core_Memory/Locations/LOC-0066_临丘城.md","x":1119.0122782477285,"y":-1851.6816012675192,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0067_叠霜城","type":"file","file":"01_Core_Memory/Locations/LOC-0067_叠霜城.md","x":1271.6245093084744,"y":-1826.99077059057,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0065_浮光城","type":"file","file":"01_Core_Memory/Locations/LOC-0065_浮光城.md","x":1413.383786421446,"y":-1765.310647850225,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0063_海岱都","type":"file","file":"01_Core_Memory/Locations/LOC-0063_海岱都.md","x":1535.4762043356595,"y":-1670.4762043356593,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0064_沧溟城","type":"file","file":"01_Core_Memory/Locations/LOC-0064_沧溟城.md","x":1630.310647850225,"y":-1548.383786421446,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0069_海天城","type":"file","file":"01_Core_Memory/Locations/LOC-0069_海天城.md","x":1691.99077059057,"y":-1406.6245093084744,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0068_百泉城","type":"file","file":"01_Core_Memory/Locations/LOC-0068_百泉城.md","x":1716.6816012675192,"y":-1254.0122782477283,"width":210,"height":60,"color":"5"},
-		{"id":"region-扬州","type":"file","file":"01_Core_Memory/Locations/LOC-0076_扬州.md","x":1570,"y":-35,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0028_庐江城","type":"file","file":"01_Core_Memory/Locations/LOC-0028_庐江城.md","x":2048.647098701769,"y":-452.61603121446717,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0027_瑞禾城","type":"file","file":"01_Core_Memory/Locations/LOC-0027_瑞禾城.md","x":2119.473189523262,"y":-360.64765759233245,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0029_长乐城","type":"file","file":"01_Core_Memory/Locations/LOC-0029_长乐城.md","x":2171.914725585635,"y":-257.0889680333495,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0026_临安城","type":"file","file":"01_Core_Memory/Locations/LOC-0026_临安城.md","x":2204.1334541227784,"y":-145.57004399260734,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0025_金陵都","type":"file","file":"01_Core_Memory/Locations/LOC-0025_金陵都.md","x":2215,"y":-30,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0024_松沪城","type":"file","file":"01_Core_Memory/Locations/LOC-0024_松沪城.md","x":2204.1334541227784,"y":85.57004399260732,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0030_泰安城","type":"file","file":"01_Core_Memory/Locations/LOC-0030_泰安城.md","x":2171.914725585635,"y":197.0889680333495,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0031_金雀城","type":"file","file":"01_Core_Memory/Locations/LOC-0031_金雀城.md","x":2119.473189523262,"y":300.64765759233245,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0032_紫珠城","type":"file","file":"01_Core_Memory/Locations/LOC-0032_紫珠城.md","x":2048.647098701769,"y":392.61603121446717,"width":210,"height":60,"color":"5"},
-		{"id":"region-越州","type":"file","file":"01_Core_Memory/Locations/LOC-0077_越州.md","x":-130,"y":1665,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0020_明珠城","type":"file","file":"01_Core_Memory/Locations/LOC-0020_明珠城.md","x":317.6160312144672,"y":2123.647098701769,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0018_南海城","type":"file","file":"01_Core_Memory/Locations/LOC-0018_南海城.md","x":211.48233988252565,"y":2203.140627360626,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0019_五羊城","type":"file","file":"01_Core_Memory/Locations/LOC-0019_五羊城.md","x":90.87181965486113,"y":2258.246742672744,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0021_岭南都","type":"file","file":"01_Core_Memory/Locations/LOC-0021_岭南都.md","x":-38.69845112220156,"y":2286.4447295714394,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0023_玉溪城","type":"file","file":"01_Core_Memory/Locations/LOC-0023_玉溪城.md","x":-171.30154887779838,"y":2286.4447295714394,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0022_秋水城","type":"file","file":"01_Core_Memory/Locations/LOC-0022_秋水城.md","x":-300.87181965486104,"y":2258.246742672744,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0016_栖岩城","type":"file","file":"01_Core_Memory/Locations/LOC-0016_栖岩城.md","x":-421.4823398825255,"y":2203.140627360626,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0017_青林城","type":"file","file":"01_Core_Memory/Locations/LOC-0017_青林城.md","x":-527.6160312144672,"y":2123.647098701769,"width":210,"height":60,"color":"5"},
-		{"id":"region-湖州","type":"file","file":"01_Core_Memory/Locations/LOC-0078_湖州.md","x":1072.07,"y":1167.07,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0062_青崖城","type":"file","file":"01_Core_Memory/Locations/LOC-0062_青崖城.md","x":1716.6816012675192,"y":1194.0122782477283,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0060_白帝城","type":"file","file":"01_Core_Memory/Locations/LOC-0060_白帝城.md","x":1701.7317497294218,"y":1309.1253479954498,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0061_锦官城","type":"file","file":"01_Core_Memory/Locations/LOC-0061_锦官城.md","x":1665.5864638570151,"y":1419.434165398942,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0058_潇湘城","type":"file","file":"01_Core_Memory/Locations/LOC-0058_潇湘城.md","x":1609.5127578670015,"y":1521.0720342486009,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0059_却月城","type":"file","file":"01_Core_Memory/Locations/LOC-0059_却月城.md","x":1535.4762043356595,"y":1610.4762043356593,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0057_武安都","type":"file","file":"01_Core_Memory/Locations/LOC-0057_武安都.md","x":1446.0720342486009,"y":1684.5127578670015,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0054_洪都城","type":"file","file":"01_Core_Memory/Locations/LOC-0054_洪都城.md","x":1344.434165398942,"y":1740.5864638570151,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0055_融金城","type":"file","file":"01_Core_Memory/Locations/LOC-0055_融金城.md","x":1234.12534799545,"y":1776.7317497294218,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0056_启明城","type":"file","file":"01_Core_Memory/Locations/LOC-0056_启明城.md","x":1119.0122782477285,"y":1791.6816012675192,"width":210,"height":60,"color":"5"},
-		{"id":"region-陵州","type":"file","file":"01_Core_Memory/Locations/LOC-0079_陵州.md","x":-1332.07,"y":-1237.07,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0042_祥符城","type":"file","file":"01_Core_Memory/Locations/LOC-0042_祥符城.md","x":-1926.6816012675192,"y":-1254.0122782477285,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0040_万仞城","type":"file","file":"01_Core_Memory/Locations/LOC-0040_万仞城.md","x":-1901.99077059057,"y":-1406.6245093084744,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0041_梧溪城","type":"file","file":"01_Core_Memory/Locations/LOC-0041_梧溪城.md","x":-1840.310647850225,"y":-1548.383786421446,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0039_玉源城","type":"file","file":"01_Core_Memory/Locations/LOC-0039_玉源城.md","x":-1745.4762043356593,"y":-1670.4762043356595,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0038_西陵城","type":"file","file":"01_Core_Memory/Locations/LOC-0038_西陵城.md","x":-1623.383786421446,"y":-1765.310647850225,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0044_咸阳都","type":"file","file":"01_Core_Memory/Locations/LOC-0044_咸阳都.md","x":-1481.6245093084744,"y":-1826.99077059057,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0043_永兴城","type":"file","file":"01_Core_Memory/Locations/LOC-0043_永兴城.md","x":-1329.0122782477283,"y":-1851.6816012675192,"width":210,"height":60,"color":"5"},
-		{"id":"region-戎州","type":"file","file":"01_Core_Memory/Locations/LOC-0080_戎州.md","x":-1332.07,"y":1167.07,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0037_安顺都","type":"file","file":"01_Core_Memory/Locations/LOC-0037_安顺都.md","x":-1329.0122782477283,"y":1791.6816012675192,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0036_烈阙城","type":"file","file":"01_Core_Memory/Locations/LOC-0036_烈阙城.md","x":-1623.383786421446,"y":1705.310647850225,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0035_黄沙城","type":"file","file":"01_Core_Memory/Locations/LOC-0035_黄沙城.md","x":-1840.310647850225,"y":1488.383786421446,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0072_怀柔府","type":"file","file":"01_Core_Memory/Locations/LOC-0072_怀柔府.md","x":-1926.6816012675192,"y":1194.0122782477285,"width":210,"height":60,"color":"5"},
-		{"id":"region-云州","type":"file","file":"01_Core_Memory/Locations/LOC-0081_云州.md","x":-1830,"y":-35,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0014_凌霄城","type":"file","file":"01_Core_Memory/Locations/LOC-0014_凌霄城.md","x":-2258.6470987017688,"y":392.6160312144672,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0013_神宫都","type":"file","file":"01_Core_Memory/Locations/LOC-0013_神宫都.md","x":-2363.2772034586596,"y":239.6786311489629,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0012_比翼城","type":"file","file":"01_Core_Memory/Locations/LOC-0012_比翼城.md","x":-2418.038068320346,"y":62.651642133631526,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0010_云阙城","type":"file","file":"01_Core_Memory/Locations/LOC-0010_云阙城.md","x":-2418.038068320346,"y":-122.6516421336314,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0011_天渚城","type":"file","file":"01_Core_Memory/Locations/LOC-0011_天渚城.md","x":-2363.2772034586596,"y":-299.6786311489628,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0015_仙霞城","type":"file","file":"01_Core_Memory/Locations/LOC-0015_仙霞城.md","x":-2258.647098701769,"y":-452.6160312144671,"width":210,"height":60,"color":"5"},
-		{"id":"region-中州","type":"file","file":"01_Core_Memory/Locations/LOC-0073_中州.md","x":-130,"y":260,"width":260,"height":70,"color":"4"},
-		{"id":"city-LOC-0004_白玉京","type":"file","file":"01_Core_Memory/Locations/LOC-0004_白玉京.md","x":-345,"y":430,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0009_洛离城","type":"file","file":"01_Core_Memory/Locations/LOC-0009_洛离城.md","x":-105,"y":430,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0008_雷鸣城","type":"file","file":"01_Core_Memory/Locations/LOC-0008_雷鸣城.md","x":135,"y":430,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0007_河津城","type":"file","file":"01_Core_Memory/Locations/LOC-0007_河津城.md","x":-345,"y":530,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0005_上京都","type":"file","file":"01_Core_Memory/Locations/LOC-0005_上京都.md","x":-105,"y":530,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0006_山岚城","type":"file","file":"01_Core_Memory/Locations/LOC-0006_山岚城.md","x":135,"y":530,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0002_平都城","type":"file","file":"01_Core_Memory/Locations/LOC-0002_平都城.md","x":-345,"y":630,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0003_上阳城","type":"file","file":"01_Core_Memory/Locations/LOC-0003_上阳城.md","x":-105,"y":630,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0001_九曲城","type":"file","file":"01_Core_Memory/Locations/LOC-0001_九曲城.md","x":135,"y":630,"width":210,"height":60,"color":"5"},
-		{"id":"region-海外十五州","type":"file","file":"01_Core_Memory/Locations/LOC-0082_海外十五州.md","x":-400,"y":2400,"width":300,"height":80,"color":"6"},
-		{"id":"city-LOC-0070_蓬莱仙境","type":"file","file":"01_Core_Memory/Locations/LOC-0070_蓬莱仙境.md","x":-400,"y":2540,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0071_骷髅岛","type":"file","file":"01_Core_Memory/Locations/LOC-0071_骷髅岛.md","x":-170,"y":2540,"width":210,"height":60,"color":"5"},
-		{"id":"region-三十六洞天·七十二奇地","type":"file","file":"01_Core_Memory/Locations/LOC-0083_三十六洞天，七十二奇地.md","x":500,"y":2400,"width":300,"height":80,"color":"6"},
-		{"id":"city-LOC-0033_平都山","type":"file","file":"01_Core_Memory/Locations/LOC-0033_平都山.md","x":500,"y":2540,"width":210,"height":60,"color":"5"},
-		{"id":"city-LOC-0034_幽都","type":"file","file":"01_Core_Memory/Locations/LOC-0034_幽都.md","x":730,"y":2540,"width":210,"height":60,"color":"5"}
-	],
-	"edges":[
-		{"id":"e-center-region-凉州","fromNode":"center","fromSide":"bottom","toNode":"region-凉州","toSide":"top","color":"3"},
-		{"id":"e-region-凉州-city-LOC-0053_幽云都","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0053_幽云都","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0051_凛冬城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0051_凛冬城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0052_铁穹城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0052_铁穹城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0049_饮马城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0049_饮马城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0048_鹰扬城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0048_鹰扬城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0047_碧血城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0047_碧血城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0045_太平城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0045_太平城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0050_龙渊城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0050_龙渊城","toSide":"top","color":"2"},
-		{"id":"e-region-凉州-city-LOC-0046_牧野城","fromNode":"region-凉州","fromSide":"bottom","toNode":"city-LOC-0046_牧野城","toSide":"top","color":"2"},
-		{"id":"e-center-region-海州","fromNode":"center","fromSide":"bottom","toNode":"region-海州","toSide":"top","color":"3"},
-		{"id":"e-region-海州-city-LOC-0066_临丘城","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0066_临丘城","toSide":"top","color":"2"},
-		{"id":"e-region-海州-city-LOC-0067_叠霜城","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0067_叠霜城","toSide":"top","color":"2"},
-		{"id":"e-region-海州-city-LOC-0065_浮光城","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0065_浮光城","toSide":"top","color":"2"},
-		{"id":"e-region-海州-city-LOC-0063_海岱都","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0063_海岱都","toSide":"top","color":"2"},
-		{"id":"e-region-海州-city-LOC-0064_沧溟城","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0064_沧溟城","toSide":"top","color":"2"},
-		{"id":"e-region-海州-city-LOC-0069_海天城","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0069_海天城","toSide":"top","color":"2"},
-		{"id":"e-region-海州-city-LOC-0068_百泉城","fromNode":"region-海州","fromSide":"bottom","toNode":"city-LOC-0068_百泉城","toSide":"top","color":"2"},
-		{"id":"e-center-region-扬州","fromNode":"center","fromSide":"bottom","toNode":"region-扬州","toSide":"top","color":"3"},
-		{"id":"e-region-扬州-city-LOC-0028_庐江城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0028_庐江城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0027_瑞禾城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0027_瑞禾城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0029_长乐城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0029_长乐城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0026_临安城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0026_临安城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0025_金陵都","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0025_金陵都","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0024_松沪城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0024_松沪城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0030_泰安城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0030_泰安城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0031_金雀城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0031_金雀城","toSide":"top","color":"2"},
-		{"id":"e-region-扬州-city-LOC-0032_紫珠城","fromNode":"region-扬州","fromSide":"bottom","toNode":"city-LOC-0032_紫珠城","toSide":"top","color":"2"},
-		{"id":"e-center-region-越州","fromNode":"center","fromSide":"bottom","toNode":"region-越州","toSide":"top","color":"3"},
-		{"id":"e-region-越州-city-LOC-0020_明珠城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0020_明珠城","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0018_南海城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0018_南海城","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0019_五羊城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0019_五羊城","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0021_岭南都","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0021_岭南都","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0023_玉溪城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0023_玉溪城","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0022_秋水城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0022_秋水城","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0016_栖岩城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0016_栖岩城","toSide":"top","color":"2"},
-		{"id":"e-region-越州-city-LOC-0017_青林城","fromNode":"region-越州","fromSide":"bottom","toNode":"city-LOC-0017_青林城","toSide":"top","color":"2"},
-		{"id":"e-center-region-湖州","fromNode":"center","fromSide":"bottom","toNode":"region-湖州","toSide":"top","color":"3"},
-		{"id":"e-region-湖州-city-LOC-0062_青崖城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0062_青崖城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0060_白帝城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0060_白帝城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0061_锦官城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0061_锦官城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0058_潇湘城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0058_潇湘城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0059_却月城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0059_却月城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0057_武安都","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0057_武安都","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0054_洪都城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0054_洪都城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0055_融金城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0055_融金城","toSide":"top","color":"2"},
-		{"id":"e-region-湖州-city-LOC-0056_启明城","fromNode":"region-湖州","fromSide":"bottom","toNode":"city-LOC-0056_启明城","toSide":"top","color":"2"},
-		{"id":"e-center-region-陵州","fromNode":"center","fromSide":"bottom","toNode":"region-陵州","toSide":"top","color":"3"},
-		{"id":"e-region-陵州-city-LOC-0042_祥符城","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0042_祥符城","toSide":"top","color":"2"},
-		{"id":"e-region-陵州-city-LOC-0040_万仞城","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0040_万仞城","toSide":"top","color":"2"},
-		{"id":"e-region-陵州-city-LOC-0041_梧溪城","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0041_梧溪城","toSide":"top","color":"2"},
-		{"id":"e-region-陵州-city-LOC-0039_玉源城","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0039_玉源城","toSide":"top","color":"2"},
-		{"id":"e-region-陵州-city-LOC-0038_西陵城","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0038_西陵城","toSide":"top","color":"2"},
-		{"id":"e-region-陵州-city-LOC-0044_咸阳都","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0044_咸阳都","toSide":"top","color":"2"},
-		{"id":"e-region-陵州-city-LOC-0043_永兴城","fromNode":"region-陵州","fromSide":"bottom","toNode":"city-LOC-0043_永兴城","toSide":"top","color":"2"},
-		{"id":"e-center-region-戎州","fromNode":"center","fromSide":"bottom","toNode":"region-戎州","toSide":"top","color":"3"},
-		{"id":"e-region-戎州-city-LOC-0037_安顺都","fromNode":"region-戎州","fromSide":"bottom","toNode":"city-LOC-0037_安顺都","toSide":"top","color":"2"},
-		{"id":"e-region-戎州-city-LOC-0036_烈阙城","fromNode":"region-戎州","fromSide":"bottom","toNode":"city-LOC-0036_烈阙城","toSide":"top","color":"2"},
-		{"id":"e-region-戎州-city-LOC-0035_黄沙城","fromNode":"region-戎州","fromSide":"bottom","toNode":"city-LOC-0035_黄沙城","toSide":"top","color":"2"},
-		{"id":"e-region-戎州-city-LOC-0072_怀柔府","fromNode":"region-戎州","fromSide":"bottom","toNode":"city-LOC-0072_怀柔府","toSide":"top","color":"2"},
-		{"id":"e-center-region-云州","fromNode":"center","fromSide":"bottom","toNode":"region-云州","toSide":"top","color":"3"},
-		{"id":"e-region-云州-city-LOC-0014_凌霄城","fromNode":"region-云州","fromSide":"bottom","toNode":"city-LOC-0014_凌霄城","toSide":"top","color":"2"},
-		{"id":"e-region-云州-city-LOC-0013_神宫都","fromNode":"region-云州","fromSide":"bottom","toNode":"city-LOC-0013_神宫都","toSide":"top","color":"2"},
-		{"id":"e-region-云州-city-LOC-0012_比翼城","fromNode":"region-云州","fromSide":"bottom","toNode":"city-LOC-0012_比翼城","toSide":"top","color":"2"},
-		{"id":"e-region-云州-city-LOC-0010_云阙城","fromNode":"region-云州","fromSide":"bottom","toNode":"city-LOC-0010_云阙城","toSide":"top","color":"2"},
-		{"id":"e-region-云州-city-LOC-0011_天渚城","fromNode":"region-云州","fromSide":"bottom","toNode":"city-LOC-0011_天渚城","toSide":"top","color":"2"},
-		{"id":"e-region-云州-city-LOC-0015_仙霞城","fromNode":"region-云州","fromSide":"bottom","toNode":"city-LOC-0015_仙霞城","toSide":"top","color":"2"},
-		{"id":"e-center-region-中州","fromNode":"center","fromSide":"bottom","toNode":"region-中州","toSide":"top","color":"3"},
-		{"id":"e-region-中州-city-LOC-0004_白玉京","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0004_白玉京","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0009_洛离城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0009_洛离城","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0008_雷鸣城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0008_雷鸣城","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0007_河津城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0007_河津城","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0005_上京都","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0005_上京都","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0006_山岚城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0006_山岚城","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0002_平都城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0002_平都城","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0003_上阳城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0003_上阳城","toSide":"top","color":"2"},
-		{"id":"e-region-中州-city-LOC-0001_九曲城","fromNode":"region-中州","fromSide":"bottom","toNode":"city-LOC-0001_九曲城","toSide":"top","color":"2"},
-		{"id":"e-center-region-海外十五州","fromNode":"center","fromSide":"right","toNode":"region-海外十五州","toSide":"left","color":"6"},
-		{"id":"e-region-海外十五州-city-LOC-0070_蓬莱仙境","fromNode":"region-海外十五州","fromSide":"bottom","toNode":"city-LOC-0070_蓬莱仙境","toSide":"top","color":"2"},
-		{"id":"e-region-海外十五州-city-LOC-0071_骷髅岛","fromNode":"region-海外十五州","fromSide":"bottom","toNode":"city-LOC-0071_骷髅岛","toSide":"top","color":"2"},
-		{"id":"e-center-region-三十六洞天·七十二奇地","fromNode":"center","fromSide":"right","toNode":"region-三十六洞天·七十二奇地","toSide":"left","color":"6"},
-		{"id":"e-region-三十六洞天·七十二奇地-city-LOC-0033_平都山","fromNode":"region-三十六洞天·七十二奇地","fromSide":"bottom","toNode":"city-LOC-0033_平都山","toSide":"top","color":"2"},
-		{"id":"e-region-三十六洞天·七十二奇地-city-LOC-0034_幽都","fromNode":"region-三十六洞天·七十二奇地","fromSide":"bottom","toNode":"city-LOC-0034_幽都","toSide":"top","color":"2"}
-	]
+  "nodes": [
+    {
+      "id": "center",
+      "type": "text",
+      "text": "# 九州\n大陆居中，八州环列",
+      "x": -150,
+      "y": -60,
+      "width": 300,
+      "height": 120,
+      "color": "1"
+    },
+    {
+      "id": "region-凉州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0074_凉州.md",
+      "x": -130.0,
+      "y": -2235.0,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0087",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0087_肃北府.md",
+      "x": -630.896283598205,
+      "y": -2689.9882021194876,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0045",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0045.md",
+      "x": -971.4303641884916,
+      "y": -2820.135574582833,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0046",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0046.md",
+      "x": -794.7341211032451,
+      "y": -3021.2746883913337,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0088",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0088_开元府.md",
+      "x": -300.69033781614905,
+      "y": -2900.0902407306635,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0047",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0047.md",
+      "x": -513.6393308676223,
+      "y": -3200.128489256765,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0048",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0048.md",
+      "x": -256.5855359729801,
+      "y": -3274.974009860023,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0089",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0089_黑水府.md",
+      "x": 90.69033781614903,
+      "y": -2900.090240730664,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0049",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0049.md",
+      "x": 9.22436252770136,
+      "y": -3263.6420270297494,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0050",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0050.md",
+      "x": 211.9222354877728,
+      "y": -3260.9392285558815,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0051",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0051.md",
+      "x": 384.3883548460069,
+      "y": -3154.4067429205647,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0090",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0090_奉天府.md",
+      "x": 420.89628359820483,
+      "y": -2689.9882021194876,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0052",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0052.md",
+      "x": 614.7341211032449,
+      "y": -3021.2746883913337,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0053",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0053.md",
+      "x": 791.4303641884915,
+      "y": -2820.135574582833,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-海州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0075_海州.md",
+      "x": 1425.62,
+      "y": -1590.62,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0091",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0091_琅琊府.md",
+      "x": 1475.3935399571128,
+      "y": -2283.181485302038,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0063",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0063.md",
+      "x": 1306.679142931501,
+      "y": -2611.8209602978895,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0064",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0064.md",
+      "x": 1503.8420330766883,
+      "y": -2658.9434344660012,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0065",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0065.md",
+      "x": 1697.177715582568,
+      "y": -2597.9922516053434,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0092",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0092_黄龙府.md",
+      "x": 1945.594746830583,
+      "y": -2078.594746830583,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0066",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0066.md",
+      "x": 2117.414473535037,
+      "y": -2420.727052916479,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0067",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0067.md",
+      "x": 2306.727052916479,
+      "y": -2231.414473535037,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0093",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0093_怒涛府.md",
+      "x": 2150.181485302038,
+      "y": -1608.3935399571126,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0068",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0068.md",
+      "x": 2515.861929675929,
+      "y": -1750.7602914197669,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0069",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0069.md",
+      "x": 2525.3370448807364,
+      "y": -1483.199592482189,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-扬州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0076_扬州.md",
+      "x": 2070.0,
+      "y": -35.0,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0094",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0094_余杭府.md",
+      "x": 2607.1822082116746,
+      "y": -505.1471320163339,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0024",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0024.md",
+      "x": 2727.4881407331663,
+      "y": -866.2644564146415,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0025",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0025.md",
+      "x": 2900.2239783837267,
+      "y": -760.1698608252009,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0026",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0026.md",
+      "x": 2993.833955806851,
+      "y": -580.3618939578517,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0095",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0095_平江府.md",
+      "x": 2795.0,
+      "y": -28.0,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0027",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0027.md",
+      "x": 3135.929298918253,
+      "y": -219.371676828183,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0028",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0028.md",
+      "x": 3190.0,
+      "y": -24.0,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0029",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0029.md",
+      "x": 3135.929298918253,
+      "y": 171.371676828183,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0096",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0096_安庆府.md",
+      "x": 2607.1822082116746,
+      "y": 449.1471320163339,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0030",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0030.md",
+      "x": 2993.833955806851,
+      "y": 532.3618939578517,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0031",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0031.md",
+      "x": 2900.2239783837267,
+      "y": 712.1698608252009,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0032",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0032.md",
+      "x": 2727.4881407331663,
+      "y": 818.2644564146415,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-越州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0077_越州.md",
+      "x": -130.0,
+      "y": 2165.0,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0097",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0097_玉桂府.md",
+      "x": 372.14713201633396,
+      "y": 2684.1822082116746,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0016",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0016.md",
+      "x": 727.512632574752,
+      "y": 2857.1535845735234,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0017",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0017.md",
+      "x": 531.6187297631353,
+      "y": 3039.6476509574536,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0098",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0098_南越府.md",
+      "x": -104.99999999999996,
+      "y": 2872.0,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0018",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0018.md",
+      "x": 105.37167682818307,
+      "y": 3201.929298918253,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0019",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0019.md",
+      "x": -89.99999999999993,
+      "y": 3256.0,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0020",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0020.md",
+      "x": -285.3716768281829,
+      "y": 3201.929298918253,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0099",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0099_彩云府.md",
+      "x": -582.1471320163339,
+      "y": 2684.1822082116746,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0021",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0021.md",
+      "x": -646.3618939578516,
+      "y": 3059.833955806851,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0022",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0022.md",
+      "x": -826.1698608252009,
+      "y": 2966.2239783837267,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0023",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0023.md",
+      "x": -932.2644564146415,
+      "y": 2793.4881407331663,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-湖州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0078_湖州.md",
+      "x": 1425.62,
+      "y": 1520.62,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0100",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0100_隆昌府.md",
+      "x": 2150.181485302038,
+      "y": 1552.3935399571126,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0054",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0054.md",
+      "x": 2497.8209602978895,
+      "y": 1372.6791429315008,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0055",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0055.md",
+      "x": 2544.9434344660012,
+      "y": 1569.842033076688,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0056",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0056.md",
+      "x": 2483.9922516053434,
+      "y": 1763.1777155825675,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0101",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0101_江陵府.md",
+      "x": 1945.594746830583,
+      "y": 2022.594746830583,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0057",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0057.md",
+      "x": 2329.210201820052,
+      "y": 2118.912926746062,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0058",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0058.md",
+      "x": 2229.295323681471,
+      "y": 2295.295323681471,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0059",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0059.md",
+      "x": 2052.912926746062,
+      "y": 2395.210201820052,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0102",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0102_巴川府.md",
+      "x": 1475.3935399571128,
+      "y": 2227.181485302038,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0060",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0060.md",
+      "x": 1697.177715582568,
+      "y": 2549.9922516053434,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0061",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0061.md",
+      "x": 1503.8420330766883,
+      "y": 2610.9434344660012,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0062",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0062.md",
+      "x": 1306.679142931501,
+      "y": 2563.8209602978895,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-陵州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0079_陵州.md",
+      "x": -1685.62,
+      "y": -1590.62,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0103",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0103_兴安府.md",
+      "x": -2360.181485302038,
+      "y": -1608.3935399571128,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0038",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0038.md",
+      "x": -2705.3370448807364,
+      "y": -1483.1995924821892,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0039",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0039.md",
+      "x": -2695.861929675929,
+      "y": -1750.760291419767,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0104",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0104_广武府.md",
+      "x": -2155.594746830583,
+      "y": -2078.594746830583,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0040",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0040.md",
+      "x": -2509.210201820052,
+      "y": -2166.912926746062,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0041",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0041.md",
+      "x": -2409.295323681471,
+      "y": -2343.295323681471,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0042",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0042.md",
+      "x": -2232.912926746062,
+      "y": -2443.210201820052,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0105",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0105_大夏府.md",
+      "x": -1685.3935399571126,
+      "y": -2283.181485302038,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0043",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0043.md",
+      "x": -1816.7602914197666,
+      "y": -2629.861929675929,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0044",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0044.md",
+      "x": -1549.1995924821888,
+      "y": -2639.3370448807364,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-戎州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0080_戎州.md",
+      "x": -1685.62,
+      "y": 1520.62,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0106",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0106_西宁府.md",
+      "x": -1857.6976717998903,
+      "y": 2199.3047409893534,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0035",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0035.md",
+      "x": -1814.3752620425876,
+      "y": 2582.247798856283,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0036",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0036.md",
+      "x": -2071.273965788727,
+      "y": 2506.8716657791415,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0072",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0072_怀柔府.md",
+      "x": -2332.3047409893534,
+      "y": 1724.6976717998905,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0037",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0037.md",
+      "x": -2681.933600383574,
+      "y": 1835.6826936341167,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-云州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0081_云州.md",
+      "x": -2330.0,
+      "y": -35.0,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0107",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0107_云中府.md",
+      "x": -2817.1822082116746,
+      "y": 449.14713201633396,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0010",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0010.md",
+      "x": -2971.1535845735234,
+      "y": 793.512632574752,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0011",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0011.md",
+      "x": -3153.6476509574536,
+      "y": 597.6187297631352,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0108",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0108_天山府.md",
+      "x": -3005.0,
+      "y": -27.999999999999915,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0012",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0012.md",
+      "x": -3345.6407929976153,
+      "y": 109.86420864453427,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0013",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0013.md",
+      "x": -3345.6407929976153,
+      "y": -157.8642086445342,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0109",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0109_流霞府.md",
+      "x": -2817.1822082116746,
+      "y": -505.1471320163338,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0014",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0014.md",
+      "x": -3153.6476509574536,
+      "y": -645.6187297631351,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0015",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0015.md",
+      "x": -2971.153584573523,
+      "y": -841.5126325747519,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-中州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0073_中州.md",
+      "x": -130,
+      "y": 300,
+      "width": 260,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "fu-LOC-0084",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0084_平川府.md",
+      "x": -520,
+      "y": 470,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0001",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0001.md",
+      "x": -520,
+      "y": 570,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0002",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0002.md",
+      "x": -320,
+      "y": 570,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0003",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0003.md",
+      "x": -520,
+      "y": 650,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0085",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0085_皇极府.md",
+      "x": -100,
+      "y": 470,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0004",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0004.md",
+      "x": -100,
+      "y": 570,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0005",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0005.md",
+      "x": 100,
+      "y": 570,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0006",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0006.md",
+      "x": -100,
+      "y": 650,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "fu-LOC-0086",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0086_河洛府.md",
+      "x": 320,
+      "y": 470,
+      "width": 210,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0007",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0007.md",
+      "x": 320,
+      "y": 570,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0008",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0008.md",
+      "x": 520,
+      "y": 570,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "city-LOC-0009",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0009.md",
+      "x": 320,
+      "y": 650,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-海外十五州",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0082_海外十五州.md",
+      "x": -700,
+      "y": 3100,
+      "width": 300,
+      "height": 80,
+      "color": "6"
+    },
+    {
+      "id": "fu-LOC-0110",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0110_蓬莱.md",
+      "x": -700,
+      "y": 3230,
+      "width": 240,
+      "height": 56,
+      "color": "5"
+    },
+    {
+      "id": "city-LOC-0070",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0070.md",
+      "x": -380,
+      "y": 3234,
+      "width": 180,
+      "height": 48
+    },
+    {
+      "id": "region-三十六洞天·七十二奇地",
+      "type": "file",
+      "file": "01_Core_Memory/Locations/LOC-0083_三十六洞天，七十二奇地.md",
+      "x": 500,
+      "y": 3100,
+      "width": 300,
+      "height": 80,
+      "color": "6"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-center-region-凉州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-凉州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-凉州-fu-LOC-0087",
+      "fromNode": "region-凉州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0087",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0087-city-LOC-0045",
+      "fromNode": "fu-LOC-0087",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0045",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0087-city-LOC-0046",
+      "fromNode": "fu-LOC-0087",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0046",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-凉州-fu-LOC-0088",
+      "fromNode": "region-凉州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0088",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0088-city-LOC-0047",
+      "fromNode": "fu-LOC-0088",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0047",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0088-city-LOC-0048",
+      "fromNode": "fu-LOC-0088",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0048",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-凉州-fu-LOC-0089",
+      "fromNode": "region-凉州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0089",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0089-city-LOC-0049",
+      "fromNode": "fu-LOC-0089",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0049",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0089-city-LOC-0050",
+      "fromNode": "fu-LOC-0089",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0050",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0089-city-LOC-0051",
+      "fromNode": "fu-LOC-0089",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0051",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-凉州-fu-LOC-0090",
+      "fromNode": "region-凉州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0090",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0090-city-LOC-0052",
+      "fromNode": "fu-LOC-0090",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0052",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0090-city-LOC-0053",
+      "fromNode": "fu-LOC-0090",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0053",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-海州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-海州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-海州-fu-LOC-0091",
+      "fromNode": "region-海州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0091",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0091-city-LOC-0063",
+      "fromNode": "fu-LOC-0091",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0063",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0091-city-LOC-0064",
+      "fromNode": "fu-LOC-0091",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0064",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0091-city-LOC-0065",
+      "fromNode": "fu-LOC-0091",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0065",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-海州-fu-LOC-0092",
+      "fromNode": "region-海州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0092",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0092-city-LOC-0066",
+      "fromNode": "fu-LOC-0092",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0066",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0092-city-LOC-0067",
+      "fromNode": "fu-LOC-0092",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0067",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-海州-fu-LOC-0093",
+      "fromNode": "region-海州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0093",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0093-city-LOC-0068",
+      "fromNode": "fu-LOC-0093",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0068",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0093-city-LOC-0069",
+      "fromNode": "fu-LOC-0093",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0069",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-扬州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-扬州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-扬州-fu-LOC-0094",
+      "fromNode": "region-扬州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0094",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0094-city-LOC-0024",
+      "fromNode": "fu-LOC-0094",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0024",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0094-city-LOC-0025",
+      "fromNode": "fu-LOC-0094",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0025",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0094-city-LOC-0026",
+      "fromNode": "fu-LOC-0094",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0026",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-扬州-fu-LOC-0095",
+      "fromNode": "region-扬州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0095",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0095-city-LOC-0027",
+      "fromNode": "fu-LOC-0095",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0027",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0095-city-LOC-0028",
+      "fromNode": "fu-LOC-0095",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0028",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0095-city-LOC-0029",
+      "fromNode": "fu-LOC-0095",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0029",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-扬州-fu-LOC-0096",
+      "fromNode": "region-扬州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0096",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0096-city-LOC-0030",
+      "fromNode": "fu-LOC-0096",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0030",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0096-city-LOC-0031",
+      "fromNode": "fu-LOC-0096",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0031",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0096-city-LOC-0032",
+      "fromNode": "fu-LOC-0096",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0032",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-越州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-越州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-越州-fu-LOC-0097",
+      "fromNode": "region-越州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0097",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0097-city-LOC-0016",
+      "fromNode": "fu-LOC-0097",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0016",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0097-city-LOC-0017",
+      "fromNode": "fu-LOC-0097",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0017",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-越州-fu-LOC-0098",
+      "fromNode": "region-越州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0098",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0098-city-LOC-0018",
+      "fromNode": "fu-LOC-0098",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0018",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0098-city-LOC-0019",
+      "fromNode": "fu-LOC-0098",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0019",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0098-city-LOC-0020",
+      "fromNode": "fu-LOC-0098",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0020",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-越州-fu-LOC-0099",
+      "fromNode": "region-越州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0099",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0099-city-LOC-0021",
+      "fromNode": "fu-LOC-0099",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0021",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0099-city-LOC-0022",
+      "fromNode": "fu-LOC-0099",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0022",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0099-city-LOC-0023",
+      "fromNode": "fu-LOC-0099",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0023",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-湖州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-湖州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-湖州-fu-LOC-0100",
+      "fromNode": "region-湖州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0100",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0100-city-LOC-0054",
+      "fromNode": "fu-LOC-0100",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0054",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0100-city-LOC-0055",
+      "fromNode": "fu-LOC-0100",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0055",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0100-city-LOC-0056",
+      "fromNode": "fu-LOC-0100",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0056",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-湖州-fu-LOC-0101",
+      "fromNode": "region-湖州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0101",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0101-city-LOC-0057",
+      "fromNode": "fu-LOC-0101",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0057",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0101-city-LOC-0058",
+      "fromNode": "fu-LOC-0101",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0058",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0101-city-LOC-0059",
+      "fromNode": "fu-LOC-0101",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0059",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-湖州-fu-LOC-0102",
+      "fromNode": "region-湖州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0102",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0102-city-LOC-0060",
+      "fromNode": "fu-LOC-0102",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0060",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0102-city-LOC-0061",
+      "fromNode": "fu-LOC-0102",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0061",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0102-city-LOC-0062",
+      "fromNode": "fu-LOC-0102",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0062",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-陵州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-陵州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-陵州-fu-LOC-0103",
+      "fromNode": "region-陵州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0103",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0103-city-LOC-0038",
+      "fromNode": "fu-LOC-0103",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0038",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0103-city-LOC-0039",
+      "fromNode": "fu-LOC-0103",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0039",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-陵州-fu-LOC-0104",
+      "fromNode": "region-陵州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0104",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0104-city-LOC-0040",
+      "fromNode": "fu-LOC-0104",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0040",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0104-city-LOC-0041",
+      "fromNode": "fu-LOC-0104",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0041",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0104-city-LOC-0042",
+      "fromNode": "fu-LOC-0104",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0042",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-陵州-fu-LOC-0105",
+      "fromNode": "region-陵州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0105",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0105-city-LOC-0043",
+      "fromNode": "fu-LOC-0105",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0043",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0105-city-LOC-0044",
+      "fromNode": "fu-LOC-0105",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0044",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-戎州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-戎州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-戎州-fu-LOC-0106",
+      "fromNode": "region-戎州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0106",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0106-city-LOC-0035",
+      "fromNode": "fu-LOC-0106",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0035",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0106-city-LOC-0036",
+      "fromNode": "fu-LOC-0106",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0036",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-戎州-fu-LOC-0072",
+      "fromNode": "region-戎州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0072",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0072-city-LOC-0037",
+      "fromNode": "fu-LOC-0072",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0037",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-云州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-云州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-云州-fu-LOC-0107",
+      "fromNode": "region-云州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0107",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0107-city-LOC-0010",
+      "fromNode": "fu-LOC-0107",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0010",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0107-city-LOC-0011",
+      "fromNode": "fu-LOC-0107",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0011",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-云州-fu-LOC-0108",
+      "fromNode": "region-云州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0108",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0108-city-LOC-0012",
+      "fromNode": "fu-LOC-0108",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0012",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0108-city-LOC-0013",
+      "fromNode": "fu-LOC-0108",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0013",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-云州-fu-LOC-0109",
+      "fromNode": "region-云州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0109",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0109-city-LOC-0014",
+      "fromNode": "fu-LOC-0109",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0014",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0109-city-LOC-0015",
+      "fromNode": "fu-LOC-0109",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0015",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-中州",
+      "fromNode": "center",
+      "fromSide": "bottom",
+      "toNode": "region-中州",
+      "toSide": "top",
+      "color": "3"
+    },
+    {
+      "id": "e-region-中州-fu-LOC-0084",
+      "fromNode": "region-中州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0084",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0084-city-LOC-0001",
+      "fromNode": "fu-LOC-0084",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0001",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0084-city-LOC-0002",
+      "fromNode": "fu-LOC-0084",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0002",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0084-city-LOC-0003",
+      "fromNode": "fu-LOC-0084",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0003",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-中州-fu-LOC-0085",
+      "fromNode": "region-中州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0085",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0085-city-LOC-0004",
+      "fromNode": "fu-LOC-0085",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0004",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0085-city-LOC-0005",
+      "fromNode": "fu-LOC-0085",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0005",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0085-city-LOC-0006",
+      "fromNode": "fu-LOC-0085",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0006",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-region-中州-fu-LOC-0086",
+      "fromNode": "region-中州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0086",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0086-city-LOC-0007",
+      "fromNode": "fu-LOC-0086",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0007",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0086-city-LOC-0008",
+      "fromNode": "fu-LOC-0086",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0008",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0086-city-LOC-0009",
+      "fromNode": "fu-LOC-0086",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0009",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-海外十五州",
+      "fromNode": "center",
+      "fromSide": "right",
+      "toNode": "region-海外十五州",
+      "toSide": "left",
+      "color": "6"
+    },
+    {
+      "id": "e-region-海外十五州-fu-LOC-0110",
+      "fromNode": "region-海外十五州",
+      "fromSide": "bottom",
+      "toNode": "fu-LOC-0110",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-fu-LOC-0110-city-LOC-0070",
+      "fromNode": "fu-LOC-0110",
+      "fromSide": "bottom",
+      "toNode": "city-LOC-0070",
+      "toSide": "top",
+      "color": "2"
+    },
+    {
+      "id": "e-center-region-三十六洞天·七十二奇地",
+      "fromNode": "center",
+      "fromSide": "right",
+      "toNode": "region-三十六洞天·七十二奇地",
+      "toSide": "left",
+      "color": "6"
+    }
+  ]
 }
