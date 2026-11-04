@@ -334,7 +334,14 @@ class Orchestrator:
         self.index.close()
         result = rebuild(self.cfg)
         self.index = ensure_index(self.cfg)
+        # 索引页是索引库的投影，重建完顺手刷新，省得两边脱节
+        result["index_md"] = self.write_entity_index()
         return result
+
+    def write_entity_index(self) -> dict[str, Any]:
+        from .workflow.index_md import write_entity_index
+
+        return write_entity_index(self.cfg, self.index)
 
     # ------------------------------------------------------------- 新建实体
     def new_entity(

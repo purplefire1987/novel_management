@@ -130,6 +130,21 @@ novel dice verify                                                        # 任�
   全部引自 `01_Core_Memory/World/九州/规则书/`，不自创。
 - 掷骰是"发生过的事"，**不参与 `novel rollback`**。
 
+## 索引与视图（Obsidian）
+
+```bash
+novel rebuild-index   # 重扫 Markdown → 重建 SQLite → 顺带刷新实体索引页
+novel index-md        # 只重画 07_Entity_Graph/Entity_Index.md
+novel find 环教        # 按名称 / 别名 / 概要查单条
+```
+
+- **全量索引**：`07_Entity_Graph/Entity_Index.md`，按类型分组、按编号排序、每条都是双链，
+  由 `novel index-md` 生成（含 `generated_at`，请勿手改）。
+- **动态表格**：`12_Dashboard/九州视图.base` 是 Obsidian Bases 视图（人物 / 势力 / 地点 / 物品 /
+  敌人 / 设定 / 大纲），读 frontmatter，不依赖 Dataview。
+- **仓库根必须是 `NovelVault/`**。若把上一级目录当 Vault 打开，`.venv/`、交付 HTML、临时文件
+  会一起进文件树与图谱——`.obsidian/app.json` 里的 `userIgnoreFilters` 只是兜底，不是解法。
+
 ## 编务团（WorkBuddy 专家团）
 
 `novel-kb-team`「小说知识库编务团」把上述流程角色化：知识库总管 + 录入员 / 资料官 / 主笔 /

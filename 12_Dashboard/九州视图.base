@@ -1,0 +1,110 @@
+# 九州知识库 · 动态视图
+#
+# 用法：在 Obsidian 里点开本文件，YAML 会渲染成表格。
+# 也可以在笔记里嵌入单个视图：![[九州视图.base#人物]]
+#
+# 说明：数据来自每份档案的 frontmatter（id / name / aliases / canon_status / updated_at）。
+# 视图默认按文件名排序，而文件名以编号打头（CHAR-0001_xxx.md），所以等于按编号排序。
+
+properties:
+  file.name:
+    displayName: 档案
+  id:
+    displayName: 编号
+  name:
+    displayName: 名称
+  aliases:
+    displayName: 别名
+  canon_status:
+    displayName: 状态
+  updated_at:
+    displayName: 更新
+
+views:
+  - type: table
+    name: 人物
+    filters:
+      and:
+        - 'type == "character"'
+    order:
+      - file.name
+      - id
+      - aliases
+      - canon_status
+      - updated_at
+
+  - type: table
+    name: 势力
+    filters:
+      and:
+        - 'type == "faction"'
+    order:
+      - file.name
+      - id
+      - aliases
+      - canon_status
+      - updated_at
+
+  - type: table
+    name: 地点
+    filters:
+      and:
+        - 'type == "location"'
+    order:
+      - file.name
+      - id
+      - aliases
+      - canon_status
+      - updated_at
+
+  - type: table
+    name: 物品
+    filters:
+      and:
+        - 'type == "item"'
+    order:
+      - file.name
+      - id
+      - canon_status
+      - updated_at
+
+  - type: table
+    name: 敌人
+    filters:
+      and:
+        - 'type == "enemy"'
+    order:
+      - file.name
+      - id
+      - canon_status
+      - updated_at
+
+  - type: table
+    name: 世界设定
+    filters:
+      and:
+        - 'type == "world"'
+    order:
+      - file.name
+      - id
+      - updated_at
+
+  - type: table
+    name: 大纲与卷
+    filters:
+      or:
+        - 'type == "volume"'
+        - 'type == "chapter_outline"'
+    order:
+      - file.name
+      - id
+      - canon_status
+      - updated_at
+
+  - type: cards
+    name: 全部实体卡片
+    limit: 60
+    order:
+      - file.name
+      - id
+      - canon_status

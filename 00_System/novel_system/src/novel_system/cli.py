@@ -99,6 +99,7 @@ def cmd_rebuild(args: argparse.Namespace) -> int:
                 ("扫描文件", result["files"]),
                 ("错误", len(result["errors"])),
                 ("清理临时文件", result.get("cleaned_temp", 0)),
+                ("索引页", result.get("index_md", {}).get("path", "—")),
             ]
         )
         for key, value in result["indexed"].items():
@@ -347,6 +348,21 @@ def cmd_find(args: argparse.Namespace) -> int:
             ],
         )
         print(f"\n  共 {len(rows)} 条。看正文：novel show <ID> --body")
+        return 0
+
+
+def cmd_index_md(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        result = orch.write_entity_index()
+        head("生成实体索引页")
+        kv_block(
+            [
+                ("文件", result["path"]),
+                ("实体", result["entities"]),
+            ]
+        )
+        for doc_type, count in result["by_type"].items():
+            print(f"    {doc_type}: {count}")
         return 0
 
 
@@ -734,6 +750,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="环境与配置体检").set_defaults(func=cmd_doctor)
     sub.add_parser("rebuild-index", help="从 Markdown 重建 SQLite 索引").set_defaults(func=cmd_rebuild)
+    sub.add_parser("index-md", help="生成 07_Entity_Graph/Entity_Index.md 全量索引页").set_defaults(
+        func=cmd_index_md
+    )
 
     p_status = sub.add_parser("status", help="查看章节与索引状态")
     p_status.add_argument("chapter", nargs="?", help="章节 ID，如 CH-0002")
