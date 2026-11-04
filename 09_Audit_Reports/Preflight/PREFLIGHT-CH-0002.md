@@ -5,7 +5,7 @@ report_type: Preflight
 target: CH-0002
 verdict: ACCEPTED
 generated_by: chief_editor/offline
-created_at: '2026-11-04T13:27:54+08:00'
+created_at: '2026-11-04T13:53:36+08:00'
 pack: .novel_system/staging/preflight/PREFLIGHT-CH-0002.md
 issue_count: 0
 ---
@@ -24,7 +24,7 @@ issue_count: 0
 ## 上下文预算实际用量
 | 区块 | 字符数 | 预算 | 占比 |
 |---|---:|---:|---:|
-| task_and_outline | 3993 | 4800 | 20% |
+| task_and_outline | 4002 | 4800 | 20% |
 | canon_and_state | 4831 | 4800 | 20% |
 | recent_text | 93 | 6000 | 25% |
 | foreshadow_and_events | 0 | 3600 | 15% |
