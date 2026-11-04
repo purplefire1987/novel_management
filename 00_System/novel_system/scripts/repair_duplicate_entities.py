@@ -23,7 +23,7 @@
 
 用法
 ----
-    cd "/Users/Mr_Zhou/WorkBuddy/超长篇小说管理系统/NovelVault"
+    cd "/Users/Mr_Zhou/WorkBuddy/超长篇小说管理系统"
     ../.venv/bin/python 00_System/novel_system/scripts/repair_duplicate_entities.py           # 看计划
     ../.venv/bin/python 00_System/novel_system/scripts/repair_duplicate_entities.py --apply   # 执行
     ../.venv/bin/novel --vault . rebuild-index                                               # 重建索引

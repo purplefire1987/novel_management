@@ -22,7 +22,7 @@
 ## 目录结构
 
 ```text
-NovelVault/
+超长篇小说管理系统/            # ← 仓库根，同时也是 Obsidian Vault 根
 ├── 00_System/                  # 配置 / Prompt / 质量门 / Schema
 │   ├── Config/                 # system_config、agent_registry、permissions、workflow、id_rules
 │   ├── Prompts/                # 5 个 Agent 的 System Prompt（可改）
@@ -52,10 +52,10 @@ NovelVault/
 ```bash
 # 1. 装依赖（建议 venv 放在 Vault 之外）
 python3 -m venv .venv
-./.venv/bin/pip install -e NovelVault/00_System/novel_system
+./.venv/bin/pip install -e 00_System/novel_system
 
 # 2. 体检
-./.venv/bin/novel --vault NovelVault doctor
+./.venv/bin/novel doctor
 
 # 3. 配模型（任何 OpenAI 兼容接口都行）
 export NOVEL_LLM_API_KEY=sk-...
@@ -142,8 +142,8 @@ novel find 环教        # 按名称 / 别名 / 概要查单条
   由 `novel index-md` 生成（含 `generated_at`，请勿手改）。
 - **动态表格**：`12_Dashboard/九州视图.base` 是 Obsidian Bases 视图（人物 / 势力 / 地点 / 物品 /
   敌人 / 设定 / 大纲），读 frontmatter，不依赖 Dataview。
-- **仓库根必须是 `NovelVault/`**。若把上一级目录当 Vault 打开，`.venv/`、交付 HTML、临时文件
-  会一起进文件树与图谱——`.obsidian/app.json` 里的 `userIgnoreFilters` 只是兜底，不是解法。
+- **仓库根 = Vault 根 = 本目录**（不再是 `NovelVault/` 子目录）。Obsidian 不允许仓库嵌套，
+  Vault 一旦是某个 Vault 的子文件夹就打不开——所以路径不要再套一层。
 
 ## 编务团（WorkBuddy 专家团）
 

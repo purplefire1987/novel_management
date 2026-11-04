@@ -4,8 +4,8 @@
 
 对应 PRD：`超长篇小说个人知识库_MVP_PRD.md` v1.0。
 
-- **事实源**：`NovelVault/` 下的 Markdown + YAML（Obsidian 可直接打开）
-- **可重建索引**：`NovelVault/.novel_system/index.sqlite`（SQLite + FTS5）
+- **事实源**：仓库根（= Obsidian Vault 根）下的 Markdown + YAML（Obsidian 直接打开）
+- **可重建索引**：`.novel_system/index.sqlite`（SQLite + FTS5）
 - **执行层**：Python（状态机 / 权限 / Schema / 事务 / 审计 / Git）
 - **Agent 层**：总编、资料官、编辑、主笔、记忆管理员（Prompt 在 Vault 内，可改）
 
@@ -14,7 +14,7 @@
 ## 1. 目录
 
 ```text
-NovelVault/                       # 唯一 Git 仓库：事实源 + 执行层代码
+超长篇小说管理系统/                  # 唯一 Git 仓库 = Vault 根：事实源 + 执行层代码
 ├── 00_System/
 │   ├── Config/                 # system_config / agent_registry / permissions / workflow / id_rules
 │   ├── Prompts/                # 5 个 Agent 的 System Prompt
@@ -61,15 +61,15 @@ NovelVault/                       # 唯一 Git 仓库：事实源 + 执行层代
 ```bash
 cd /Users/Mr_Zhou/WorkBuddy/2026-11-03-04-14-38
 python3 -m venv .venv
-./.venv/bin/pip install -e NovelVault/00_System/novel_system
-./.venv/bin/novel --vault NovelVault doctor
+./.venv/bin/pip install -e 00_System/novel_system
+./.venv/bin/novel doctor
 ```
 
 代码与 Vault 同属一个 Git 仓库（`00_System/novel_system/`），但 venv 建议放在 Vault 之外，
 避免把解释器产物混进事实源目录（`.gitignore` 已兜底，双保险）。
 
 CLI 入口为 `novel`；也可以用 `./.venv/bin/python -m novel_system.cli`。
-Vault 路径解析顺序：`--vault` → `NOVEL_VAULT` 环境变量 → 当前目录/`NovelVault` → 逐级向上查找。
+Vault 路径解析顺序：`--vault` → `NOVEL_VAULT` 环境变量 → 当前目录 → 逐级向上查找含 `00_System` 的目录。
 
 ---
 

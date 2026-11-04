@@ -28,6 +28,9 @@
 .obsidian/plugins/
 .vscode/
 .idea/
+# 仓库根上移后，本地临时目录与回收站不再入库
+.workbuddy/
+.trash_*/
 
 # Python 代码产物（代码位于 00_System/novel_system）
 __pycache__/

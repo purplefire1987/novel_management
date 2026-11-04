@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..database.sqlite import Index, now_iso
+from ..database.sqlite import Index
 
 INDEX_REL = "07_Entity_Graph/Entity_Index.md"
 
@@ -81,7 +81,6 @@ def render(index: Index) -> tuple[str, dict[str, int]]:
     lines: list[str] = [
         "---",
         "type: index",
-        f"generated_at: {now_iso()}",
         f"entity_count: {len(rows)}",
         "---",
         "",
@@ -89,6 +88,7 @@ def render(index: Index) -> tuple[str, dict[str, int]]:
         "",
         "> 本页由 `novel index-md` 从索引库生成，**请勿手改**。改档案请改 Markdown",
         "> frontmatter，然后跑 `novel rebuild-index`（会自动刷新本页）。",
+        "> 不写生成时间戳：每次重建只为真实变化留 diff，不给 Git 制造噪音。",
         "",
         f"共 **{len(rows)}** 条实体。每一条都是双链，点开即档案；档案页的「反向链接」",
         "里也能回到本页。",

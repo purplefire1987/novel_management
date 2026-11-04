@@ -1,6 +1,5 @@
 ---
 type: index
-generated_at: 2026-11-04T10:56:43+08:00
 entity_count: 708
 ---
 
@@ -8,6 +7,7 @@ entity_count: 708
 
 > 本页由 `novel index-md` 从索引库生成，**请勿手改**。改档案请改 Markdown
 > frontmatter，然后跑 `novel rebuild-index`（会自动刷新本页）。
+> 不写生成时间戳：每次重建只为真实变化留 diff，不给 Git 制造噪音。
 
 共 **708** 条实体。每一条都是双链，点开即档案；档案页的「反向链接」
 里也能回到本页。

@@ -1,1 +1,13 @@
-{}
+{
+  "userIgnoreFilters": [
+    "__pycache__/",
+    "*.egg-info/",
+    ".pytest_cache/",
+    ".pytest_tmp/",
+    ".novel_system/",
+    ".venv/",
+    ".workbuddy/",
+    ".trash_20261104/",
+    "*.pyc"
+  ]
+}

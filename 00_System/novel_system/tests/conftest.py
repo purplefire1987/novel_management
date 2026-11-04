@@ -39,6 +39,10 @@ COPY_IGNORE = (
     ".pytest_cache",
     ".venv",
     "*.egg-info",
+    # 仓库根上移后，根目录多了本地环境与回收站：
+    # .workbuddy 有访问限制，rsync 遇到会以退出码 23 失败，必须排除
+    ".workbuddy",
+    ".trash_*",
 )
 
 # 本机环境注意：系统临时目录（/private/var/folders/...）在沙箱下不可写，

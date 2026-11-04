@@ -15,7 +15,7 @@
 # =============================================================================
 set -euo pipefail
 
-VAULT="/Users/Mr_Zhou/WorkBuddy/超长篇小说管理系统/NovelVault"
+VAULT="/Users/Mr_Zhou/WorkBuddy/超长篇小说管理系统"
 PY="/Users/Mr_Zhou/WorkBuddy/超长篇小说管理系统/.venv/bin/python"
 NOVEL="/Users/Mr_Zhou/WorkBuddy/超长篇小说管理系统/.venv/bin/novel"
 
