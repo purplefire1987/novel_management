@@ -5,7 +5,7 @@ report_type: Preflight
 target: CH-0001
 verdict: REVISION_REQUIRED
 generated_by: chief_editor/offline
-created_at: '2026-11-04T12:53:39+08:00'
+created_at: '2026-11-04T12:57:54+08:00'
 pack: .novel_system/staging/preflight/PREFLIGHT-CH-0001.md
 issue_count: 8
 ---
