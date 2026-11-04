@@ -336,7 +336,14 @@ class Orchestrator:
         self.index = ensure_index(self.cfg)
         # 索引页是索引库的投影，重建完顺手刷新，省得两边脱节
         result["index_md"] = self.write_entity_index()
+        # 实体↔地图的挂链同样是投影：索引一变就跟着重算
+        result["map_sync"] = self.sync_map()
         return result
+
+    def sync_map(self) -> dict[str, Any]:
+        from .workflow import map_sync
+
+        return map_sync.run(self.cfg)
 
     def write_entity_index(self) -> dict[str, Any]:
         from .workflow.index_md import write_entity_index

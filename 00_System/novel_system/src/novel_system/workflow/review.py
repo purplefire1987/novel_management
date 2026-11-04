@@ -243,4 +243,13 @@ def publish(cfg: Config, index: Index, chapter_id: str, confirmed: bool = False)
     result["path"] = rel
     result["word_count"] = words
     commit_artifacts(cfg, f"publish {chapter_id}")
+
+    # 正文一落盘，人物/势力/物品的出场章节就变了：立刻重算地图投影，
+    # 免得地图页要等到下次 rebuild-index 才跟上。失败不影响发布本身。
+    try:
+        from . import map_sync
+
+        result["map_sync"] = map_sync.run(cfg)
+    except Exception as exc:  # noqa: BLE001 - 派生页失败不该回滚已经发布的正文
+        result["map_sync_error"] = str(exc)
     return result

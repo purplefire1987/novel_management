@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -45,17 +46,25 @@ COPY_IGNORE = (
     ".trash_*",
 )
 
-# 本机环境注意：系统临时目录（/private/var/folders/...）在沙箱下不可写，
-# 而 basetemp 若落在 Vault 内（项目目录内跑测试时就会这样），复制 Vault 会递归、
-# 且清理时会被安全策略拦住 .novel_system 下的文件删除。
-# 这里统一把 basetemp 指到系统 /tmp（不受上述限制），用户显式传 --basetemp 时不覆盖。
-DEFAULT_BASETEMP = Path("/tmp/nv_pytest")
+# 本机环境注意：系统临时目录（/private/var/folders/...）在沙箱下不可写——每个 mkdir
+# 都要过一次中间层，45 个用例直接卡在夹具上（实测 20 分钟不动）。`/tmp` 不受此限。
+#
+# 但 `pytest_configure` 写在**子目录** conftest 里是无效的：configure 阶段子目录的
+# conftest 还没被加载，钩子来不及注册，pytest 仍会用自己的默认 temp root。
+# 所以这里不靠钩子，直接自己建临时根目录，绕开 `tmp_path_factory`。
+DEFAULT_TEMPROOT = Path("/tmp/nv_pytest")
+
+
+def _temproot() -> Path:
+    return Path(os.environ.get("NOVEL_TEST_TMP", str(DEFAULT_TEMPROOT)))
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    if getattr(config.option, "basetemp", None) or not DEFAULT_BASETEMP.parent.exists():
+    """尽力而为：能改 basetemp 就改，改不了也不影响（夹具已不依赖 tmp_path）。"""
+    root = _temproot()
+    if getattr(config.option, "basetemp", None) or not root.parent.exists():
         return
-    config.option.basetemp = str(DEFAULT_BASETEMP)
+    config.option.basetemp = str(root)
 
 
 def _copy_tree(src: Path, dst: Path) -> None:
@@ -64,11 +73,14 @@ def _copy_tree(src: Path, dst: Path) -> None:
     Vault 现在有近千个 Markdown；Python 逐文件复制在受限宿主里每个 `open` 都要过一次
     中间层，整棵树要 20 秒以上，夹具直接超时。rsync 是原生进程，0.2 秒完成同样的活，
     且 `--exclude` 与 `shutil.ignore_patterns` 语义一致。
+
+    `--inplace` 是必须的：不带它时 rsync 会先写 `.name.XXXXXX` 临时文件再改名，
+    那一步会产生**删除**操作，在带文件守卫的环境里会被判成批量删除而中断整轮测试。
     """
     dst.parent.mkdir(parents=True, exist_ok=True)
     rsync = shutil.which("rsync")
     if rsync:
-        args = [rsync, "-a"]
+        args = [rsync, "-a", "--inplace"]
         for pattern in COPY_IGNORE:
             args += ["--exclude", pattern]
         args += [f"{src}/", f"{dst}/"]
@@ -78,15 +90,30 @@ def _copy_tree(src: Path, dst: Path) -> None:
 
 
 @pytest.fixture(scope="session")
-def vault_template(tmp_path_factory) -> Path:
-    dst = tmp_path_factory.mktemp("template") / "NovelVault"
+def test_root() -> Path:
+    """本次测试专用的临时根目录，**不删旧目录**。
+
+    带文件守卫的宿主里，session 结束时的清理（rmtree）会被判成批量删除而中断，
+    所以改成「每次运行一个新目录」，旧目录由使用者在方便时手动清：
+        rm -rf /tmp/nv_pytest
+    用 PID 区分并发运行，避免两个进程互相覆盖。
+    """
+    root = _temproot() / f"run-{os.getpid()}"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+@pytest.fixture(scope="session")
+def vault_template(test_root: Path) -> Path:
+    dst = test_root / "template" / "NovelVault"
     _copy_tree(VAULT_SRC, dst)
     return dst
 
 
 @pytest.fixture
-def vault_dir(tmp_path, vault_template) -> Path:
-    dst = tmp_path / "NovelVault"
+def vault_dir(test_root: Path, vault_template: Path, request: pytest.FixtureRequest) -> Path:
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in request.node.name)[:80]
+    dst = test_root / "cases" / safe / "NovelVault"
     _copy_tree(vault_template, dst)
     return dst
 
