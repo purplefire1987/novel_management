@@ -89,6 +89,34 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         return 0 if result["all_ok"] else 1
 
 
+def cmd_integrity(args: argparse.Namespace) -> int:
+    with Orchestrator(Config.load(args.vault)) as orch:
+        report = orch.integrity()
+        head("结构完整性")
+        kv_block(list(report.stats.items()))
+        head("问题分布")
+        if report.by_category:
+            kv_block(list(report.by_category.items()))
+        else:
+            print("  无问题")
+        head("明细")
+        print_issues(report.issues)
+
+        if args.report:
+            from datetime import date
+
+            from .validators import integrity as integrity_mod
+
+            target = Path(args.report)
+            if target.is_dir() or args.report.endswith("/"):
+                target = target / f"结构完整性_{date.today():%Y%m%d}.md"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(integrity_mod.render_markdown(report), encoding="utf-8")
+            print(f"\n报告已写入：{target}")
+
+        return 0 if not report.blockers else 1
+
+
 def cmd_rebuild(args: argparse.Namespace) -> int:
     with Orchestrator(Config.load(args.vault)) as orch:
         result = orch.rebuild_index()
@@ -749,6 +777,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", help="环境与配置体检").set_defaults(func=cmd_doctor)
+
+    p_inte = sub.add_parser("integrity", help="结构校验：单一事实源 + 可维护性")
+    p_inte.add_argument(
+        "--report",
+        nargs="?",
+        const="09_Audit_Reports/",
+        default="",
+        help="顺带把完整报告写成 Markdown（给目录则自动命名）",
+    )
+    p_inte.set_defaults(func=cmd_integrity)
     sub.add_parser("rebuild-index", help="从 Markdown 重建 SQLite 索引").set_defaults(func=cmd_rebuild)
     sub.add_parser("index-md", help="生成 07_Entity_Graph/Entity_Index.md 全量索引页").set_defaults(
         func=cmd_index_md

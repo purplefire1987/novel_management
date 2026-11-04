@@ -329,7 +329,13 @@ def _collapse(chains: list[list[str]]) -> list[list[str]]:
 
 
 def _existing_links(text: str) -> set[str]:
-    return {m.group(1).strip() for m in WIKILINK.finditer(text)}
+    """手写段里的双链——**必须排除受控块自己写的那些**。
+
+    否则第一轮写完块，第二轮就会把块内的链接当成「手写已收录」，
+    `fresh` 归零、提示行消失、再写一次盘。表现是「跑两三次才稳定」。
+    """
+    outside = re.sub(r"<!-- AUTO:[A-Z-]+ -->.*?<!-- /AUTO:[A-Z-]+ -->", "", text, flags=re.S)
+    return {m.group(1).strip() for m in WIKILINK.finditer(outside)}
 
 
 def _render_place_block(place: Place, members: list[Entity], places: dict[str, Place]) -> str:

@@ -338,12 +338,25 @@ class Orchestrator:
         result["index_md"] = self.write_entity_index()
         # 实体↔地图的挂链同样是投影：索引一变就跟着重算
         result["map_sync"] = self.sync_map()
+        # 人物↔物品↔势力 的关系索引，和地图投影一样是派生页
+        result["relation_sync"] = self.sync_relations()
         return result
 
     def sync_map(self) -> dict[str, Any]:
         from .workflow import map_sync
 
         return map_sync.run(self.cfg)
+
+    def sync_relations(self) -> dict[str, Any]:
+        from .workflow import relation_sync
+
+        return relation_sync.run(self.cfg)
+
+    def integrity(self) -> Any:
+        """结构校验：单一事实源 + 可维护性。只读，不改档案。"""
+        from .validators import integrity
+
+        return integrity.run(self.cfg)
 
     def write_entity_index(self) -> dict[str, Any]:
         from .workflow.index_md import write_entity_index
@@ -443,10 +456,15 @@ class Orchestrator:
         from .agents.base import LLMClient
 
         llm = LLMClient(cfg)
+        # 作者已裁定正文由会话直接成稿，`llm.enabled=false` 时没有 key 是**预期状态**，
+        # 不该让体检一直挂红。只有显式开启却没配 key 才算问题。
+        llm_enabled = bool((cfg.llm or {}).get("enabled", True))
         add(
             "LLM 配置",
-            llm.available,
-            f"{llm.model} @ {llm.base_url}" if llm.available else "未配置 API Key（将使用离线模式）",
+            llm.available or not llm_enabled,
+            f"{llm.model} @ {llm.base_url}"
+            if llm.available
+            else ("已关闭外部 LLM（正文由会话直接成稿）" if not llm_enabled else "未配置 API Key"),
         )
 
         import subprocess
@@ -460,4 +478,12 @@ class Orchestrator:
 
         stats = self.index.stats()
         add("已索引实体", stats["entities"] > 0, str(stats))
+
+        # 结构校验只取「结论」，明细留给 novel integrity。
+        # 放在最后：前面任何一项失败都不影响这里跑完。
+        from .validators import integrity
+
+        report = integrity.run(cfg)
+        for check in integrity.checks_for_doctor(report):
+            add(check["check"], bool(check["ok"]), str(check["detail"]))
         return {"checks": checks, "stats": stats, "all_ok": all(c["ok"] for c in checks)}
