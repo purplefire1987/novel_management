@@ -8,6 +8,7 @@
     上级 / 上级势力 / 所属势力 / 势力所属（值为真实势力时）  →  上级
     下级 / 下属势力 / 关联：军团库                          →  下级
     盟友 / 盟好 / 结盟                                      →  盟友（对称）
+    中立 / 中立势力                                         →  中立（对称）
     敌对 / 敌对势力 / 仇敌                                  →  敌对（对称）
 
 写什么
@@ -37,7 +38,7 @@ from novel_system.workflow import relation_sync as rs  # noqa: E402
 OUT = VAULT / "01_Core_Memory/World/九州/总表/WORLD-0042_势力关系表.md"
 TODAY = date.today().isoformat()
 
-LABEL_ORDER = ("上级", "下级", "盟友", "敌对")
+LABEL_ORDER = ("上级", "下级", "盟友", "中立", "敌对")
 
 
 def collect() -> tuple[dict, dict, dict]:
@@ -53,6 +54,7 @@ def collect() -> tuple[dict, dict, dict]:
     parents: dict[str, set[str]] = defaultdict(set)
     children: dict[str, set[str]] = defaultdict(set)
     ally: dict[str, set[str]] = defaultdict(set)
+    neutral: dict[str, set[str]] = defaultdict(set)
     foe: dict[str, set[str]] = defaultdict(set)
 
     for e in edges:
@@ -65,11 +67,14 @@ def collect() -> tuple[dict, dict, dict]:
         elif e.label == "盟友":
             ally[e.src].add(e.dst)
             ally[e.dst].add(e.src)
+        elif e.label == "中立":
+            neutral[e.src].add(e.dst)
+            neutral[e.dst].add(e.src)
         elif e.label == "敌对":
             foe[e.src].add(e.dst)
             foe[e.dst].add(e.src)
 
-    linked = set(parents) | set(children) | set(ally) | set(foe)
+    linked = set(parents) | set(children) | set(ally) | set(neutral) | set(foe)
     isolated = [n for n in factions if n.id not in linked]
     return by_id, {
         "factions": factions,
@@ -77,6 +82,7 @@ def collect() -> tuple[dict, dict, dict]:
         "parents": parents,
         "children": children,
         "ally": ally,
+        "neutral": neutral,
         "foe": foe,
         "isolated": isolated,
     }, {}
@@ -109,6 +115,7 @@ def render(by_id: dict, data: dict) -> str:
     parents: dict = data["parents"]
     children: dict = data["children"]
     ally: dict = data["ally"]
+    neutral: dict = data["neutral"]
     foe: dict = data["foe"]
     isolated: list = data["isolated"]
 
@@ -143,7 +150,7 @@ def render(by_id: dict, data: dict) -> str:
     out.append("> 势力卡的声明字段，**要改关系就改卡片，再重跑**")
     out.append("> `00_System/scripts/gen_faction_relations.py`；直接改本表会在下次重跑时被覆盖。")
     out.append(">")
-    out.append("> 写关系的四个字段：`上级`／`下级`（层级）、`盟友`／`敌对`（横向，写一头即可，")
+    out.append("> 写关系的五个字段：`上级`／`下级`（层级）、`盟友`／`中立`／`敌对`（横向，写一头即可，")
     out.append("> 反向自动补全）。字段白名单见 `novel_system/workflow/relation_sync.py`。")
     out.append("")
 
@@ -188,12 +195,17 @@ def render(by_id: dict, data: dict) -> str:
         out.append("")
 
     # ---------------- 横向
-    out.append("## 横向：盟友与敌对")
+    out.append("## 横向：盟友、中立与敌对")
+    out.append("")
+    out.append("一对势力只取一个立场。三个标签互斥，靠 `novel integrity` 的「立场矛盾」兜底。")
     out.append("")
     pairs: dict[tuple[str, str], str] = {}
     for src, dsts in ally.items():
         for dst in dsts:
             pairs[tuple(sorted((src, dst)))] = "盟友"
+    for src, dsts in neutral.items():
+        for dst in dsts:
+            pairs[tuple(sorted((src, dst)))] = "中立"
     for src, dsts in foe.items():
         for dst in dsts:
             pairs[tuple(sorted((src, dst)))] = "敌对"
@@ -201,11 +213,12 @@ def render(by_id: dict, data: dict) -> str:
     if pairs:
         out.append("| 甲方 | 关系 | 乙方 |")
         out.append("| --- | --- | --- |")
-        for (a, b), label in sorted(pairs.items(), key=lambda kv: (kv[1], kv[0])):
+        rank = {"盟友": 0, "中立": 1, "敌对": 2}
+        for (a, b), label in sorted(pairs.items(), key=lambda kv: (rank.get(kv[1], 9), kv[0])):
             out.append(f"| {link(by_id, a)} | {label} | {link(by_id, b)} |")
         out.append("")
     else:
-        out.append("**零条**。全库还没有任何一对势力写过 `盟友` 或 `敌对`。")
+        out.append("**零条**。全库还没有任何一对势力写过 `盟友`、`中立` 或 `敌对`。")
         out.append("")
 
     # ---------------- 孤立

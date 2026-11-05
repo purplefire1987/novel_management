@@ -348,7 +348,7 @@ def _check_faction_relations(
     1. 类别词撞上势力名   → 层级会被静默算错（MAJOR）
     2. 类别词没登记       → 多半是笔误或势力改过名（MINOR）
     3. 层级自相矛盾       → A 说 B 是它下级，B 却说自己的上级不是 A（MAJOR）
-    4. 恩怨自相矛盾       → 同一对势力既是盟友又敌对（MAJOR）
+    4. 立场自相矛盾       → 同一对势力同时被记为盟友／中立／敌对中的两种（MAJOR）
 
     第 3、4 条今天都是 0——写进来是为了将来改设定时不至于无声出错。
     """
@@ -427,16 +427,26 @@ def _check_faction_relations(
                     [a, b],
                 )
 
-    # ---- 4) 恩怨矛盾
-    ally = {frozenset((e.src, e.dst)) for e in edges if e.label == "盟友"}
-    foe = {frozenset((e.src, e.dst)) for e in edges if e.label == "敌对"}
-    for pair in sorted(ally & foe, key=lambda p: sorted(p)):
-        a, b = sorted(pair)
-        report.add(
-            "MAJOR", "恩怨矛盾",
-            f"{_name(by_id, a)} 与 {_name(by_id, b)} 同时被记为盟友和敌对",
-            [a, b],
-        )
+    # ---- 4) 立场矛盾：盟友 / 中立 / 敌对 三者两两互斥
+    #
+    # 一对势力只能有一个横向立场。同时写两条通常不是笔误，而是**改设定时只加新行、
+    # 忘了删旧行**——页面上就会出现「盟友 + 中立」两个互相打脸的标签。所以按 MAJOR
+    # 报出来，由作者决定哪条算数。
+    #
+    # 前两条沿用旧类别名「恩怨矛盾」，与历史体检报告可比；牵涉中立的用「立场矛盾」。
+    stance = {
+        label: {frozenset((e.src, e.dst)) for e in edges if e.label == label}
+        for label in ("盟友", "中立", "敌对")
+    }
+    for labels in (("盟友", "敌对"), ("盟友", "中立"), ("中立", "敌对")):
+        category = "恩怨矛盾" if labels == ("盟友", "敌对") else "立场矛盾"
+        for pair in sorted(stance[labels[0]] & stance[labels[1]], key=lambda p: sorted(p)):
+            a, b = sorted(pair)
+            report.add(
+                "MAJOR", category,
+                f"{_name(by_id, a)} 与 {_name(by_id, b)} 同时被记为{labels[0]}和{labels[1]}",
+                [a, b],
+            )
 
     # ---- 覆盖率：有多少势力一条对外关系都没有
     linked = {i for e in edges if e.src_kind == "势力" and e.dst_kind == "势力" for i in (e.src, e.dst)}
