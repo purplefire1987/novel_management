@@ -24,6 +24,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 from .. import vault
 from ..config import Config
 from ..links import WIKILINK
@@ -237,6 +239,23 @@ def _check_relations(cfg: Config, report: Report) -> None:
     from ..workflow import relation_sync
 
     dangling = relation_sync.dangling(cfg)
+    # 「势力所属」里可能只写了类别（宗门、门阀、邪派…），那不是「待建档的势力」，
+    # 是分类标签。不过滤掉的话，每个门阀都会挂一条假缺口，把真缺口埋了。
+    cats = _faction_categories(cfg)
+
+    def _category_only(d: dict) -> bool:
+        # 只在势力卡上成立：人物卡的「势力」必须是真的势力，类别词算缺口
+        if d.get("kind") != "势力":
+            return False
+        if d.get("field") not in ("势力所属", "所属势力", "势力"):
+            return False
+        text = str(d.get("value") or "")
+        if "[[" in text:
+            return False
+        toks = [t.strip() for t in re.split(r"[,，、]", text) if t.strip()]
+        return bool(toks) and all(t in cats for t in toks)
+
+    dangling = [d for d in dangling if not _category_only(d)]
     if dangling:
         # 分两级：写了双链却解析不到 = 链错了（MAJOR）；
         # 只写了名字解析不到 = 还没建档（MINOR），属于知识缺口而不是错误。
@@ -299,6 +318,137 @@ def _check_relations(cfg: Config, report: Report) -> None:
 
     report.stats["关系边"] = len(edges)
     report.stats["悬空关系字段"] = len(dangling)
+    _check_faction_relations(cfg, report, nodes, by_id, edges)
+
+
+FACTION_CATEGORY_CONFIG = "00_System/Config/faction_categories.yaml"
+
+
+def _faction_categories(cfg: Config) -> set[str]:
+    path = cfg.vault / FACTION_CATEGORY_CONFIG
+    if not path.exists():
+        return set()
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return {str(x).strip() for x in (data.get("categories") or []) if str(x).strip()}
+
+
+def _check_faction_relations(
+    cfg: Config,
+    report: Report,
+    nodes: list,
+    by_id: dict,
+    edges: list,
+) -> None:
+    """势力之间的四类毛病。
+
+    势力卡的 `势力所属` 一栏是旧表格沿用的，同时装着「类别」和「上级」两种东西；
+    关系引擎按「这个名字有没有对应档案」来分辨。这个办法只在**类别词恰好不和
+    任何势力重名**时成立，所以这里把前提显式验一遍：
+
+    1. 类别词撞上势力名   → 层级会被静默算错（MAJOR）
+    2. 类别词没登记       → 多半是笔误或势力改过名（MINOR）
+    3. 层级自相矛盾       → A 说 B 是它下级，B 却说自己的上级不是 A（MAJOR）
+    4. 恩怨自相矛盾       → 同一对势力既是盟友又敌对（MAJOR）
+
+    第 3、4 条今天都是 0——写进来是为了将来改设定时不至于无声出错。
+    """
+    from ..workflow import relation_sync
+
+    factions = [n for n in nodes if n.kind == "势力"]
+    names = {n.name: n.id for n in factions}
+    cats = _faction_categories(cfg)
+
+    # ---- 1) 类别词与势力同名
+    clash = sorted(cats & set(names))
+    if clash:
+        report.add(
+            "MAJOR",
+            "类别撞名",
+            f"{len(clash)} 个类别词同时也是势力名（{'、'.join(clash)}）——"
+            "势力卡的「势力所属」会把它们解析成上级，层级会算错。"
+            f"要么把它们从 {FACTION_CATEGORY_CONFIG} 移到势力卡，要么给势力改名",
+            clash,
+        )
+
+    # ---- 2) 既非类别、也非势力的词
+    unknown: dict[str, list[str]] = defaultdict(list)
+    for n in factions:
+        fields = dict(relation_sync._fields(relation_sync._read_body(n.path)))
+        for tok in re.split(r"[,，、]", fields.get("势力所属", "")):
+            tok = tok.strip()
+            if not tok or tok in names or tok in cats:
+                continue
+            unknown[tok].append(n.id)
+    if unknown:
+        detail = "；".join(
+            f"「{k}」（{len(v)} 张）" for k, v in sorted(unknown.items(), key=lambda kv: -len(kv[1]))[:5]
+        )
+        report.add(
+            "MINOR",
+            "势力类别未登记",
+            f"{len(unknown)} 个词既不是已有势力、也不在类别白名单里：{detail}——"
+            f"要么加进 {FACTION_CATEGORY_CONFIG}，要么是笔误、或那个势力已经改名/删除",
+            [i for v in unknown.values() for i in v][:8],
+        )
+
+    # ---- 3) 层级矛盾
+    parents: dict[str, set[str]] = defaultdict(set)
+    children: dict[str, set[str]] = defaultdict(set)
+    for e in edges:
+        if e.label == "上级":
+            parents[e.src].add(e.dst)
+            children[e.dst].add(e.src)
+        elif e.label == "下级":
+            children[e.src].add(e.dst)
+            parents[e.dst].add(e.src)
+
+    # 只有「A 单方面把 B 记为下级，而 B 明确写了别的上级、且没提 A」才算矛盾。
+    # 多个上级本身合法——北府军同时归李家与帝室，是共管不是错误。
+    for parent, kids in sorted(children.items()):
+        for kid in sorted(kids):
+            declared = parents.get(kid, set())
+            if declared and parent not in declared and len(declared) == 1:
+                only = next(iter(declared))
+                report.add(
+                    "MAJOR",
+                    "层级矛盾",
+                    f"{_name(by_id, parent)} 把 {_name(by_id, kid)} 记为下级，"
+                    f"但 {_name(by_id, kid)} 只申报了 {_name(by_id, only)} 一个上级",
+                    [parent, kid, only],
+                )
+
+    # 互相当对方上级 = 环
+    for a, ups in parents.items():
+        for b in ups:
+            if a in parents.get(b, set()):
+                report.add(
+                    "MAJOR", "层级成环",
+                    f"{_name(by_id, a)} 与 {_name(by_id, b)} 互称上级",
+                    [a, b],
+                )
+
+    # ---- 4) 恩怨矛盾
+    ally = {frozenset((e.src, e.dst)) for e in edges if e.label == "盟友"}
+    foe = {frozenset((e.src, e.dst)) for e in edges if e.label == "敌对"}
+    for pair in sorted(ally & foe, key=lambda p: sorted(p)):
+        a, b = sorted(pair)
+        report.add(
+            "MAJOR", "恩怨矛盾",
+            f"{_name(by_id, a)} 与 {_name(by_id, b)} 同时被记为盟友和敌对",
+            [a, b],
+        )
+
+    # ---- 覆盖率：有多少势力一条对外关系都没有
+    linked = {i for e in edges if e.src_kind == "势力" and e.dst_kind == "势力" for i in (e.src, e.dst)}
+    isolated = [n.id for n in factions if n.id not in linked]
+    report.stats["势力数"] = len(factions)
+    report.stats["势力间关系边"] = sum(1 for e in edges if e.src_kind == "势力" and e.dst_kind == "势力")
+    report.stats["孤立势力"] = len(isolated)
+
+
+def _name(by_id: dict, ident: str) -> str:
+    node = by_id.get(ident)
+    return node.name if node is not None else ident
 
 
 def _check_projection(cfg: Config, report: Report) -> None:
