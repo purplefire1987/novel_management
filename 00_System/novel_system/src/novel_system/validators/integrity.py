@@ -26,10 +26,10 @@ from pathlib import Path
 
 from .. import vault
 from ..config import Config
+from ..links import WIKILINK
 from .schema import CANON_STATUSES, Issue
 
 ENTITY_DIRS = ("Characters", "Factions", "Items", "Enemies", "Locations", "Skills", "Destinies")
-WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]")
 AUTO_OPEN = re.compile(r"<!-- AUTO:([A-Z-]+) -->")
 AUTO_CLOSE = re.compile(r"<!-- /AUTO:([A-Z-]+) -->")
 H1 = re.compile(r"^#\s+(.+?)\s*$", re.M)

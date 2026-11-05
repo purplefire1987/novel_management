@@ -37,6 +37,7 @@ from pathlib import Path
 
 from .. import vault
 from ..config import Config
+from ..links import WIKILINK
 
 LOC_BLOCK_START = "<!-- AUTO:LOCAL-ENTITIES -->"
 LOC_BLOCK_END = "<!-- /AUTO:LOCAL-ENTITIES -->"
@@ -67,7 +68,6 @@ PLACE_FIELDS: tuple[str, ...] = (
 # 没有直接地点时，沿「所属势力」借一层——人的据点通常就是组织的据点
 FACTION_FIELDS: tuple[str, ...] = ("势力所属", "所属势力", "所属", "阵营")
 
-WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]")
 LOC_STEM = re.compile(r"(LOC-\d{4})")
 CH_STEM = re.compile(r"(CH-\d{4})")
 FAC_STEM = re.compile(r"(FAC-\d{4})")

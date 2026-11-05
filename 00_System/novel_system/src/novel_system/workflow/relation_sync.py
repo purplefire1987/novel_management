@@ -35,6 +35,7 @@ from pathlib import Path
 
 from .. import vault
 from ..config import Config
+from ..links import WIKILINK
 
 BLOCK_START = "<!-- AUTO:RELATIONS -->"
 BLOCK_END = "<!-- /AUTO:RELATIONS -->"
@@ -119,7 +120,6 @@ ALLOWED: dict[str, set[str]] = {
     "命格总览": set(),
 }
 
-WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]")
 STOP_CHARS = re.compile(r"[、，,；;/／|｜]")
 
 # 「长歌行「百川」」这类名字带书名括号，人写的时候常常省掉或换一种写法。
