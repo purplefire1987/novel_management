@@ -450,6 +450,42 @@ def _check_config_drift(cfg: Config, report: Report) -> None:
     report.stats["配置漂移"] = len(drift)
 
 
+def _check_garrison_drift(cfg: Config, report: Report) -> None:
+    """驻军表与军团卡对得上吗。
+
+    `WORLD-0041_各州驻军表` 是派生表，由 `scripts/gen_garrison_table.py` 从军团卡生成。
+    改了卡忘了重跑，表就静默过期——而且数字看着依然精确，比空表更危险。
+    这里只比对支数与总人数，不改文件。
+    """
+    table = cfg.vault / "01_Core_Memory/World/九州/总表/WORLD-0041_各州驻军表.md"
+    if not table.exists():
+        return
+    total = count = 0
+    for p in (cfg.vault / "01_Core_Memory/Factions").glob("FAC-*.md"):
+        text = p.read_text(encoding="utf-8")
+        if "subtype: 军团" not in text[:900]:
+            continue
+        m = re.search(r"^-\s*\*\*军团人数\*\*：([\d,]+)", text, re.M)
+        if m:
+            total += int(m.group(1).replace(",", ""))
+            count += 1
+    body = table.read_text(encoding="utf-8")
+    mt = re.search(r"\*\*军团\*\*：(\d+) 支", body)
+    mn = re.search(r"\*\*总兵力\*\*：([\d,]+) 人", body)
+    if not mt or not mn:
+        report.add("MINOR", "驻军表格式",
+                   "WORLD-0041 缺「军团 N 支 / 总兵力 N 人」两行，无法比对", [])
+        return
+    got_c, got_n = int(mt.group(1)), int(mn.group(1).replace(",", ""))
+    if (got_c, got_n) != (count, total):
+        report.add(
+            "MINOR",
+            "驻军表漂移",
+            f"驻军表写 {got_c} 支 / {got_n:,} 人，军团卡实为 {count} 支 / {total:,} 人",
+            ["重跑：00_System/scripts/gen_garrison_table.py"],
+        )
+
+
 def run(cfg: Config) -> Report:
     report = Report()
     docs = _docs(cfg)
@@ -459,6 +495,7 @@ def run(cfg: Config) -> Report:
     _check_catalog(cfg, report)
     _check_projection(cfg, report)
     _check_config_drift(cfg, report)
+    _check_garrison_drift(cfg, report)
     _check_hygiene(cfg, report)
     return report
 
