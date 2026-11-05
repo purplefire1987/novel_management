@@ -330,16 +330,39 @@ class Orchestrator:
         self.index = ensure_index(self.cfg)
         return result
 
-    def rebuild_index(self) -> dict[str, Any]:
+    def rebuild_index(self, full: bool = True) -> dict[str, Any]:
+        """重建索引并刷新三张派生页。
+
+        整段包在 `vault.cached_docs()` 里：索引器读过的文档，两个投影模块直接复用，
+        而投影刚写完的文件会立刻回填缓存。受限宿主里读一次盘约 18ms，
+        不共享缓存的话同一次重建要把全库读三四遍。
+        """
         self.index.close()
-        result = rebuild(self.cfg)
-        self.index = ensure_index(self.cfg)
-        # 索引页是索引库的投影，重建完顺手刷新，省得两边脱节
-        result["index_md"] = self.write_entity_index()
-        # 实体↔地图的挂链同样是投影：索引一变就跟着重算
-        result["map_sync"] = self.sync_map()
-        # 人物↔物品↔势力 的关系索引，和地图投影一样是派生页
-        result["relation_sync"] = self.sync_relations()
+        with vault.cached_docs() as cache:
+            result = rebuild(self.cfg, full=full)
+            self.index = ensure_index(self.cfg)
+            # 索引页是索引库的投影，重建完顺手刷新，省得两边脱节
+            result["index_md"] = self.write_entity_index()
+            # 一个文件都没变、也没有删档时，两张投影页必然是原样：
+            # 直接跳过，否则每次热启动都要白白读一遍全库再得出「无变化」。
+            untouched = (
+                not full
+                and result.get("pruned", 0) == 0
+                and result.get("files", 0) > 0
+                and result.get("skipped", 0) == result.get("files", 0)
+            )
+            if untouched:
+                result["map_sync"] = {"skipped": "无文件变更"}
+                result["relation_sync"] = {"skipped": "无文件变更"}
+                result["catalog_sync"] = {"skipped": "无文件变更"}
+            else:
+                # 实体↔地图的挂链同样是投影：索引一变就跟着重算
+                result["map_sync"] = self.sync_map()
+                # 人物↔物品↔势力↔技能↔命格 的关系索引，和地图投影一样是派生页
+                result["relation_sync"] = self.sync_relations()
+                # 技能库的属技表、命格总览的命格表，由上面的卡片汇总而来
+                result["catalog_sync"] = self.sync_catalog()
+            result["cache"] = cache.stats()
         return result
 
     def sync_map(self) -> dict[str, Any]:
@@ -351,6 +374,11 @@ class Orchestrator:
         from .workflow import relation_sync
 
         return relation_sync.run(self.cfg)
+
+    def sync_catalog(self) -> dict[str, Any]:
+        from .workflow import catalog_sync
+
+        return catalog_sync.run(self.cfg)
 
     def integrity(self) -> Any:
         """结构校验：单一事实源 + 可维护性。只读，不改档案。"""

@@ -21,6 +21,8 @@ ENTITY_TYPES = {
     "story_asset",
     "character_state",
     "volume",
+    "skill",
+    "destiny",
 }
 
 
@@ -41,13 +43,36 @@ def _json(value: Any) -> str:
     return json.dumps(value or [], ensure_ascii=False)
 
 
-def index_document(cfg: Config, index: Index, path: Path, doc: vault.Doc | None = None) -> str | None:
-    """索引单个文件；返回文档类型，未识别则返回 None。"""
+def stamp_of(path: Path) -> tuple[int, int]:
+    """文件指纹 `(mtime 整秒, size)`。
+
+    为什么只到秒：仓库要能整目录复制（测试夹具、备份、换机），而 macOS 自带的
+    rsync 只把修改时间还原到秒，纳秒/微秒位会丢。用更细的精度做判据，
+    每次复制都会判定「全库改过」，增量索引退化成全量——比不做还慢。
+    """
+    st = path.stat()
+    return (int(st.st_mtime), st.st_size)
+
+
+def index_document(
+    cfg: Config,
+    index: Index,
+    path: Path,
+    doc: vault.Doc | None = None,
+    stamp: tuple[int, int] | None = None,
+) -> str | None:
+    """索引单个文件；返回文档类型，未识别则返回 None。
+
+    `stamp` 是 `(mtime, size)`，写进 `files` 表供增量索引用。
+    """
     doc = doc or vault.read_doc(path)
+    if stamp is None:
+        stamp = stamp_of(path)
     meta = doc.meta
     doc_type = meta.get("type")
     doc_id = meta.get("id")
     rel_path = cfg.rel(path)
+    digest = vault.sha256_text(doc.raw)
 
     if not doc_id or doc_type not in ENTITY_TYPES | {
         "foreshadowing",
@@ -57,7 +82,7 @@ def index_document(cfg: Config, index: Index, path: Path, doc: vault.Doc | None 
         "scene_beat",
         "relationship",
     }:
-        index.set_file_hash(rel_path, vault.sha256_text(doc.raw))
+        index.set_file_hash(rel_path, digest, *stamp)
         return None
 
     # 先清理旧的派生记录，避免改名/改类型后残留
@@ -77,7 +102,7 @@ def index_document(cfg: Config, index: Index, path: Path, doc: vault.Doc | None 
             "updated_at": str(meta.get("updated_at") or ""),
             "tags": _json(meta.get("tags")),
             "summary": summarize(doc.body),
-            "content_hash": vault.sha256_text(doc.raw),
+            "content_hash": digest,
         }
     )
 
@@ -136,28 +161,36 @@ def index_document(cfg: Config, index: Index, path: Path, doc: vault.Doc | None 
         )
 
     elif doc_type == "manuscript":
-        digest = vault.sha256_text(doc.body)
+        body_digest = vault.sha256_text(doc.body)
         index.upsert_chapter(
             str(doc_id),
             title=name,
             manuscript_path=rel_path,
             status=str(meta.get("status") or "draft"),
             word_count=int(meta.get("word_count") or 0),
-            content_hash=digest,
+            content_hash=body_digest,
             updated_at=str(meta.get("updated_at") or now_iso()),
         )
         index.index_chapter_text(str(doc_id), name, doc.body)
 
-    index.set_file_hash(rel_path, vault.sha256_text(doc.raw))
+    index.set_file_hash(rel_path, digest, *stamp)
     return str(doc_type)
 
 
-def index_vault(cfg: Config, index: Index) -> dict[str, Any]:
-    """全量索引。返回统计信息，便于 rebuild-index 输出。"""
+def index_vault(cfg: Config, index: Index, full: bool = True) -> dict[str, Any]:
+    """索引全库。
+
+    `full=False` 时走增量：`files` 表里 `(mtime_ns, size)` 未变的文件直接跳过。
+    这不是微优化——受限宿主里单次读盘约 18ms，全量读 800 个档案要 15 秒，
+    而一次正常写作只改动几个文件。默认仍为全量，保证 `rebuild-index` 语义不变。
+    """
     cfg.ensure_dirs()
     counts: dict[str, int] = {}
     errors: list[str] = []
     total = 0
+    skipped = 0
+    seen: set[str] = set()
+    fingerprints = {} if full else index.file_fingerprints()
 
     # 模板、配置、归档不是事实源，不参与索引
     excluded = {
@@ -177,18 +210,26 @@ def index_vault(cfg: Config, index: Index) -> dict[str, Any]:
         ):
             continue
         total += 1
+        seen.add(rel)
         try:
-            doc_type = index_document(cfg, index, path)
+            stamp = stamp_of(path)
+            if fingerprints.get(rel) == stamp:
+                skipped += 1
+                continue
+            doc_type = index_document(cfg, index, path, stamp=stamp)
         except Exception as exc:  # noqa: BLE001 - 单个文件坏掉不应中断全量索引
             errors.append(f"{rel}: {exc}")
             continue
         if doc_type:
             counts[doc_type] = counts.get(doc_type, 0) + 1
 
+    pruned = index.prune_missing(seen)
     index.commit()
     return {
         "files": total,
         "indexed": counts,
+        "skipped": skipped,
+        "pruned": pruned,
         "errors": errors,
         "stats": index.stats(),
     }

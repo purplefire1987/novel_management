@@ -120,8 +120,11 @@ views:
       - file.name
       - id
       - updated_at
+    sort:
+      - property: id
+        direction: ASC
     columnSize:
-      file.name: 184
+      file.name: 291
   - type: table
     name: 大纲与卷
     filters:
@@ -156,3 +159,34 @@ views:
       - id
       - word_count
       - canon_status
+  - type: table
+    name: 技能
+    filters:
+      and:
+        - type == "skill"
+        - '!file.inFolder("99_Archive")'
+    order:
+      - file.name
+      - id
+      - subtype
+      - grade
+      - school
+      - canon_status
+    sort:
+      - property: subtype
+        direction: ASC
+      - property: id
+        direction: ASC
+  - type: table
+    name: 命格
+    filters:
+      and:
+        - type == "destiny"
+        - '!file.inFolder("99_Archive")'
+    order:
+      - file.name
+      - id
+      - updated_at
+    sort:
+      - property: id
+        direction: ASC

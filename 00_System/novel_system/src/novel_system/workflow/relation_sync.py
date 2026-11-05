@@ -39,13 +39,38 @@ from ..config import Config
 BLOCK_START = "<!-- AUTO:RELATIONS -->"
 BLOCK_END = "<!-- /AUTO:RELATIONS -->"
 
-# 实体类型 → 目录
-KIND_DIRS: tuple[tuple[str, str], ...] = (
-    ("人物", "Characters"),
-    ("势力", "Factions"),
-    ("物品", "Items"),
-    ("生物", "Enemies"),
+# 参与关系投影的目录。技能与技能库同在 Skills/，命格与命格总览同在 Destinies/，
+# 所以具体类型要看 frontmatter 的 `type`，不能只按目录判（见 `_kind_of`）。
+KIND_DIRS: tuple[str, ...] = (
+    "Characters",
+    "Factions",
+    "Items",
+    "Enemies",
+    "Skills",
+    "Destinies",
 )
+
+TYPE_KINDS: dict[str, str] = {
+    "character": "人物",
+    "faction": "势力",
+    "item": "物品",
+    "enemy": "生物",
+    "skill": "技能",
+    "destiny": "命格",
+}
+
+# 同一目录下 type: world 的那一份是「容器页」：技能库 / 命格总览
+CONTAINER_KINDS: dict[str, str] = {
+    "Skills": "技能库",
+    "Destinies": "命格总览",
+}
+
+
+def _kind_of(meta: dict, subdir: str) -> str:
+    kind = TYPE_KINDS.get(str(meta.get("type") or ""))
+    if kind:
+        return kind
+    return CONTAINER_KINDS.get(subdir, "")
 
 # 声明字段：键名 → (目标类型, 语义标签)
 # 只认这几个键，别的一律不看。新增关系类型时在这里加一行即可。
@@ -57,6 +82,8 @@ DECLARATIONS: dict[str, tuple[str, str]] = {
     "物品": ("物品", "持有"),
     "持有物": ("物品", "持有"),
     "随身物品": ("物品", "持有"),
+    "技能": ("技能", "修习"),
+    "命格": ("命格", "命格"),
     # 势力侧
     "上级势力": ("势力", "上级"),
     "关联角色": ("人物", "成员"),
@@ -67,20 +94,49 @@ DECLARATIONS: dict[str, tuple[str, str]] = {
     "关联：角色": ("人物", "持有者"),
     "持有者": ("人物", "持有者"),
     "归属": ("势力", "归属势力"),
+    # 技能侧
+    "所属技能库": ("技能库", "所属技能库"),
+}
+
+# 同名字段在不同档案里含义不同（命格的「关联角色」是持有者，势力的「关联角色」是成员），
+# 这里按当前档案类型覆盖全局表。
+KIND_DECLARATIONS: dict[str, dict[str, tuple[str, str]]] = {
+    "命格": {
+        "关联角色": ("人物", "命格持有者"),
+        "关联奇物": ("物品", "关联奇物"),
+    },
 }
 
 # 同一字段名在不同类型档案下含义不同，这里按「当前档案类型」收窄。
 ALLOWED: dict[str, set[str]] = {
-    "人物": {"势力", "所属势力", "势力所属", "物品", "持有物", "随身物品"},
+    "人物": {"势力", "所属势力", "势力所属", "物品", "持有物", "随身物品", "技能", "命格"},
     "势力": {"上级势力", "势力所属", "所属势力", "关联角色", "关联：角色库", "关联：物品库", "信物"},
     "物品": {"关联：角色", "持有者", "归属"},
-    "生物": set(),
+    "生物": {"技能"},
+    "技能": {"所属技能库"},
+    "命格": {"关联角色", "关联奇物"},
+    "技能库": set(),
+    "命格总览": set(),
 }
 
 WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]")
 STOP_CHARS = re.compile(r"[、，,；;/／|｜]")
 
+# 「长歌行「百川」」这类名字带书名括号，人写的时候常常省掉或换一种写法。
+# 建索引与查值时都过一遍归一化，才能认出来（不做模糊匹配，只去括号）。
+BRACKETS = "「」『』“”\"'"
+
+
+def _norm(text: str) -> str:
+    return text.strip().strip(BRACKETS).strip()
+
 REL_BLOCK_HEADINGS = ("关系（自动）", "关系图谱（自动）")
+
+# 这些标签在关系块里不必重复渲染（页面别处已有，见 `_render`）
+SKIP_LABELS: dict[str, set[str]] = {
+    "技能库": {"下属技能"},
+    "技能": {"所属技能库"},
+}
 
 
 @dataclass
@@ -121,7 +177,7 @@ def _docs(directory: Path) -> list[Path]:
 def load_nodes(cfg: Config) -> tuple[list[Node], dict[str, Node]]:
     nodes: list[Node] = []
     seen: set[str] = set()
-    for kind, subdir in KIND_DIRS:
+    for subdir in KIND_DIRS:
         for path in _docs(cfg.vault / "01_Core_Memory" / subdir):
             try:
                 doc = vault.read_doc(path)
@@ -129,6 +185,9 @@ def load_nodes(cfg: Config) -> tuple[list[Node], dict[str, Node]]:
                 continue
             nid = str(doc.meta.get("id") or "")
             if not nid or nid in seen:
+                continue
+            kind = _kind_of(doc.meta, subdir)
+            if not kind:
                 continue
             seen.add(nid)
             aliases = doc.meta.get("aliases")
@@ -199,9 +258,13 @@ class Resolver:
         self.by_stem = {n.stem: n for n in nodes}
         self.by_name: dict[str, list[Node]] = defaultdict(list)
         for node in sorted(nodes, key=lambda n: n.id):
-            self.by_name[node.name].append(node)
+            for label in {node.name, _norm(node.name)}:
+                if label:
+                    self.by_name[label].append(node)
             for alias in node.aliases:
-                self.by_name[alias].append(node)
+                for label in {alias, _norm(alias)}:
+                    if label:
+                        self.by_name[label].append(node)
 
     def one(self, raw: str, want: str) -> Node | None:
         """字段值 → 单个节点。优先级：双链 > 整值同名 > 分隔片段同名。"""
@@ -212,11 +275,11 @@ class Resolver:
             if node is not None:
                 candidates.append(node)
         if not candidates:
-            exact = self.by_name.get(raw.strip(), [])
+            exact = self.by_name.get(raw.strip(), []) or self.by_name.get(_norm(raw), [])
             candidates = list(exact)
         if not candidates:
             for piece in STOP_CHARS.split(raw):
-                piece = piece.strip()
+                piece = _norm(piece)
                 if len(piece) < 2:
                     continue
                 for node in self.by_name.get(piece, []):
@@ -238,7 +301,7 @@ class Resolver:
         if out:
             return out
         for piece in STOP_CHARS.split(raw):
-            piece = piece.strip()
+            piece = _norm(piece)
             if len(piece) < 2:
                 continue
             for node in self.by_name.get(piece, []):
@@ -256,11 +319,12 @@ def collect_declarations(nodes: list[Node], by_id: dict[str, Node]) -> list[Edge
         allowed = ALLOWED.get(node.kind, set())
         if not allowed:
             continue
+        overrides = KIND_DECLARATIONS.get(node.kind, {})
         body = _read_body(node.path)
         for key, value in _fields(body):
             if key not in allowed or not value:
                 continue
-            spec = DECLARATIONS.get(key)
+            spec = overrides.get(key) or DECLARATIONS.get(key)
             if spec is None:
                 continue
             want, label = spec
@@ -309,6 +373,14 @@ def build_index(edges: list[Edge]) -> dict[str, list[tuple[str, str]]]:
         "归属势力": "关联物品",
         "成员": "所属势力",
         "下级": "上级",
+        "修习": "修习者",
+        "修习者": "修习",
+        "命格": "命格持有者",
+        "命格持有者": "命格",
+        "所属技能库": "下属技能",
+        "下属技能": "所属技能库",
+        "关联奇物": "关联命格",
+        "关联命格": "关联奇物",
     }
 
     for edge in edges:
@@ -321,9 +393,17 @@ def build_index(edges: list[Edge]) -> dict[str, list[tuple[str, str]]]:
 
 def _render(node: Node, relations: list[tuple[str, str]], by_id: dict[str, Node]) -> str:
     lines: list[str] = [BLOCK_START, "", "## 关系（自动）", ""]
-    order = ("所属势力", "上级", "下级", "成员", "持有", "持有者", "关联物品", "信物", "作为信物", "归属势力")
+    order = (
+        "所属势力", "上级", "下级", "成员", "持有", "持有者", "关联物品", "信物", "作为信物", "归属势力",
+        "命格", "命格持有者", "修习", "修习者", "所属技能库", "下属技能", "关联奇物", "关联命格",
+    )
+    # 容器页的属技清单、技能页的所属库，已由 `catalog_sync` 的表格与手写段呈现，
+    # 关系块里再列一遍只会让页面变长，直接跳过。
+    skip = SKIP_LABELS.get(node.kind, set())
     grouped: dict[str, list[Node]] = defaultdict(list)
     for label, other in relations:
+        if label in skip:
+            continue
         target = by_id.get(other)
         if target is not None:
             grouped[label].append(target)
@@ -379,7 +459,7 @@ def run(cfg: Config, *, write: bool = True) -> dict[str, object]:
     if write:
         for node in nodes:
             block = _render(node, index.get(node.id, []), by_id)
-            text = node.path.read_text(encoding="utf-8")
+            text = vault.read_text(node.path)
             new = _replace_block(text, block)
             if new != text:
                 vault.write_atomic(node.path, new)
@@ -407,11 +487,12 @@ def dangling(cfg: Config) -> list[dict[str, object]]:
         allowed = ALLOWED.get(node.kind, set())
         if not allowed:
             continue
+        overrides = KIND_DECLARATIONS.get(node.kind, {})
         body = _read_body(node.path)
         for key, value in _fields(body):
             if key not in allowed or not value:
                 continue
-            spec = DECLARATIONS.get(key)
+            spec = overrides.get(key) or DECLARATIONS.get(key)
             if spec is None:
                 continue
             want, _label = spec

@@ -103,11 +103,52 @@ def test_root() -> Path:
     return root
 
 
+def _seed_index(src_root: Path, dst_root: Path) -> None:
+    """把现成的索引库带进临时 Vault，省掉每个用例一次全量重建。
+
+    全量索引要逐份读 800 多个 Markdown；在当前宿主里单次读盘约 18ms，
+    一次重建就是 15 秒以上，60 个用例各自重建等于十几分钟空转。
+    索引本身是派生层、可随时重建，复制它是安全的：`files` 表存了
+    `(mtime 整秒, size)`，而 rsync 与 copy2 都保留秒级 mtime，指纹自然对得上。
+
+    注意：`_copy_tree` 的排除表里有 `.novel_system`（避免把运行产物和临时目录
+    递归复制进去），所以每个用例复制完必须**再单独补种**，不能只种在模板上。
+    """
+    src_dir = src_root / ".novel_system"
+    if not src_dir.is_dir():
+        return
+    dst_dir = dst_root / ".novel_system"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    # 只复制主库与 WAL：`-shm` 是进程间的共享内存索引，跨进程复制反而可能
+    # 让 SQLite 读到与主库不一致的页映射，交给它自己重建。
+    for name in ("index.sqlite", "index.sqlite-wal"):
+        source = src_dir / name
+        if source.is_file():
+            shutil.copy2(source, dst_dir / name)
+
+
 @pytest.fixture(scope="session")
 def vault_template(test_root: Path) -> Path:
     dst = test_root / "template" / "NovelVault"
     _copy_tree(VAULT_SRC, dst)
+    _seed_index(VAULT_SRC, dst)
     return dst
+
+
+@pytest.fixture
+def tmp_path(test_root: Path, request: pytest.FixtureRequest) -> Path:
+    """覆盖 pytest 内置的 `tmp_path`，不再依赖系统临时目录。
+
+    内置实现走 `tmp_path_factory`，而它要在 `tempfile.gettempdir()` 下建
+    `pytest-of-<user>`。受限宿主里那个目录会被安全策略拦掉，报
+    `FileExistsError: mkdir '/private/var/.../pytest-of-unknown'`，
+    于是「只想拿个空目录」的用例全数变 ERROR。这里直接开在 `test_root` 下，
+    和 `vault_dir` 用同一套路径规则，行为与环境无关。
+    """
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in request.node.name)[:80]
+    path = test_root / "tmp" / safe
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 @pytest.fixture
@@ -115,6 +156,7 @@ def vault_dir(test_root: Path, vault_template: Path, request: pytest.FixtureRequ
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in request.node.name)[:80]
     dst = test_root / "cases" / safe / "NovelVault"
     _copy_tree(vault_template, dst)
+    _seed_index(vault_template, dst)
     return dst
 
 

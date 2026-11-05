@@ -24,6 +24,25 @@
 08_Manuscripts/
 99_Archive/
 
+# ---------------------------------------------------------------------
+# 素材卡正文摘录：同样只在本地（2026-11-05 作者裁定）
+#
+# 这五类素材（战斗/对话/情绪/名场面/感官）每张都带**旧稿原文摘录**，
+# 性质与正文相同，一推上去即等于公开发表旧稿片段。
+# 只保留目录骨架（.gitkeep）、README、Settings 与模板——
+# 即「素材怎么用」可公开，「素材里的原文」不公开。
+# ---------------------------------------------------------------------
+05_Story_Assets/Battles/*
+05_Story_Assets/Dialogue/*
+05_Story_Assets/Emotional_Beats/*
+05_Story_Assets/Highlights/*
+05_Story_Assets/Sensory/*
+!05_Story_Assets/Battles/.gitkeep
+!05_Story_Assets/Dialogue/.gitkeep
+!05_Story_Assets/Emotional_Beats/.gitkeep
+!05_Story_Assets/Highlights/.gitkeep
+!05_Story_Assets/Sensory/.gitkeep
+
 # 索引可随时从 Markdown 重建，不入版本库
 .novel_system/index.sqlite
 .novel_system/index.sqlite-wal

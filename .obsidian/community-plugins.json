@@ -1,3 +1,5 @@
 [
-  "dataview"
+  "dataview",
+  "templater-obsidian",
+  "infranodus-graph-view"
 ]

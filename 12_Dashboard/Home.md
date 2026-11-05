@@ -58,9 +58,12 @@ novel history                # 版本状态与提交历史
 - 重生成：改 [[WORLD-0029_九州表|九州表]] / [[WORLD-0040_行政区划表|行政区划表]] → `python 00_System/scripts/build_jiuzhou_map.py`
 
 ## 快速入口
+- [[12_Dashboard/看板|知识库看板]]（Dataview 实时分布 / 孤立档案 / 连通块）
 - [[12_Dashboard/Characters|人物总览]]
 - [[12_Dashboard/Foreshadowing|伏笔账本]]
 - [[12_Dashboard/Chapters|章节进度]]
+- [[07_Entity_Graph/图谱分析|图谱结构分析]]（InfraNodus 怎么看 + 可复算的数字）
+- [[05_Story_Assets/Settings/ASSET-0020_大盛官制与军制速查|官制与军制速查]]（写朝堂、军队前先翻这张）
 
 ## 规则提醒
 1. 正式事实源只有 Markdown/YAML；SQLite 随时可重建。

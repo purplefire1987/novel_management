@@ -19,6 +19,8 @@ prefixes:
   relationship: REL
   volume: VOL
   world: WORLD
+  skill: SKL
+  destiny: FATE
 
 # 子编号类型：EVT-CH-0001-001 / SCENE-CH-0001-001 / STATE-CHAR-0001
 composite:
@@ -53,6 +55,8 @@ id_patterns:
   relationship: '^REL-\d{4}$'
   volume: '^VOL-\d{4}$'
   world: '^WORLD-\d{4}$'
+  skill: '^SKL-\d{4}$'
+  destiny: '^FATE-\d{4}$'
 
 # 号段保留：按前缀划分互不干扰的数字区间
 #   CH   → 0xxx 给新版正文主序列；1xxx 留给旧稿存档（见 99_Archive/Original_Draft）

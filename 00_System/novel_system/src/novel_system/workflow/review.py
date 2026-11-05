@@ -246,12 +246,18 @@ def publish(cfg: Config, index: Index, chapter_id: str, confirmed: bool = False)
 
     # 正文一落盘，人物/势力/物品的出场章节就变了：立刻重算地图投影，
     # 免得地图页要等到下次 rebuild-index 才跟上。失败不影响发布本身。
+    #
+    # 两个投影都要读全库；包一层缓存，第二个模块直接复用第一个读过的文档，
+    # 不会因为「发布一章」把 800 个档案读两遍。
     try:
-        from . import map_sync, relation_sync
+        from . import catalog_sync, map_sync, relation_sync
 
-        result["map_sync"] = map_sync.run(cfg)
-        # 同一时刻，人物页的「出场章节」也会影响关系索引里的活跃度排序
-        result["relation_sync"] = relation_sync.run(cfg)
+        with vault.cached_docs():
+            result["map_sync"] = map_sync.run(cfg)
+            # 同一时刻，人物页的「出场章节」也会影响关系索引里的活跃度排序
+            result["relation_sync"] = relation_sync.run(cfg)
+            # 属技表要读到刚刷新的技能卡，必须排在关系投影之后
+            result["catalog_sync"] = catalog_sync.run(cfg)
     except Exception as exc:  # noqa: BLE001 - 派生页失败不该回滚已经发布的正文
         result["map_sync_error"] = str(exc)
     return result

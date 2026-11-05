@@ -93,7 +93,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE TABLE IF NOT EXISTS files (
     path       TEXT PRIMARY KEY,
     hash       TEXT,
-    indexed_at TEXT
+    indexed_at TEXT,
+    mtime      INTEGER,
+    size       INTEGER
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS fts_chapters USING fts5(
@@ -157,7 +159,23 @@ class Index:
 
     def init_schema(self) -> None:
         self.conn.executescript(SCHEMA_SQL)
+        self._migrate_files()
         self.conn.commit()
+
+    def _migrate_files(self) -> None:
+        """老库补列：`files` 早期只有 path/hash，增量索引要 mtime 与 size。
+
+        直接用**整秒**的 mtime，不用纳秒：仓库要能整目录复制（测试夹具、备份、
+        换机），而 macOS 自带的 rsync 只把时间还原到秒。若拿纳秒做判据，
+        每复制一次就会判定「全库都改过」，增量索引直接退化成全量。
+        代价是「同一秒内、长度不变」的改动看不出来——这种改动下一次
+        `rebuild-index`（全量）会修正，日常编辑几乎碰不到。
+        """
+        cols = {row["name"] for row in self.conn.execute("PRAGMA table_info(files)")}
+        if "mtime" not in cols:
+            self.conn.execute("ALTER TABLE files ADD COLUMN mtime INTEGER")
+        if "size" not in cols:
+            self.conn.execute("ALTER TABLE files ADD COLUMN size INTEGER")
 
     def reset(self) -> None:
         """清空派生数据，保留表结构与审计流水。
@@ -443,12 +461,54 @@ class Index:
         )
         return [dict(r) for r in cur.fetchall()]
 
-    def set_file_hash(self, rel_path: str, digest: str) -> None:
+    def set_file_hash(
+        self,
+        rel_path: str,
+        digest: str,
+        mtime: int | None = None,
+        size: int | None = None,
+    ) -> None:
         self.conn.execute(
-            "INSERT INTO files (path, hash, indexed_at) VALUES (?, ?, ?) "
-            "ON CONFLICT(path) DO UPDATE SET hash=excluded.hash, indexed_at=excluded.indexed_at",
-            (rel_path, digest, now_iso()),
+            "INSERT INTO files (path, hash, indexed_at, mtime, size) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(path) DO UPDATE SET hash=excluded.hash, indexed_at=excluded.indexed_at, "
+            "mtime=excluded.mtime, size=excluded.size",
+            (rel_path, digest, now_iso(), mtime, size),
         )
+
+    def file_fingerprints(self) -> dict[str, tuple[int, int]]:
+        """`路径 -> (mtime, size)`。增量索引据此判断「文件没动过，跳过」。"""
+        rows = self.conn.execute(
+            "SELECT path, mtime, size FROM files WHERE mtime IS NOT NULL"
+        )
+        return {r["path"]: (int(r["mtime"]), int(r["size"] or 0)) for r in rows}
+
+    def prune_missing(self, keep: set[str]) -> int:
+        """删掉事实源已消失的派生记录，返回清理条数。
+
+        以前只增不减：改名或删档后，索引里会留下指向不存在文件的实体，
+        搜索能搜到、点开却是空。索引既然是派生的，就该跟着事实源收缩。
+        """
+        rows = [r["path"] for r in self.conn.execute("SELECT path FROM files")]
+        stale = [p for p in rows if p not in keep]
+        if not stale:
+            return 0
+        for path in stale:
+            self.conn.execute("DELETE FROM files WHERE path=?", (path,))
+            self.conn.execute("DELETE FROM entities WHERE file_path=?", (path,))
+            self.conn.execute("DELETE FROM relationships WHERE file_path=?", (path,))
+            self.conn.execute("DELETE FROM events WHERE file_path=?", (path,))
+            self.conn.execute("DELETE FROM foreshadowing WHERE file_path=?", (path,))
+            # 章节行只在「大纲和正文都没了」时删；否则会误删还有一方存活的章节
+            cursor = self.conn.execute(
+                "DELETE FROM chapter_index WHERE outline_path=? AND (manuscript_path IS NULL OR manuscript_path='')",
+                (path,),
+            )
+            if cursor.rowcount == 0:
+                self.conn.execute(
+                    "DELETE FROM chapter_index WHERE manuscript_path=? AND (outline_path IS NULL OR outline_path='')",
+                    (path,),
+                )
+        return len(stale)
 
     def get_file_hash(self, rel_path: str) -> str | None:
         cur = self.conn.execute("SELECT hash FROM files WHERE path=?", (rel_path,))

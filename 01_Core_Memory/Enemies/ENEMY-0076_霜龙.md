@@ -47,3 +47,15 @@ tags:
 - **所在地**：[[LOC-0074_凉州|凉州]]
 
 <!-- /AUTO:GEO-APPEARANCE -->
+
+<!-- AUTO:RELATIONS -->
+
+## 关系（自动）
+
+- **修习**（1）：[[SKL-0172_冰吐息|冰吐息]]
+
+- 手写段尚未收录：1 条（本块已补上）
+
+> 由实体档案的声明字段算出，随 `rebuild-index` / `publish` 自动刷新。
+
+<!-- /AUTO:RELATIONS -->

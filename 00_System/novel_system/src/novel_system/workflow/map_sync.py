@@ -542,7 +542,7 @@ def run(cfg: Config, *, write: bool = True) -> dict[str, object]:
 
         for pid, place in places.items():
             block = _render_place_block(place, by_place.get(pid, []), places)
-            text = place.path.read_text(encoding="utf-8")
+            text = vault.read_text(place.path)
             new = _replace_block(text, LOC_BLOCK_START, LOC_BLOCK_END, block)
             if new != text:
                 vault.write_atomic(place.path, new)
@@ -550,7 +550,7 @@ def run(cfg: Config, *, write: bool = True) -> dict[str, object]:
 
         for entity in entities:
             block = _render_entity_block(entity, places, chapters)
-            text = entity.path.read_text(encoding="utf-8")
+            text = vault.read_text(entity.path)
             new = _replace_block(text, ENT_BLOCK_START, ENT_BLOCK_END, block)
             if new != text:
                 vault.write_atomic(entity.path, new)
@@ -560,7 +560,7 @@ def run(cfg: Config, *, write: bool = True) -> dict[str, object]:
         map_dir.mkdir(parents=True, exist_ok=True)
         page = map_dir / "实体分布.md"
         text = _render_map_page(entities, places, chapters)
-        if not page.exists() or page.read_text(encoding="utf-8") != text:
+        if not page.exists() or vault.read_text(page) != text:
             vault.write_atomic(page, text)
             touched += 1
 

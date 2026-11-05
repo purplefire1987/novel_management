@@ -28,7 +28,7 @@ from .. import vault
 from ..config import Config
 from .schema import CANON_STATUSES, Issue
 
-ENTITY_DIRS = ("Characters", "Factions", "Items", "Enemies", "Locations")
+ENTITY_DIRS = ("Characters", "Factions", "Items", "Enemies", "Locations", "Skills", "Destinies")
 WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]")
 AUTO_OPEN = re.compile(r"<!-- AUTO:([A-Z-]+) -->")
 AUTO_CLOSE = re.compile(r"<!-- /AUTO:([A-Z-]+) -->")
@@ -102,7 +102,12 @@ def _check_identity(cfg: Config, docs: list[Path], report: Report) -> dict[str, 
             report.add("MAJOR", "缺ID", f"frontmatter 没有 id：{path.name}", [path.stem])
             continue
         by_id[eid].append(path)
-        records[eid] = {"path": path, "name": str(doc.meta.get("name") or ""), "body": doc.body}
+        records[eid] = {
+            "path": path,
+            "name": str(doc.meta.get("name") or ""),
+            "body": doc.body,
+            "type": str(doc.meta.get("type") or ""),
+        }
 
         prefix = path.stem.split("_")[0]
         if prefix != eid:
@@ -141,21 +146,28 @@ def _check_identity(cfg: Config, docs: list[Path], report: Report) -> dict[str, 
                 [p.name for p in paths],
             )
 
-    # 同类型内重名：不影响双链（stem 不同），但会让人搜错
-    name_map: dict[str, list[str]] = defaultdict(list)
+    # 同类型内重名：不影响双链（stem 不同），但会让人搜错。
+    # 跨类型同名是正常的（技能「正本通识」与物品「正本通识」本是两样东西），
+    # 所以分组键带上 type。
+    name_map: dict[tuple[str, str], list[str]] = defaultdict(list)
     for eid, rec in records.items():
         if rec["name"]:
-            name_map[rec["name"]].append(eid)
-    for name, ids in sorted(name_map.items()):
+            name_map[(rec["type"], rec["name"])].append(eid)
+    for key, ids in sorted(name_map.items()):
         if len(ids) > 1:
-            report.add("MINOR", "重名", f"「{name}」被 {len(ids)} 个实体共用", sorted(ids))
+            report.add("MINOR", "重名", f"{key[0]}「{key[1]}」被 {len(ids)} 个实体共用", sorted(ids))
 
     report.stats["档案总数"] = len(docs)
-    # 实体 = 人物/势力/物品/生物，地点档案单列；两者口径混用会让所有对比数字失真
-    report.stats["实体数"] = sum(
-        1 for p in docs if p.parent.name != "Locations"
-    )
-    report.stats["地点数"] = sum(1 for p in docs if p.parent.name == "Locations")
+    # 口径分开数：地点、技能、命格各自成类，混在一起会让所有对比数字失真。
+    # 「实体数」只数地图投影覆盖的四类（人物/势力/物品/生物），这样它能和
+    # `实体分布.md` 的统计行直接对得上。
+    def _count(*dirs: str) -> int:
+        return sum(1 for p in docs if p.parent.name in dirs)
+
+    report.stats["实体数"] = _count("Characters", "Factions", "Items", "Enemies")
+    report.stats["地点数"] = _count("Locations")
+    report.stats["技能数"] = _count("Skills")
+    report.stats["命格数"] = _count("Destinies")
     report.stats["唯一ID"] = len(by_id)
     return records
 
@@ -327,6 +339,43 @@ def _check_projection(cfg: Config, report: Report) -> None:
         )
 
 
+def _check_catalog(cfg: Config, report: Report) -> None:
+    """技能卡必须归属到某个技能库；命格不做强制约束（未分配是常态）。"""
+    from ..workflow import catalog_sync, relation_sync
+
+    broken = catalog_sync.dangling(cfg)
+    if broken:
+        sample = "；".join(f"{b['node']}.subtype=「{b['subtype']}」" for b in broken[:4])
+        report.add(
+            "MAJOR",
+            "技能无库",
+            f"{len(broken)} 张技能卡的 subtype 在 Skills/ 里找不到同名技能库（例：{sample}）",
+            [str(b["node"]) for b in broken[:8]],
+        )
+
+    nodes, by_id = relation_sync.load_nodes(cfg)
+    users: dict[str, int] = defaultdict(int)
+    holders: dict[str, int] = defaultdict(int)
+    resolver = relation_sync.Resolver(nodes, by_id)
+    for node in nodes:
+        if node.kind not in ("人物", "生物"):
+            continue
+        for key, value in relation_sync._fields(relation_sync._read_body(node.path)):
+            if not value:
+                continue
+            if key == "技能":
+                for hit in resolver.many(value, "技能"):
+                    users[hit.id] += 1
+            elif key == "命格" and node.kind == "人物":
+                for hit in resolver.many(value, "命格"):
+                    holders[hit.id] += 1
+
+    skills = [n for n in nodes if n.kind == "技能"]
+    fates = [n for n in nodes if n.kind == "命格"]
+    report.stats["已挂人物技能"] = f"{sum(1 for n in skills if users.get(n.id))}/{len(skills)}"
+    report.stats["已定人命格"] = f"{sum(1 for n in fates if holders.get(n.id))}/{len(fates)}"
+
+
 def _check_hygiene(cfg: Config, report: Report) -> None:
     """临时文件、空目录。这两类最容易在批量操作后悄悄堆积。"""
     temps = [
@@ -362,6 +411,7 @@ def run(cfg: Config) -> Report:
     _check_identity(cfg, docs, report)
     _check_links(cfg, docs, report)
     _check_relations(cfg, report)
+    _check_catalog(cfg, report)
     _check_projection(cfg, report)
     _check_hygiene(cfg, report)
     return report

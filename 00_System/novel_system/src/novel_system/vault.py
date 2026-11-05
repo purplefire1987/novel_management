@@ -78,10 +78,97 @@ def render_doc(meta: dict[str, Any], body: str) -> str:
     return f"---\n{yaml_text}\n---\n\n{body}"
 
 
-def read_doc(path: Path) -> Doc:
+class DocCache:
+    """一次运行内的文档缓存：同一个文件只读一次。
+
+    为什么需要：受限宿主里 `open()` 走 IPC 中转，单次读盘约 18ms（800 个档案
+    ≈ 15 秒）。索引器、地图投影、关系投影各读一遍全库，就是三次 15 秒；
+    一次 `rebuild-index` 因此能拖到一分钟以上。
+
+    缓存用 `(mtime_ns, size)` 做指纹：文件被本进程写过就自动刷新，
+    被外部改过（编辑器、git checkout）也认得出，不会给出陈旧内容。
+    """
+
+    __slots__ = ("_docs", "hits", "misses")
+
+    def __init__(self) -> None:
+        self._docs: dict[Path, tuple[int, int, Doc]] = {}
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, path: Path) -> Doc:
+        try:
+            st = path.stat()
+        except OSError:
+            # 读不到就让上层照常报错，不要在这里吞掉
+            self.misses += 1
+            return _load_doc(path)
+        hit = self._docs.get(path)
+        if hit is not None and hit[0] == st.st_mtime_ns and hit[1] == st.st_size:
+            self.hits += 1
+            return hit[2]
+        self.misses += 1
+        doc = _load_doc(path)
+        self._docs[path] = (st.st_mtime_ns, st.st_size, doc)
+        return doc
+
+    def store(self, path: Path, text: str) -> None:
+        """本进程刚写完的内容直接入缓存，省掉下一次读盘。
+
+        解析失败（比如写的是半成品）就退化成失效，让后来者重新读盘。
+        """
+        try:
+            meta, body = split_frontmatter(text)
+            st = path.stat()
+        except (OSError, VaultError):
+            self._docs.pop(path, None)
+            return
+        self._docs[path] = (st.st_mtime_ns, st.st_size, Doc(path=path, meta=meta, body=body, raw=text))
+
+    def invalidate(self, path: Path) -> None:
+        self._docs.pop(path, None)
+
+    def stats(self) -> dict[str, int]:
+        return {"hits": self.hits, "misses": self.misses, "size": len(self._docs)}
+
+
+_CACHE: DocCache | None = None
+
+
+@contextlib.contextmanager
+def cached_docs() -> Iterator[DocCache]:
+    """在 `with` 块内让 `read_doc` 走缓存。
+
+    只包住「一次重建 / 一次发布」这种连续读全库的流程；脱离块一律直读，
+    避免长驻进程里缓存无界增长或跨操作串味。
+    """
+    global _CACHE
+    prev = _CACHE
+    cache = DocCache()
+    _CACHE = cache
+    try:
+        yield cache
+    finally:
+        _CACHE = prev
+
+
+def _load_doc(path: Path) -> Doc:
     raw = path.read_text(encoding="utf-8")
     meta, body = split_frontmatter(raw)
     return Doc(path=path, meta=meta, body=body, raw=raw)
+
+
+def read_doc(path: Path) -> Doc:
+    if _CACHE is not None:
+        return _CACHE.get(path)
+    return _load_doc(path)
+
+
+def read_text(path: Path) -> str:
+    """读原文。有缓存时复用缓存里的 raw，省一次读盘。"""
+    if _CACHE is not None:
+        return _CACHE.get(path).raw
+    return path.read_text(encoding="utf-8")
 
 
 def read_optional(path: Path) -> Doc | None:
@@ -150,6 +237,7 @@ def write_atomic(path: Path, text: str) -> None:
 
     if _RENAME_OK is False:
         _direct_write(path, text)
+        _remember(path, text)
         return
 
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp_", suffix=path.suffix)
@@ -163,16 +251,24 @@ def write_atomic(path: Path, text: str) -> None:
             os.replace(tmp, path)
             renamed = True
             _RENAME_OK = True
+            _remember(path, text)
         except PermissionError:
             # rename 被环境拒绝：本进程后续一律直写，不再产生临时文件
             _RENAME_OK = False
             _log_atomic_fallback(path)
             _direct_write(path, text)
+            _remember(path, text)
     finally:
         if not renamed:
             with contextlib.suppress(OSError):
                 if os.path.exists(tmp):
                     os.unlink(tmp)
+
+
+def _remember(path: Path, text: str) -> None:
+    """写盘后把新内容塞回缓存，紧跟着的读不必再走一次 IPC。"""
+    if _CACHE is not None:
+        _CACHE.store(path, text)
 
 
 def backup_file(path: Path, backup_dir: Path, op_id: str) -> Path | None:
