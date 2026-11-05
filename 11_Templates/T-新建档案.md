@@ -1,6 +1,11 @@
 <%*
 // 新建实体档案：问类型 → 算下一个 ID → 改名移入对应目录 → 生成骨架
 // 用 Templater 插入（命令面板 → Templater: Insert Template），不要在库里手动新建空文件。
+//
+// 前缀与目录的**权威**是 00_System/Config/id_rules.yaml（前缀）与
+// system_config.yaml（paths，目录）。Templater 读不了 YAML，只能在下面抄一份；
+// 抄了就会漂移，所以 `novel integrity` 里有「配置漂移」一项专门比对这两份——
+// 加类型、改前缀、挪目录时，两处一起改。
 const TYPES = [
   {
     label: "人物", type: "character", prefix: "CHAR",
@@ -41,11 +46,27 @@ const TYPES = [
     ],
   },
   {
-    label: "生物", type: "enemy", prefix: "BIO",
+    label: "生物", type: "enemy", prefix: "ENEMY",
     dir: "01_Core_Memory/Enemies", subtype: "生物",
     fields: [
       ["栖息地", ""], ["分布地", ""], ["危险等级", ""],
       ["形态", ""], ["习性", ""], ["弱点", ""],
+    ],
+  },
+  {
+    label: "技能", type: "skill", prefix: "SKL",
+    dir: "01_Core_Memory/Skills", subtype: "方术",
+    fields: [
+      ["品级", "上品／中品／下品"], ["能力系别", ""],
+      ["效果", ""], ["代价", ""], ["备注", ""],
+    ],
+  },
+  {
+    label: "命格", type: "destiny", prefix: "FATE",
+    dir: "01_Core_Memory/Destinies", subtype: "命格",
+    fields: [
+      ["命格类型", ""], ["命格效果", ""], ["觉醒条件", ""],
+      ["代价", ""], ["持有者", ""],
     ],
   },
 ];

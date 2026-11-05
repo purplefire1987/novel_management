@@ -25,7 +25,7 @@
 超长篇小说管理系统/            # ← 仓库根，同时也是 Obsidian Vault 根
 ├── 00_System/                  # 配置 / Prompt / 质量门 / Schema
 │   ├── Config/                 # system_config、agent_registry、permissions、workflow、id_rules
-│   ├── Prompts/                # 5 个 Agent 的 System Prompt（可改）
+│   ├── Prompts/                # 8 个 Agent 的 System Prompt（可改）
 │   ├── Quality_Gates/          # 写前 / 写作 / 写后三道门
 │   └── novel_system/           # Python 执行层（src 布局）
 ├── 01_Core_Memory/             # 世界观、人物、势力、地点、物品、敌人（Canon）

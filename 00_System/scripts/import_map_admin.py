@@ -14,29 +14,25 @@ from __future__ import annotations
 
 import sys
 from collections import OrderedDict
+from datetime import date
 from pathlib import Path
 
 import openpyxl
+import yaml
 
 VAULT = Path(__file__).resolve().parents[2]
 XLSX = VAULT / "99_Archive/Raw_Sources/九州旧稿/九州-世界观资产.xlsx"
 OUT = VAULT / "01_Core_Memory/World/九州/总表/WORLD-0040_行政区划表.md"
-TODAY = "2026-11-05"
+LAYOUT_FILE = VAULT / "00_System/Config/jiuzhou_layout.yaml"
+TODAY = date.today().isoformat()
 
-# 州（大区）的排列顺序：大陆八州按方位，中州居中，其余殿后
-STATE_ORDER = [
-    "中州",
-    "凉州",
-    "海州",
-    "扬州",
-    "越州",
-    "湖州",
-    "陵州",
-    "戎州",
-    "云州",
-    "海外十五州",
-    "三十六洞天，七十二奇地",
-]
+# 州（大区）的排列顺序：大陆八州按方位，中州居中，其余殿后。
+# 顺序属「版式」，与地图脚本共用同一份配置，避免两处排得不一样。
+STATE_ORDER = list(
+    (yaml.safe_load(LAYOUT_FILE.read_text(encoding="utf-8")) or {}).get("order") or []
+)
+if not STATE_ORDER:
+    raise SystemExit(f"✗ 版式配置里没有 order：{LAYOUT_FILE.relative_to(VAULT)}")
 
 # 原表已知的口径问题：照录，但在表内与文末点名，不改数据
 ANOMALIES = {

@@ -1,0 +1,88 @@
+# 九州的「版式」——不是世界设定，只是呈现方式。
+#
+# 世界设定在 01_Core_Memory/World/九州/总表/WORLD-0029_九州表.md（地貌、口语、简介）
+# 与 WORLD-0040_行政区划表.md（府郡归属）。本文件只回答三个排版问题：
+#   1. 大区按什么顺序排（总表、州域档案、地图页的共同顺序）；
+#   2. 每个大区在方位图上放在哪个方向、偏移多少（Canvas 坐标）；
+#   3. 哪些大区不在这块大陆上（海外、洞天），画层级树时要单独分层。
+#
+# 改这里 → 重跑：
+#   00_System/scripts/import_map_admin.py   （重排 WORLD-0040）
+#   00_System/scripts/build_jiuzhou_map.py  （重画地图页与两张 canvas）
+version: 1
+
+# 大区排列顺序：大陆八州按方位环绕，中州居中，界外殿后。
+order:
+  - 中州
+  - 凉州
+  - 海州
+  - 扬州
+  - 越州
+  - 湖州
+  - 陵州
+  - 戎州
+  - 云州
+  - 海外十五州
+  - 三十六洞天，七十二奇地
+
+# dx / dy 是方位图上的单位向量（长度 1 或 √2/2），原点是中州。
+# mainland: false 表示不在这块大陆上，层级树里另起一层，不参与方位环绕。
+regions:
+  中州:
+    direction: 中部
+    dx: 0.0
+    dy: 0.0
+    mainland: true
+  凉州:
+    direction: 北部
+    dx: 0.0
+    dy: -1.0
+    mainland: true
+  海州:
+    direction: 东北
+    dx: 0.7071
+    dy: -0.7071
+    mainland: true
+  扬州:
+    direction: 东部
+    dx: 1.0
+    dy: 0.0
+    mainland: true
+  越州:
+    direction: 南部
+    dx: 0.0
+    dy: 1.0
+    mainland: true
+  湖州:
+    direction: 东南
+    dx: 0.7071
+    dy: 0.7071
+    mainland: true
+  陵州:
+    direction: 西北
+    dx: -0.7071
+    dy: -0.7071
+    mainland: true
+  戎州:
+    direction: 西南
+    dx: -0.7071
+    dy: 0.7071
+    mainland: true
+  云州:
+    direction: 西部
+    dx: -1.0
+    dy: 0.0
+    mainland: true
+  海外十五州:
+    direction: 海外
+    dx: 0.0
+    dy: 0.0
+    mainland: false
+  三十六洞天，七十二奇地:
+    direction: 界外
+    dx: 0.0
+    dy: 0.0
+    mainland: false
+
+# 不分府的大区（府那层留空，郡直接挂在州下）
+no_fu: （未分府）

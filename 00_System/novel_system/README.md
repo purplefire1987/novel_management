@@ -4,10 +4,15 @@
 
 对应 PRD：`超长篇小说个人知识库_MVP_PRD.md` v1.0。
 
+> **入口分工**（避免两份 README 各说一套）：
+> 项目是什么、怎么装、怎么开第一本书、目录与规则口径 —— 看**仓库根 `README.md`**；
+> 本文件只讲执行层实现：模块职责、CLI 命令、状态机、错误码、测试。
+> 目录树在两处都有，改结构时**两处一起改**；根 README 是给读者看的门面，本文件是给改代码的人看的。
+
 - **事实源**：仓库根（= Obsidian Vault 根）下的 Markdown + YAML（Obsidian 直接打开）
 - **可重建索引**：`.novel_system/index.sqlite`（SQLite + FTS5）
 - **执行层**：Python（状态机 / 权限 / Schema / 事务 / 审计 / Git）
-- **Agent 层**：总编、资料官、编辑、主笔、记忆管理员（Prompt 在 Vault 内，可改）
+- **Agent 层**：总编、资料官、编辑、主笔、记忆管理员等 8 个角色（Prompt 在 Vault 内，可改）
 
 ---
 
@@ -17,13 +22,13 @@
 超长篇小说管理系统/                  # 唯一 Git 仓库 = Vault 根：事实源 + 执行层代码
 ├── 00_System/
 │   ├── Config/                 # system_config / agent_registry / permissions / workflow / id_rules
-│   ├── Prompts/                # 5 个 Agent 的 System Prompt
+│   ├── Prompts/                # 8 个 Agent 的 System Prompt
 │   ├── Quality_Gates/          # 写前 / 写作 / 写后三道门槛
 │   ├── Schemas/                # `novel export-schemas` 导出的 JSON Schema
 │   └── novel_system/           # Python 包（src 布局）
 │       ├── src/novel_system/
 │       │   ├── cli.py orchestrator.py config.py vault.py transaction.py ids.py gitops.py
-│       │   ├── agents/         # base + 5 个 Agent
+│       │   ├── agents/         # base + 5 个实现类（共 8 个角色）
 │       │   ├── workflow/       # state_machine / preflight / writing / review / memory_commit / ingest
 │       │   ├── memory/         # entity_resolver / retrieval / context_builder / summarizer
 │       │   ├── validators/     # schema / canon / continuity / foreshadowing / permissions
@@ -157,7 +162,7 @@ export NOVEL_LLM_BASE_URL=https://api.openai.com/v1   # 兼容 OpenAI 协议即�
 export NOVEL_LLM_MODEL=gpt-4o-mini
 ```
 
-- 有 Key：5 个 Agent 走真实模型（Prompt 见 Vault 内 `00_System/Prompts/`）。
+- 有 Key：8 个 Agent 走真实模型（Prompt 见 Vault 内 `00_System/Prompts/`）。
 - 无 Key：自动降级为 **offline** 模式，报告里显式标注 `[OFFLINE]`，不会伪装成模型输出。
   - 总编：只按硬规则给裁决；
   - 资料官 / 编辑：确定性结构化输出；

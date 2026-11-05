@@ -28,32 +28,42 @@ import math
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
+
+import yaml
 
 VAULT = Path(__file__).resolve().parents[2]
 WORLD_TABLE = VAULT / "01_Core_Memory/World/九州/总表/WORLD-0029_九州表.md"
 ADMIN_TABLE = VAULT / "01_Core_Memory/World/九州/总表/WORLD-0040_行政区划表.md"
 LOC_DIR = VAULT / "01_Core_Memory/Locations"
 MAP_DIR = VAULT / "01_Core_Memory/Maps"
-TODAY = "2026-11-05"
+LAYOUT_FILE = VAULT / "00_System/Config/jiuzhou_layout.yaml"
+TODAY = date.today().isoformat()
+
+
+def load_layout() -> dict:
+    """读「版式」配置：大区顺序、方位、Canvas 偏移、是否在大陆上。
+
+    这些都是**排版**，不是设定；写死在本文件里时，加一个州要改代码、
+    改方位要改代码，而且和 WORLD-0029/0040 的顺序很容易对不上。
+    """
+    if not LAYOUT_FILE.exists():
+        raise SystemExit(f"✗ 缺少版式配置：{LAYOUT_FILE.relative_to(VAULT)}")
+    return yaml.safe_load(LAYOUT_FILE.read_text(encoding="utf-8")) or {}
+
+
+LAYOUT = load_layout()
+_REGION_CFG: dict[str, dict] = LAYOUT.get("regions") or {}
 
 # 大区名 → (方位, dx, dy)；dx/dy 用于 Canvas 方位图
 REGIONS: dict[str, tuple[str, float, float]] = {
-    "中州": ("中部", 0.0, 0.0),
-    "凉州": ("北部", 0.0, -1.0),
-    "海州": ("东北", 0.7071, -0.7071),
-    "扬州": ("东部", 1.0, 0.0),
-    "越州": ("南部", 0.0, 1.0),
-    "湖州": ("东南", 0.7071, 0.7071),
-    "陵州": ("西北", -0.7071, -0.7071),
-    "戎州": ("西南", -0.7071, 0.7071),
-    "云州": ("西部", -1.0, 0.0),
-    "海外十五州": ("海外", 0.0, 0.0),
-    "三十六洞天，七十二奇地": ("界外", 0.0, 0.0),
+    name: (cfg.get("direction", ""), float(cfg.get("dx", 0.0)), float(cfg.get("dy", 0.0)))
+    for name, cfg in _REGION_CFG.items()
 }
-
-OFF_MAINLAND = {"海外十五州", "三十六洞天，七十二奇地"}
-NO_FU = "（未分府）"
+ORDER: list[str] = list(LAYOUT.get("order") or REGIONS.keys())
+OFF_MAINLAND = {name for name, cfg in _REGION_CFG.items() if not cfg.get("mainland", True)}
+NO_FU = LAYOUT.get("no_fu", "（未分府）")
 
 
 @dataclass
@@ -474,7 +484,7 @@ def update_city(path: Path, region: Region, fu: Fu | None, jun: Jun, alias: str 
 
 # ------------------------------------------------------------------ 生成：地图页
 def build_md(regions: list[Region]) -> str:
-    order = list(REGIONS.keys())
+    order = ORDER
     regions = sorted(regions, key=lambda r: order.index(r.name))
 
     rows = []
@@ -768,7 +778,7 @@ def main() -> int:
                 fu_names.append(fu.name)
     fu_ids = allocate_fu(fu_names, stems)
 
-    order = list(REGIONS.keys())
+    order = ORDER
     regions: list[Region] = []
     for name in sorted(admin.keys(), key=lambda n: order.index(n) if n in order else 99):
         r = admin[name]

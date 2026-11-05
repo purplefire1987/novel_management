@@ -405,6 +405,51 @@ def _check_hygiene(cfg: Config, report: Report) -> None:
 
 
 # ------------------------------------------------------------------ 主流程
+def _check_config_drift(cfg: Config, report: Report) -> None:
+    """配置与「被迫抄了一份」的地方对得上吗。
+
+    Templater 模板跑在 Obsidian 里，读不了 YAML，只能把 ID 前缀和目录写死一份。
+    写死就会漂移，而且漂得没有声音：模板出 `BIO-0001`，`id_rules.yaml` 认的是
+    `ENEMY`，索引器按 type 判类时这张卡就掉出实体之外。这里只比对、只报，不改文件。
+    """
+    tpl = cfg.vault / "11_Templates/T-新建档案.md"
+    if not tpl.exists():
+        return
+    text = tpl.read_text(encoding="utf-8")
+    pairs = re.findall(r'type:\s*"([a-z_]+)",\s*prefix:\s*"([A-Z-]+)"', text)
+    dirs = re.findall(r'dir:\s*"([^"]+)"', text)
+    prefixes = {k: str(v) for k, v in (cfg.id_rules.get("prefixes") or {}).items()}
+    tops = {
+        str(v).split("/")[0]
+        for v in (cfg.system.get("paths") or {}).values()
+        if isinstance(v, str)
+    }
+
+    drift: list[str] = []
+    for idx, (doc_type, prefix) in enumerate(pairs):
+        want = prefixes.get(doc_type, "").split("-")[0]
+        if want and want != prefix:
+            drift.append(f"{doc_type}：模板写 {prefix}，id_rules.yaml 是 {want}")
+        if idx < len(dirs):
+            top = dirs[idx].split("/")[0]
+            if top and top not in tops:
+                drift.append(f"{doc_type}：目录 {dirs[idx]} 不在 system_config.paths 里")
+
+    missing = [t for t in ("character", "location", "faction", "item", "enemy", "skill", "destiny")
+               if t in prefixes and t not in {p[0] for p in pairs}]
+    if missing:
+        drift.append("模板缺类型：" + "、".join(missing))
+
+    if drift:
+        report.add(
+            "MINOR",
+            "配置漂移",
+            f"Templater 模板与配置有 {len(drift)} 处不一致（改配置时忘了同步模板，新建的档案会带错前缀）",
+            drift[:6],
+        )
+    report.stats["配置漂移"] = len(drift)
+
+
 def run(cfg: Config) -> Report:
     report = Report()
     docs = _docs(cfg)
@@ -413,6 +458,7 @@ def run(cfg: Config) -> Report:
     _check_relations(cfg, report)
     _check_catalog(cfg, report)
     _check_projection(cfg, report)
+    _check_config_drift(cfg, report)
     _check_hygiene(cfg, report)
     return report
 

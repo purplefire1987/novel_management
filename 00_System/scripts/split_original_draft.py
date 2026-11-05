@@ -19,7 +19,13 @@ from pathlib import Path
 
 VAULT = Path(__file__).resolve().parents[2]
 RAW_DIR = VAULT / "99_Archive/Raw_Sources/原文"
-SOURCE = Path("/Users/Mr_Zhou/Downloads/九州.md")
+ARCHIVED = RAW_DIR / "九州_原稿_20261104.md"
+CHAPTERED = RAW_DIR / "九州_原稿_切章_20261105.md"
+
+# 路径不写死：默认读归档件，也可以 `python split_original_draft.py <原稿路径> [输出路径]`。
+# 早先这里写的是作者机器上的 /Users/<user>/Downloads/九州.md，换台机器就找不到。
+SOURCE = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else ARCHIVED
+TARGET = Path(sys.argv[2]).expanduser() if len(sys.argv) > 2 else CHAPTERED
 
 # 卷标题（原稿写法）→ 章名前缀。第四卷出现两次，是作者原件里的编号重复，不改，
 # 只在标题里保留原样，另在卷页「待裁」里点名。
@@ -37,10 +43,11 @@ def normalize_title(text: str) -> str:
 def main() -> int:
     if not SOURCE.exists():
         print(f"✗ 找不到原稿：{SOURCE}", file=sys.stderr)
+        print("  用法：python split_original_draft.py <原稿.md> [中间稿输出路径]", file=sys.stderr)
         return 1
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    archived = RAW_DIR / "九州_原稿_20261104.md"
+    archived = ARCHIVED
     if not archived.exists():
         shutil.copy2(SOURCE, archived)
 
@@ -89,7 +96,7 @@ def main() -> int:
         buffer.append(line)
     flush()
 
-    target = RAW_DIR / "九州_原稿_切章_20261105.md"
+    target = TARGET
     target.write_text("\n".join(out), encoding="utf-8")
 
     print(f"✓ 原件照录：{archived.relative_to(VAULT)}")

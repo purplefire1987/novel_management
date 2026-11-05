@@ -59,6 +59,7 @@ novel history                # 版本状态与提交历史
 
 ## 快速入口
 - [[12_Dashboard/看板|知识库看板]]（Dataview 实时分布 / 孤立档案 / 连通块）
+- [[06_Plot_Ledger/伏笔规则|伏笔规则]]（状态机与四条硬规则的唯一出口）
 - [[12_Dashboard/Characters|人物总览]]
 - [[12_Dashboard/Foreshadowing|伏笔账本]]
 - [[12_Dashboard/Chapters|章节进度]]
