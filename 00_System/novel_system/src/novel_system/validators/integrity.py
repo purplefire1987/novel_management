@@ -646,6 +646,207 @@ def _check_garrison_drift(cfg: Config, report: Report) -> None:
         )
 
 
+# ---------------------------------------------------------------- 场景链
+# `[ \t]*` 而不是 `\s*`：`\s` 会跨行，空字段会把下一行整行吞成自己的值。
+SCENE_FIELD = re.compile(r"^-\s*\*\*(.+?)\*\*[：:][ \t]*(.*)$", re.M)
+SCENE_REF = re.compile(r"SCENE-[A-Za-z0-9-]*[A-Za-z0-9]")
+CN_DIGIT = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+CN_MONTH = {"正": 1, "腊": 12}
+DAY_RE = re.compile(r"(正|腊|[一二三四五六七八九十]{1,3})月(初[一二三四五六七八九十]{1,3}|[一二三四五六七八九十]{1,3})")
+HM_RE = re.compile(r"(\d{1,2}):(\d{2})")
+
+
+def _cn_num(text: str) -> int:
+    """「八」「二十」「三十」「正」「腊」→ 数字。只覆盖月日够用的范围。"""
+    if text in CN_MONTH:
+        return CN_MONTH[text]
+    if "十" in text:
+        tens, _, ones = text.partition("十")
+        return (CN_DIGIT.get(tens, 1) if tens else 1) * 10 + (CN_DIGIT.get(ones, 0) if ones else 0)
+    return CN_DIGIT.get(text, 0)
+
+
+def _scene_time(text: str) -> tuple[tuple[int, int] | None, int | None, int | None]:
+    """把「七月初八夜 21:00–21:30」「21:45」拆成 (日期, 起始分钟, 结束分钟)。
+
+    日期可以没有——省掉的那一场默认沿用上一场的日子，这也正是时间倒退最容易藏身的地方。
+    """
+    day = None
+    match = DAY_RE.search(text)
+    if match:
+        day = (_cn_num(match.group(1)), _cn_num(match.group(2).lstrip("初")))
+    clocks = [(int(h), int(m)) for h, m in HM_RE.findall(text)]
+    if not clocks:
+        return day, None, None
+    start = clocks[0][0] * 60 + clocks[0][1]
+    end = clocks[1][0] * 60 + clocks[1][1] if len(clocks) > 1 else start
+    if end < start:  # 22:00–01:00 这种跨夜区间
+        end += 24 * 60
+    return day, start, end
+
+
+def _check_scene_chain(cfg: Config, report: Report) -> None:
+    """场景之间的接缝。
+
+    断裂几乎都发生在换场那一行：上一场湿透的衣裳下一场干了，人凭空换了个地方，
+    时间倒退半小时。这三样在成稿里都要重写整段，在细纲里只是改一行字。
+    所以查在细纲上——`sequence` 连不连、时间退不退、换了地点有没有交代怎么到的。
+    """
+    directory = cfg.vault / "04_Outline/Scenes"
+    if not directory.is_dir():
+        return
+
+    by_chapter: dict[str, list[dict]] = defaultdict(list)
+    for path in sorted(directory.glob("SCENE-*.md")):
+        doc = vault.read_doc(path)
+        fields = {m.group(1).strip(): m.group(2).strip() for m in SCENE_FIELD.finditer(doc.body)}
+        seq = doc.meta.get("sequence")
+        chapter = doc.meta.get("chapter_id")
+        sid = str(doc.meta.get("id") or path.stem)
+        if not isinstance(seq, int) or not chapter:
+            report.add("MINOR", "场景卡片", f"{path.name} 缺 sequence 或 chapter_id", [sid])
+            continue
+        by_chapter[str(chapter)].append({
+            "id": sid,
+            "seq": seq,
+            "place": fields.get("地点", ""),
+            "time": fields.get("时间", ""),
+            "entry": fields.get("承接上文", ""),
+            "next": fields.get("与下一场景的连接", ""),
+        })
+
+    report.stats["场景"] = sum(len(v) for v in by_chapter.values())
+    claimed: dict[str, str] = {}
+
+    for chapter, items in sorted(by_chapter.items()):
+        items.sort(key=lambda s: s["seq"])
+        seqs = [s["seq"] for s in items]
+        if seqs != list(range(1, len(items) + 1)):
+            report.add(
+                "MAJOR", "场景跳号",
+                f"{chapter} 的 sequence 是 {seqs}，应为 1..{len(items)}"
+                "（叙事顺序断了，读者会在两条线之间来回跳）",
+                [s["id"] for s in items],
+            )
+
+        prev_day: tuple[int, int] | None = None
+        prev_end: int | None = None
+        for idx, sc in enumerate(items):
+            day, start, end = _scene_time(sc["time"])
+            if start is not None and prev_end is not None:
+                same_day = day is None or prev_day is None or day == prev_day
+                if same_day and start < prev_end:
+                    report.add(
+                        "MAJOR", "场景时间倒退",
+                        f"{sc['id']} 的「{sc['time']}」早于上一场结束 "
+                        f"{prev_end // 60:02d}:{prev_end % 60:02d}，且没有交代日期推进",
+                        [sc["id"]],
+                    )
+            if day is not None:
+                if prev_day is not None and day < prev_day:
+                    report.add(
+                        "MAJOR", "场景时间倒退",
+                        f"{sc['id']} 的日期 {day[0]}月{day[1]}日 早于上一场的 "
+                        f"{prev_day[0]}月{prev_day[1]}日",
+                        [sc["id"]],
+                    )
+                prev_day = day
+            if start is not None:
+                prev_end = end if end is not None else start
+
+            if idx > 0:
+                prev = items[idx - 1]
+                if sc["place"] and prev["place"] and sc["place"] != prev["place"] and not sc["entry"]:
+                    report.add(
+                        "MINOR", "场景接缝缺失",
+                        f"{sc['id']} 换了地点却没写「承接上文」：人是怎么到的、中间隔了多久",
+                        [sc["id"]],
+                    )
+
+            refs = SCENE_REF.findall(sc["next"])
+            for ref in refs:
+                if ref in claimed and claimed[ref] != sc["id"]:
+                    report.add(
+                        "MAJOR", "场景重入",
+                        f"{ref} 同时被 {claimed[ref]} 和 {sc['id']} 当成下一场"
+                        "（两条线撞进同一场，读者会来回跳）",
+                        [ref],
+                    )
+                else:
+                    claimed[ref] = sc["id"]
+
+            if idx + 1 < len(items):
+                want = items[idx + 1]["id"]
+                if refs and refs[0] != want:
+                    report.add(
+                        "MAJOR", "场景跳号",
+                        f"{sc['id']} 写「接 {refs[0]}」，但按 sequence 下一场是 {want}",
+                        [sc["id"]],
+                    )
+                elif not refs:
+                    report.add(
+                        "MINOR", "场景接缝缺失",
+                        f"{sc['id']} 没写「与下一场景的连接」",
+                        [sc["id"]],
+                    )
+            elif refs and any(r.startswith(f"SCENE-{chapter}-") for r in refs):
+                report.add(
+                    "MINOR", "场景接缝缺失",
+                    f"{sc['id']} 已是 {chapter} 最后一场，却仍指向本章的 {refs[0]}",
+                    [sc["id"]],
+                )
+
+
+# ------------------------------------------------------------------ 正文
+# `[ \t]` 而不是 `\s`：`\s` 跨行，会把标题后的空行吞进匹配里，`$` 就落不到行尾。
+MANUSCRIPT_BODY = re.compile(r"^##[ \t]*正文[ \t]*$(.*?)(?=^##[ \t]|\Z)", re.S | re.M)
+HAN = re.compile(r"[\u4e00-\u9fa5]")
+# 「先否定、再更正」：不是 A，是 B／而是 B／这是 B／那是 B。
+# 反过来的「是 B，不是 A」不在此列——那是先看见再排除，读感不一样。
+NOT_BUT = re.compile(r"不是[^，。！？；\n]{1,20}[，,]\s*(?:而是|这是|那是|是)")
+CHAPTER_LIMITS = (3000, 4000)
+STYLE_DENSITY_MAX = 1.0
+
+
+def _check_manuscript(cfg: Config, report: Report) -> None:
+    """正文的篇幅与句式密度。
+
+    口径写在 `00_System/Prompts/writer.md`（唯一出口），这里只把它变成可查的数字：
+    3,000–4,000 汉字、「不是A，是B」每千字不超过 1 处。
+    字数不对不代表写得差，但它一定是**没按批准的口径交**——要么没写透，要么该拆章。
+    """
+    low, high = CHAPTER_LIMITS
+    files = sorted((cfg.vault / "08_Manuscripts").rglob("CH-*.md"))
+    for path in files:
+        doc = vault.read_doc(path)
+        match = MANUSCRIPT_BODY.search(doc.body)
+        body = match.group(1) if match else ""
+        han = len(HAN.findall(body))
+        if not han:
+            continue
+        cid = str(doc.meta.get("id") or path.stem)
+        declared = doc.meta.get("word_count")
+        if isinstance(declared, int) and declared and abs(declared - han) / han > 0.03:
+            report.add(
+                "MINOR", "字数漂移",
+                f"{cid} 的 word_count 写 {declared:,}，正文实为 {han:,} 汉字",
+                [cid],
+            )
+        if not low <= han <= high:
+            report.add(
+                "MINOR", "篇幅越界",
+                f"{cid} 正文 {han:,} 汉字，规范是 {low:,}–{high:,}（writer.md 第一节）",
+                [cid],
+            )
+        density = len(NOT_BUT.findall(body)) * 1000 / han
+        if density > STYLE_DENSITY_MAX:
+            report.add(
+                "MINOR", "句式密度",
+                f"{cid}「不是A，是B」{density:.2f} 处/千字，上限 {STYLE_DENSITY_MAX:.0f} 处/千字",
+                [cid],
+            )
+
+
 def run(cfg: Config) -> Report:
     report = Report()
     docs = _docs(cfg)
@@ -656,6 +857,8 @@ def run(cfg: Config) -> Report:
     _check_projection(cfg, report)
     _check_config_drift(cfg, report)
     _check_garrison_drift(cfg, report)
+    _check_scene_chain(cfg, report)
+    _check_manuscript(cfg, report)
     _check_hygiene(cfg, report)
     return report
 

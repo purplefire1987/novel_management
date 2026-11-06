@@ -234,14 +234,33 @@ def render(by_id: dict, data: dict) -> str:
     # ---------------- 自称中立
     out.append("## 自称中立（身份，不是关系）")
     out.append("")
-    out.append("这些势力的 `势力所属` 里带「中立」类别——设定上就不站队。它和上表的「与某方中立」")
-    out.append("是两件事：上表是**写出来的关系**，这里是**身份**。身份不产生边，所以单凭这两个字")
-    out.append("并不会让它们从下面的「关系待建」里消失。")
+    out.append("「中立」不是本轮新造的字段，它本来就在旧势力表 `势力所属` 那一栏里标着——")
+    out.append("`平民`、`散人`、`百草`、`唐门`、`幽灵山庄`、`十巫山门`、`魇罗殿`、`凰天`、`赤水`")
+    out.append("九张卡，从建卡那天起就写着「中立」。所以这一栏记的是**身份**，不是**关系**：")
+    out.append("它不需要对端，也不产生边。")
+    out.append("")
+    out.append("与上表的区别：上表是「甲和乙之间表态了」（写出来的关系）；这里是「甲自己就不站队」")
+    out.append("（设定上的身份）。两者可以并存——唐门标着中立，仍然可以跟谁结仇；但身份不会因为")
+    out.append("结仇就消失，它只是说明这家门派不投靠谁、也不替谁打仗。")
+    out.append("")
+    out.append("身份不进「关系待建」的统计，也不该靠编一对「与某方中立」来把名单清空。")
     out.append("")
     neutral_ids = _neutral_ids(factions)
     neutrals = sorted((n for n in factions if n.id in neutral_ids), key=lambda n: n.id)
     if neutrals:
-        out.append(f"**{len(neutrals)} 张**：" + "、".join(n.label for n in neutrals))
+        out.append(f"**{len(neutrals)} 张**：")
+        out.append("")
+        out.append("| 势力 | 旧表类别 | 阵营 | 据点 |")
+        out.append("| --- | --- | --- | --- |")
+        for n in neutrals:
+            fields = dict(rs._fields(rs._read_body(n.path)))
+            tags = "／".join(sorted(_category_tokens(n))) or "—"
+            camp = fields.get("阵营", "").strip() or "—"
+            seat = fields.get("据点", "").strip() or "—"
+            out.append(f"| {link(by_id, n.id)} | {tags} | {camp} | {seat} |")
+        out.append("")
+        out.append("> 「旧表类别」照抄 `势力所属`，不做归并——`中立` 与 `宗门,中立`、`羽族,中立`")
+        out.append("> 的差别本身是设定（既属某个形态，又不站队），抹平会丢掉信息。")
     else:
         out.append("（无）")
     out.append("")
