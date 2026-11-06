@@ -180,6 +180,17 @@ def _body_of(path: Path) -> str:
         return ""
 
 
+# 受控块是本模块**自己的输出**。解析前必须剥掉，否则会自己吃自己：
+# `GEO-APPEARANCE` 里那行 `- **所在地**：[[LOC-0055_融金城|融金城]]` 就是它渲染的，
+# 一旦被当回输入读，正文里随手提一句地名就会被固化成永久落点——删掉正文里的
+# 那句话也去不掉，因为块里还留着。关系块的 `_strip_auto` 同理。
+AUTO_BLOCK = re.compile(r"<!-- AUTO:[A-Z-]+ -->.*?<!-- /AUTO:[A-Z-]+ -->", re.S)
+
+
+def _strip_auto(text: str) -> str:
+    return AUTO_BLOCK.sub("", text)
+
+
 def _fields(body: str) -> dict[str, str]:
     """读「档案」段成字典。键在原文里带 `**`（`- **据点**：…`），这里去掉。"""
     raw = vault.key_values(vault.extract_section(body, "档案"))
@@ -196,7 +207,7 @@ def resolve_places(entities: list[Entity], places: dict[str, Place]) -> None:
 
     # 正向：实体档案里出现的地点双链 / 地点名
     for entity in entities:
-        body = _body_of(entity.path)
+        body = _strip_auto(_body_of(entity.path))
         for hit in LOC_STEM.finditer(body):
             if hit.group(1) in places:
                 entity.places.add(hit.group(1))
@@ -215,7 +226,7 @@ def resolve_places(entities: list[Entity], places: dict[str, Place]) -> None:
     by_stem = {e.stem: e for e in entities}
     by_id = {e.id: e for e in entities}
     for pid, place in places.items():
-        body = _body_of(place.path)
+        body = _strip_auto(_body_of(place.path))
         section = vault.extract_section(body, "关联") or vault.extract_section(body, "实体索引（自动汇总）")
         for link in WIKILINK.finditer(section):
             stem = link.group(1).strip()
@@ -256,6 +267,25 @@ def resolve_places(entities: list[Entity], places: dict[str, Place]) -> None:
             for pid in parent.places:
                 entity.places.add(pid)
                 entity.via.setdefault(pid, f"依「{parent.name}」据点推断")
+
+    # 补齐上级：只写了「在某城」的实体，也该出现在它所属的府页与州页上。
+    #
+    # 这一步以前是**间接**完成的——实体的 `GEO-APPEARANCE` 渲染出「州 › 府 › 城」整条链，
+    # 下一轮把链里的三个 ID 全读回来。那等于用输出当输入：正文里删掉地名，州页上仍然挂着。
+    # 现在按层级直接算，上级不再需要 `via` 标记（它们不是「推断」，是行政隶属）。
+    for entity in entities:
+        for pid in list(entity.places):
+            place = places.get(pid)
+            if place is None:
+                continue
+            for ancestor in _chain_ids(place, places):
+                if ancestor in entity.places:
+                    continue
+                entity.places.add(ancestor)
+                # 上级继承下级的来历：城是从「所属势力」借来的，它所属的府与州也一样，
+                # 否则统计里那 7 个「推断」会凭空变成「直接写出」，看着像正文写了地点。
+                if pid in entity.via:
+                    entity.via[ancestor] = entity.via[pid]
 
 
 def resolve_chapters(cfg: Config, entities: list[Entity]) -> dict[str, tuple[str, str]]:
