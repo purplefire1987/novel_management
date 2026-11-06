@@ -380,11 +380,15 @@ class Orchestrator:
 
         return catalog_sync.run(self.cfg)
 
-    def integrity(self) -> Any:
-        """结构校验：单一事实源 + 可维护性。只读，不改档案。"""
+    def integrity(self, *, scope: str = "full") -> Any:
+        """结构校验：单一事实源 + 可维护性。只读，不改档案。
+
+        `scope="fast"` 跳过跨档案汇总类检查（关系图、索引页、配置漂移、驻军对账），
+        适合改完一篇就想看双链与篇幅的时候。
+        """
         from .validators import integrity
 
-        return integrity.run(self.cfg)
+        return integrity.run(self.cfg, scope=scope)
 
     def write_entity_index(self) -> dict[str, Any]:
         from .workflow.index_md import write_entity_index

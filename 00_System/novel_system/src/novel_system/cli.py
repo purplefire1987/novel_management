@@ -90,9 +90,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_integrity(args: argparse.Namespace) -> int:
+    scope = "fast" if getattr(args, "fast", False) else "full"
     with Orchestrator(Config.load(args.vault)) as orch:
-        report = orch.integrity()
-        head("结构完整性")
+        report = orch.integrity(scope=scope)
+        head("结构完整性" + ("（快查）" if scope == "fast" else ""))
         kv_block(list(report.stats.items()))
         head("问题分布")
         if report.by_category:
@@ -800,6 +801,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="环境与配置体检").set_defaults(func=cmd_doctor)
 
     p_inte = sub.add_parser("integrity", help="结构校验：单一事实源 + 可维护性")
+    p_inte.add_argument(
+        "--fast",
+        action="store_true",
+        help="只跑 ID/双链/受控块/场景接缝/正文篇幅（跳过关系图与跨表对账）",
+    )
     p_inte.add_argument(
         "--report",
         nargs="?",

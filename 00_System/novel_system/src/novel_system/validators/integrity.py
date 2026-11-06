@@ -15,6 +15,10 @@
     可维护性   新增/改名/移动之后，没人需要靠记忆去补别的地方
 
 只读，不写任何档案；报告由调用方决定落不落盘。
+
+唯一的写操作是 `.novel_system/doc_cache.json.gz`——那是「上次读到的正文」，
+不是事实源，删掉下次自动重建。全库 900+ 档案、单次读盘约 19ms，不复用这份
+缓存，每跑一次体检就要付二十几秒。
 """
 
 from __future__ import annotations
@@ -193,7 +197,7 @@ def _check_links(cfg: Config, docs: list[Path], report: Report) -> None:
 
     for path in files:
         try:
-            text = path.read_text(encoding="utf-8")
+            text = vault.read_text(path)
         except Exception:  # noqa: BLE001
             continue
         for hit in WIKILINK.finditer(text):
@@ -485,7 +489,7 @@ def _check_projection(cfg: Config, report: Report) -> None:
     # AUTO 块存在但内容为空 = 渲染逻辑没覆盖到，或者档案字段全被删了
     empty_blocks: list[str] = []
     for path in docs:
-        text = path.read_text(encoding="utf-8")
+        text = vault.read_text(path)
         for match in re.finditer(r"<!-- AUTO:([A-Z-]+) -->(.*?)<!-- /AUTO:\1 -->", text, re.S):
             inner = match.group(2).strip()
             if len(inner) < 12:
@@ -622,7 +626,7 @@ def _check_garrison_drift(cfg: Config, report: Report) -> None:
         return
     total = count = 0
     for p in (cfg.vault / "01_Core_Memory/Factions").glob("FAC-*.md"):
-        text = p.read_text(encoding="utf-8")
+        text = vault.read_text(p)
         if "subtype: 军团" not in text[:900]:
             continue
         m = re.search(r"^-\s*\*\*军团人数\*\*：([\d,]+)", text, re.M)
@@ -847,19 +851,50 @@ def _check_manuscript(cfg: Config, report: Report) -> None:
             )
 
 
-def run(cfg: Config) -> Report:
+# 检查清单：(名字, 归属范围, 调用)。
+# "fast" 只跑能在本机立刻发现问题的那几项；"full" 才跑跨档案汇总类检查。
+# 两个范围共用同一份函数，口径不会分叉。
+_CHECKS = (
+    ("ID 与命名", "fast", lambda c, d, r: _check_identity(c, d, r)),
+    ("双链解析", "fast", lambda c, d, r: _check_links(c, d, r)),
+    ("受控块卫生", "fast", lambda c, d, r: _check_hygiene(c, r)),
+    ("场景接缝", "fast", lambda c, d, r: _check_scene_chain(c, r)),
+    ("正文篇幅", "fast", lambda c, d, r: _check_manuscript(c, r)),
+    ("关系图", "full", lambda c, d, r: _check_relations(c, r)),
+    ("索引页", "full", lambda c, d, r: _check_catalog(c, r)),
+    ("关系投影", "full", lambda c, d, r: _check_projection(c, r)),
+    ("配置漂移", "full", lambda c, d, r: _check_config_drift(c, r)),
+    ("驻军对账", "full", lambda c, d, r: _check_garrison_drift(c, r)),
+)
+SCOPES = ("fast", "full")
+
+
+def run(cfg: Config, *, scope: str = "full") -> Report:
+    """跑一遍体检。
+
+    `scope="fast"` 只跑「改一篇文章就可能在本地立刻发现」的几项：ID/文件名、
+    双链、受控块卫生、场景接缝、正文篇幅。跳过的都是**跨档案汇总**类检查
+    （关系图、索引页、配置漂移、驻军对账）——它们只在批量改档时才可能变化，
+    却要再扫一遍全库。
+
+    整段包在 `vault.cached_docs()` 里：受限宿主上一次读盘约 19ms，全库 900+
+    档案就是 18 秒。不缓存的话 identity / links / relations / projection 各自
+    重读一遍，三分钟就是这么来的。
+    """
+    if scope not in SCOPES:
+        raise ValueError(f"未知的体检范围：{scope}（可选：{', '.join(SCOPES)}）")
+
     report = Report()
     docs = _docs(cfg)
-    _check_identity(cfg, docs, report)
-    _check_links(cfg, docs, report)
-    _check_relations(cfg, report)
-    _check_catalog(cfg, report)
-    _check_projection(cfg, report)
-    _check_config_drift(cfg, report)
-    _check_garrison_drift(cfg, report)
-    _check_scene_chain(cfg, report)
-    _check_manuscript(cfg, report)
-    _check_hygiene(cfg, report)
+    ran = 0
+    with vault.cached_docs(cfg.vault / vault.CACHE_FILE) as cache:
+        for _name, need, fn in _CHECKS:
+            if scope == "fast" and need != "fast":
+                continue
+            fn(cfg, docs, report)
+            ran += 1
+    report.stats["检查项数"] = ran
+    report.stats["读盘次数"] = cache.misses
     return report
 
 
