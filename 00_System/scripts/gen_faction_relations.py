@@ -24,6 +24,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from collections import defaultdict
 from datetime import date
@@ -180,18 +181,27 @@ def render(by_id: dict, data: dict) -> str:
         out.append("（无层级关系）")
         out.append("")
 
-    # 多上级 = 共管
+    # 多上级：两种来源要分开说——「共管」是朝廷名分 + 世家实权，
+    # 「加盟」是门阀结成的联盟。都写在上表里，但含义不同，混成一句「共管」会读歪。
     multi = {k: v for k, v in parents.items() if len(v) > 1}
+    alliance_ids = _alliance_ids(factions)
     if multi:
-        out.append("### 多重归属（共管）")
+        out.append("### 多重归属：共管与加盟")
         out.append("")
-        out.append("同一支力量同时归两个势力，通常是「朝廷的名分 + 世家的实权」，不是记错。")
+        out.append("同一支力量同时挂两个上级，来源有两种：**共管**（朝廷的名分 + 世家的实权）、")
+        out.append("**加盟**（加入了门阀联盟，联盟不设盟主、不调兵）。两者都不是记错。")
         out.append("")
-        out.append("| 势力 | 上级 | 说明 |")
+        out.append("| 势力 | 上级 | 归属方式 |")
         out.append("| --- | --- | --- |")
         for k in sorted(multi):
-            ups = "、".join(sorted(link(by_id, u) for u in multi[k]))
-            out.append(f"| {link(by_id, k)} | {ups} | 共管 |")
+            ups = sorted(multi[k])
+            names = "、".join(link(by_id, u) for u in ups)
+            ways = []
+            if any(u in alliance_ids for u in ups):
+                ways.append("加盟")
+            if any(u not in alliance_ids for u in ups):
+                ways.append("共管")
+            out.append(f"| {link(by_id, k)} | {names} | {' + '.join(ways)} |")
         out.append("")
 
     # ---------------- 横向
@@ -220,6 +230,21 @@ def render(by_id: dict, data: dict) -> str:
     else:
         out.append("**零条**。全库还没有任何一对势力写过 `盟友`、`中立` 或 `敌对`。")
         out.append("")
+
+    # ---------------- 自称中立
+    out.append("## 自称中立（身份，不是关系）")
+    out.append("")
+    out.append("这些势力的 `势力所属` 里带「中立」类别——设定上就不站队。它和上表的「与某方中立」")
+    out.append("是两件事：上表是**写出来的关系**，这里是**身份**。身份不产生边，所以单凭这两个字")
+    out.append("并不会让它们从下面的「关系待建」里消失。")
+    out.append("")
+    neutral_ids = _neutral_ids(factions)
+    neutrals = sorted((n for n in factions if n.id in neutral_ids), key=lambda n: n.id)
+    if neutrals:
+        out.append(f"**{len(neutrals)} 张**：" + "、".join(n.label for n in neutrals))
+    else:
+        out.append("（无）")
+    out.append("")
 
     # ---------------- 孤立
     out.append("## 关系待建")
@@ -259,6 +284,26 @@ def _is_legion(node) -> bool:
     except Exception:  # noqa: BLE001
         return False
     return "subtype: 军团" in text or "subtype: '军团'" in text
+
+
+def _category_tokens(node) -> set[str]:
+    """卡上 `势力所属` 一栏的类别词。旧表这一栏混装类别与上级，这里只取词面。"""
+    fields = dict(rs._fields(rs._read_body(node.path)))
+    return {t.strip() for t in re.split(r"[,，、]", fields.get("势力所属", "")) if t.strip()}
+
+
+def _alliance_ids(factions: list) -> set[str]:
+    """哪些势力卡自称「联盟」。
+
+    读的是 `势力所属` 里的类别词（白名单在 `faction_categories.yaml`），不按名字猜：
+    叫「XX盟」的不一定是联盟，叫「长流」的恰恰是。
+    """
+    return {n.id for n in factions if "联盟" in _category_tokens(n)}
+
+
+def _neutral_ids(factions: list) -> set[str]:
+    """哪些势力卡自称「中立」。**身份**，不是关系——中立身份不产生任何边。"""
+    return {n.id for n in factions if "中立" in _category_tokens(n)}
 
 
 def main() -> int:
