@@ -1,12 +1,27 @@
 {
-  "collapse-filter": true,
-  "search": "",
+  "collapse-filter": false,
+  "search": "敌对",
   "showTags": false,
   "showAttachments": false,
   "hideUnresolved": false,
   "showOrphans": true,
-  "collapse-color-groups": true,
-  "colorGroups": [],
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "势力",
+      "color": {
+        "a": 1,
+        "rgb": 14701138
+      }
+    },
+    {
+      "query": "人物",
+      "color": {
+        "a": 1,
+        "rgb": 14725458
+      }
+    }
+  ],
   "collapse-display": true,
   "showArrow": false,
   "textFadeMultiplier": 0,
@@ -17,6 +32,6 @@
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 0.33917459038617237,
+  "scale": 1.6157518302695253,
   "close": false
 }

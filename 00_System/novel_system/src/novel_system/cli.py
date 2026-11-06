@@ -117,6 +117,27 @@ def cmd_integrity(args: argparse.Namespace) -> int:
         return 0 if not report.blockers else 1
 
 
+def cmd_style(args: argparse.Namespace) -> int:
+    """只跑正文篇幅与句式（秒级）。
+
+    `integrity` 要扫全库九百多份档案、三分钟起步；改完一章想看「够不够三千字」，
+    不该付那个代价。这里只读 `08_Manuscripts`，口径与 `integrity` 同一份代码。
+    """
+    from .validators import integrity as integrity_mod
+
+    cfg = Config.load(args.vault)
+    report = integrity_mod.Report()
+    integrity_mod._check_manuscript(cfg, report)
+    low, high = integrity_mod.CHAPTER_LIMITS
+    head("正文篇幅与文风")
+    print(
+        f"  口径：{low:,}–{high:,} 汉字/章；"
+        f"「不是A，是B」上限 {integrity_mod.STYLE_DENSITY_MAX:.0f} 处/千字"
+    )
+    print_issues(report.issues)
+    return 0 if not report.blockers else 1
+
+
 def cmd_rebuild(args: argparse.Namespace) -> int:
     with Orchestrator(Config.load(args.vault)) as orch:
         result = orch.rebuild_index()
@@ -787,6 +808,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="顺带把完整报告写成 Markdown（给目录则自动命名）",
     )
     p_inte.set_defaults(func=cmd_integrity)
+    sub.add_parser(
+        "style", help="只查正文篇幅与句式（秒级，写完一章就地验，不跑全库体检）"
+    ).set_defaults(func=cmd_style)
     sub.add_parser("rebuild-index", help="从 Markdown 重建 SQLite 索引").set_defaults(func=cmd_rebuild)
     sub.add_parser("index-md", help="生成 07_Entity_Graph/Entity_Index.md 全量索引页").set_defaults(
         func=cmd_index_md
