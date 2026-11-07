@@ -114,8 +114,17 @@ class Config:
     def logs_dir(self) -> Path:
         return self.system_dir / "logs"
 
+    @property
+    def scratch_dir(self) -> Path:
+        """批量读盘的收容目录。
+
+        宿主的中转层会为子进程读到的每个文件在 TMPDIR 里留一份副本；指到这里，
+        垃圾留在 Vault 内部（已被 .gitignore 排除），不往系统临时目录倒。
+        """
+        return self.system_dir / "tmp"
+
     def ensure_dirs(self) -> None:
-        for d in (self.system_dir, self.staging_dir, self.backup_dir, self.logs_dir):
+        for d in (self.system_dir, self.staging_dir, self.backup_dir, self.logs_dir, self.scratch_dir):
             d.mkdir(parents=True, exist_ok=True)
         for sub in ("preflight", "draft", "memory", "outline"):
             (self.staging_dir / sub).mkdir(parents=True, exist_ok=True)

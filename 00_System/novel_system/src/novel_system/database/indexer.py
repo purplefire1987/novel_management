@@ -203,6 +203,7 @@ def index_vault(cfg: Config, index: Index, full: bool = True) -> dict[str, Any]:
     # 可检索、可引用、能进上下文，所以它留在 99_Archive 下（视图里排除），但参与索引。
     archive_exceptions = {"99_Archive/Original_Draft"}
 
+    pending: list[tuple[Path, str, tuple[int, int]]] = []
     for path in vault.iter_markdown(cfg.vault):
         rel = cfg.rel(path)
         if any(rel.startswith(prefix + "/") for prefix in excluded if prefix) and not any(
@@ -213,10 +214,24 @@ def index_vault(cfg: Config, index: Index, full: bool = True) -> dict[str, Any]:
         seen.add(rel)
         try:
             stamp = stamp_of(path)
-            if fingerprints.get(rel) == stamp:
-                skipped += 1
-                continue
-            doc_type = index_document(cfg, index, path, stamp=stamp)
+        except OSError as exc:
+            errors.append(f"{rel}: {exc}")
+            continue
+        if fingerprints.get(rel) == stamp:
+            skipped += 1
+            continue
+        pending.append((path, rel, stamp))
+
+    # 整批读：待索引的文件在受限宿主里逐份读就是每份 20ms，全量重建因此要
+    # 二十秒以上。先一次读完，下面只做解析与写库。读不到的退回单文件通路。
+    texts = vault.read_many([path for path, _, _ in pending], cfg.scratch_dir)
+    for path, rel, stamp in pending:
+        try:
+            raw = texts.get(path)
+            doc = vault.doc_from_text(path, raw) if raw is not None else None
+            doc_type = index_document(
+                cfg, index, path, doc=doc, stamp=stamp
+            )
         except Exception as exc:  # noqa: BLE001 - 单个文件坏掉不应中断全量索引
             errors.append(f"{rel}: {exc}")
             continue

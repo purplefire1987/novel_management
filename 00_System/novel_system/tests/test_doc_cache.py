@@ -109,6 +109,40 @@ def test_deleted_file_is_pruned(tmp_path: Path) -> None:
     assert str(paths[0]) in payload["files"]
 
 
+def test_read_many_returns_identical_text(tmp_path: Path) -> None:
+    """批量读盘必须与逐份读一字不差——它是性能通道，不该改变任何语义。"""
+    paths = _seed(tmp_path, count=6)
+    got = vault.read_many(paths, tmp_path / "scratch")
+    assert set(got) == set(paths), "一个都不该漏"
+    for path in paths:
+        assert got[path] == path.read_text(encoding="utf-8")
+
+
+def test_read_many_tolerates_missing_and_mixed_names(tmp_path: Path) -> None:
+    """清单里混进不存在的文件、带空格的文件名，都不能让整批失败。"""
+    paths = _seed(tmp_path, count=2)
+    spaced = tmp_path / "01_Core_Memory/Characters/带 空格 的 档案.md"
+    spaced.write_text(DOC, encoding="utf-8")
+    ghost = tmp_path / "01_Core_Memory/Characters/不存在.md"
+
+    got = vault.read_many([*paths, spaced, ghost], tmp_path / "scratch")
+    assert spaced in got and got[spaced] == DOC
+    assert ghost not in got, "读不到的路径不该出现在结果里，交给调用方退回直读"
+    assert all(p in got for p in paths)
+
+
+def test_prefetch_fills_cache_without_extra_reads(tmp_path: Path) -> None:
+    """预读补齐之后，后续 get 全命中；指纹没变时第二次预读不再读盘。"""
+    paths = _seed(tmp_path, count=4)
+    with vault.cached_docs() as cache:
+        assert cache.prefetch(paths, tmp_path / "scratch") == 4
+        assert cache.misses == 4
+        _read_all(paths)
+        assert cache.hits == 4, "预读过的文件不该再读一遍"
+        assert cache.prefetch(paths, tmp_path / "scratch") == 0
+        assert cache.misses == 4, "第二批预读应当全部命中指纹"
+
+
 def test_unknown_scope_is_rejected(tmp_path: Path) -> None:
     cfg = Config(
         vault=tmp_path, system={}, id_rules={}, permissions={}, workflow={}, agents={}

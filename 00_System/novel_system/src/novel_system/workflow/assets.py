@@ -138,12 +138,24 @@ def scan_existing(cfg: Config) -> tuple[dict[str, int], NameIndex]:
     """扫描 Vault 现有 Markdown，返回 (各前缀最大序号, 名称索引)。"""
     max_serial: dict[str, int] = {}
     names = NameIndex()
+    paths: list[Path] = []
     for path in vault.iter_markdown(cfg.vault):
         rel = cfg.rel(path)
         if rel.split("/")[0] in SKIP_TOP_DIRS:
             continue
+        paths.append(path)
+    # 一次原生进程整批读：逐份读在受限宿主里是每份 20ms 的固定开销，
+    # 九百多份就是二十秒，而录入只需要 frontmatter。
+    texts = vault.read_many(paths, cfg.scratch_dir)
+    for path in paths:
+        text = texts.get(path)
+        if text is None:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:  # noqa: BLE001 - 单个坏文件不影响录入
+                continue
         try:
-            meta, _ = vault.split_frontmatter(path.read_text(encoding="utf-8"))
+            meta, _ = vault.split_frontmatter(text)
         except Exception:  # noqa: BLE001 - 单个坏文件不影响录入
             continue
         doc_id = str(meta.get("id") or "")

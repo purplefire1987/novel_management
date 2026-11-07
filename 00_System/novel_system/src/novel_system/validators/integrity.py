@@ -888,6 +888,9 @@ def run(cfg: Config, *, scope: str = "full") -> Report:
     docs = _docs(cfg)
     ran = 0
     with vault.cached_docs(cfg.vault / vault.CACHE_FILE) as cache:
+        # 整批预读：各检查项加起来要碰几百份档案，逐份读就是几百次 20ms 的
+        # 固定开销。一次原生进程读完之后，下面每一项都只是取缓存。
+        cache.prefetch(_all_markdown(cfg), cfg.scratch_dir)
         for _name, need, fn in _CHECKS:
             if scope == "fast" and need != "fast":
                 continue

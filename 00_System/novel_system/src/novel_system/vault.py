@@ -8,15 +8,18 @@ from __future__ import annotations
 import contextlib
 import gzip
 import hashlib
+import io
 import json
 import os
 import shutil
+import subprocess
+import tarfile
 import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 import yaml
 
@@ -83,6 +86,112 @@ def render_doc(meta: dict[str, Any], body: str) -> str:
     return f"---\n{yaml_text}\n---\n\n{body}"
 
 
+# ------------------------------------------------------------------ 批量读盘
+# 受限宿主里每个 open() 都要过一次 IPC 中转，单次约 20ms——这个开销与文件大小
+# 无关，纯粹是「开一次文件」的固定成本。所以逐文件读全库是 20 秒起步，而把清单
+# 交给一个原生进程（tar）读出来，同样的活只要 0.15 秒：原生进程走的是系统调用，
+# 不经过那层中转。
+#
+# 这是纯粹的性能通道，不改变语义：拆包失败、文件读不到、编码不对，一律退回
+# 逐文件读，让上层照常报它本来会报的错。
+BULK_BATCH = 400
+
+
+def _read_batch_via_tar(paths: list[Path], scratch: Path | None = None) -> dict[Path, str]:
+    tar = shutil.which("tar")
+    if not tar:
+        return {}
+    try:
+        base = Path(os.path.commonpath([str(p.parent) for p in paths]))
+    except (ValueError, OSError):
+        return {}
+
+    names: list[str] = []
+    lookup: dict[str, Path] = {}
+    for path in paths:
+        rel = os.path.relpath(path, base)
+        # 含换行的文件名没法用「一行一个」的清单传递，交给逐文件通路
+        if "\n" in rel or "\r" in rel:
+            return {}
+        names.append(rel)
+        lookup[rel] = path
+
+    env = None
+    if scratch is not None:
+        # 宿主的中转层会为子进程读到的每个文件留一份中转副本，放在 TMPDIR 里。
+        # 指到 Vault 内部（已在 .gitignore 与定期清理范围内），不往系统临时目录倒垃圾。
+        try:
+            scratch.mkdir(parents=True, exist_ok=True)
+            env = dict(os.environ, TMPDIR=str(scratch))
+        except OSError:
+            env = None
+
+    try:
+        proc = subprocess.run(
+            [tar, "-cf", "-", "-C", str(base), "-T", "-"],
+            input="\n".join(names).encode("utf-8"),
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+    except OSError:
+        return {}
+    # bsdtar 遇到个别读不了的文件会返回 1，但其余内容照样输出，所以不因退出码放弃
+    if not proc.stdout:
+        return {}
+
+    out: dict[Path, str] = {}
+    try:
+        with tarfile.open(fileobj=io.BytesIO(proc.stdout), mode="r:") as archive:
+            for member in archive:
+                if not member.isfile():
+                    continue
+                key = lookup.get(member.name) or lookup.get(member.name.lstrip("./"))
+                if key is None:
+                    continue
+                handle = archive.extractfile(member)
+                if handle is None:
+                    continue
+                try:
+                    out[key] = handle.read().decode("utf-8")
+                except UnicodeDecodeError:
+                    continue  # 让逐文件通路去抛它原本要抛的错
+    except (tarfile.TarError, OSError, EOFError):
+        return {}
+    return out
+
+
+def read_many(paths: Iterable[Path], scratch: Path | None = None) -> dict[Path, str]:
+    """批量读一批文件的原文，返回 `{路径: 内容}`。
+
+    命中不了（没装 tar、清单里有怪名字、文件正好被删）的路径不会出现在结果里，
+    调用方对缺项退回 `read_text()` 即可。返回的字典只保证「读到的」正确。
+
+    `scratch` 给中转层当 TMPDIR 用：宿主会为子进程读过的每个文件留一份中转副本，
+    指到 Vault 内部总比堆在系统临时目录好收。
+    """
+    wanted: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        wanted.append(path)
+    if not wanted:
+        return {}
+
+    out: dict[Path, str] = {}
+    for start in range(0, len(wanted), BULK_BATCH):
+        out.update(_read_batch_via_tar(wanted[start : start + BULK_BATCH], scratch))
+    return out
+
+
+def doc_from_text(path: Path, text: str) -> Doc:
+    """由已读到的原文构造 `Doc`，省掉一次读盘。"""
+    meta, body = split_frontmatter(text)
+    return Doc(path=path, meta=meta, body=body, raw=text)
+
+
 class DocCache:
     """一次运行内的文档缓存：同一个文件只读一次。
 
@@ -122,6 +231,47 @@ class DocCache:
         doc = _load_doc(path)
         self._docs[path] = (st.st_mtime_ns, st.st_size, doc)
         return doc
+
+    def prefetch(self, paths: Iterable[Path], scratch: Path | None = None) -> int:
+        """先把一批文件整批读进缓存，返回补入条数。
+
+        全库扫描（索引重建、体检、录入前清点）都是一次性读几百份档案，逐个
+        `get()` 就是几百次 20ms 的固定开销。这里先用一次原生进程读完，后面的
+        `get()` 全部命中缓存。指纹不变的文件直接跳过，不做无谓的读盘。
+        """
+        todo: list[tuple[Path, os.stat_result]] = []
+        for path in paths:
+            try:
+                st = path.stat()
+            except OSError:
+                continue
+            hit = self._docs.get(path)
+            if hit is not None and hit[0] == st.st_mtime_ns and hit[1] == st.st_size:
+                self.hits += 1
+                continue
+            todo.append((path, st))
+        if not todo:
+            return 0
+
+        texts = read_many([path for path, _ in todo], scratch)
+        added = 0
+        for path, st in todo:
+            text = texts.get(path)
+            if text is None:
+                continue  # 没读到就留给 get() 走单文件通路
+            try:
+                meta, body = split_frontmatter(text)
+            except VaultError:
+                continue
+            self.misses += 1
+            self.dirty = True
+            self._docs[path] = (
+                st.st_mtime_ns,
+                st.st_size,
+                Doc(path=path, meta=meta, body=body, raw=text),
+            )
+            added += 1
+        return added
 
     def store(self, path: Path, text: str) -> None:
         """本进程刚写完的内容直接入缓存，省掉下一次读盘。
@@ -406,6 +556,36 @@ def cleanup_stale_temp(root: Path, min_age_seconds: int = 300) -> list[Path]:
                 removed.append(target)
             except OSError:
                 continue
+    removed.extend(_cleanup_scratch(root / ".novel_system" / "tmp", now, min_age_seconds))
+    return removed
+
+
+def _cleanup_scratch(scratch: Path, now: float, min_age_seconds: int) -> list[Path]:
+    """清掉批量读盘在收容目录里留下的中转副本。
+
+    正常情况下中转层自己会删，这里只是兜底：某些宿主会禁止子进程 unlink，
+    副本就一直堆着。只认 `tar.<后缀>.<6 位随机>` 这个名字形状，别的东西一概不动。
+    """
+    if not scratch.is_dir():
+        return []
+    removed: list[Path] = []
+    try:
+        entries = list(scratch.iterdir())
+    except OSError:
+        return []
+    for target in entries:
+        if not target.is_file():
+            continue
+        parts = target.name.split(".")
+        if len(parts) != 3 or parts[0] != "tar" or len(parts[2]) != 6:
+            continue
+        try:
+            if now - target.stat().st_mtime < min_age_seconds:
+                continue
+            target.unlink()
+            removed.append(target)
+        except OSError:
+            continue
     return removed
 
 
