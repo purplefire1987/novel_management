@@ -332,7 +332,7 @@ def _faction_categories(cfg: Config) -> set[str]:
     path = cfg.vault / FACTION_CATEGORY_CONFIG
     if not path.exists():
         return set()
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = yaml.safe_load(vault.read_text(path)) or {}
     return {str(x).strip() for x in (data.get("categories") or []) if str(x).strip()}
 
 
@@ -476,7 +476,7 @@ def _check_projection(cfg: Config, report: Report) -> None:
     entity_count = report.stats.get("实体数", 0)
     map_page = cfg.vault / "01_Core_Memory" / "Maps" / "实体分布.md"
     if map_page.exists():
-        text = map_page.read_text(encoding="utf-8")
+        text = vault.read_text(map_page)
         hit = re.search(r"实体总数：\*\*(\d+)\*\*", text)
         if hit and int(hit.group(1)) != entity_count:
             report.add(
@@ -579,7 +579,7 @@ def _check_config_drift(cfg: Config, report: Report) -> None:
     tpl = cfg.vault / "11_Templates/T-新建档案.md"
     if not tpl.exists():
         return
-    text = tpl.read_text(encoding="utf-8")
+    text = vault.read_text(tpl)
     pairs = re.findall(r'type:\s*"([a-z_]+)",\s*prefix:\s*"([A-Z-]+)"', text)
     dirs = re.findall(r'dir:\s*"([^"]+)"', text)
     prefixes = {k: str(v) for k, v in (cfg.id_rules.get("prefixes") or {}).items()}
@@ -633,7 +633,7 @@ def _check_garrison_drift(cfg: Config, report: Report) -> None:
         if m:
             total += int(m.group(1).replace(",", ""))
             count += 1
-    body = table.read_text(encoding="utf-8")
+    body = vault.read_text(table)
     mt = re.search(r"\*\*军团\*\*：(\d+) 支", body)
     mn = re.search(r"\*\*总兵力\*\*：([\d,]+) 人", body)
     if not mt or not mn:

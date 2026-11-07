@@ -49,6 +49,8 @@
 .novel_system/index.sqlite-shm
 # 解析缓存同理：只是「上次读到的正文」，删掉下次自动重建
 .novel_system/doc_cache.json.gz
+.novel_system/doc_mirror.sqlite
+.novel_system/doc_mirror.sqlite-journal
 # 原子写入残留：rename 被环境拒绝时会留下 .tmp_* 半成品，永远不该入库
 .tmp_*
 # 运行时产物

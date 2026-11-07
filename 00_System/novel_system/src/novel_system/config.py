@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from . import vault
+
 CONFIG_FILES = {
     "system": "system_config.yaml",
     "id_rules": "id_rules.yaml",
@@ -22,10 +24,15 @@ class ConfigError(RuntimeError):
     pass
 
 
+# 进程内已解析的配置。CLI 一次命令一个进程，不存在中途热更的场景。
+_LOADED: dict[Path, "Config"] = {}
+
+
 def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise ConfigError(f"缺少配置文件：{path}")
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    # 走 vault 的读取入口：命令入口挂了内容镜像时，这 5 份配置就是 0 次读盘
+    data = yaml.safe_load(vault.read_text(path)) or {}
     if not isinstance(data, dict):
         raise ConfigError(f"配置文件格式错误（顶层应为映射）：{path}")
     return data
@@ -68,10 +75,19 @@ class Config:
     # ---------- 加载 ----------
     @classmethod
     def load(cls, vault: Path | str | None = None) -> "Config":
+        """加载配置。同一个 Vault 在一个进程里只解析一次。
+
+        命令入口先加载一次用来定位镜像，各子命令再各自 `load()` 一次；
+        没有这层缓存就是白读两遍 5 份 YAML（约 100ms）。CLI 一次命令一个进程，
+        进程内配置不会中途变，缓存不会带来陈旧问题。
+        """
         root = find_vault(Path(vault) if vault else None)
+        hit = _LOADED.get(root)
+        if hit is not None:
+            return hit
         cfg_dir = root / "00_System" / "Config"
         data = {key: _read_yaml(cfg_dir / name) for key, name in CONFIG_FILES.items()}
-        return cls(
+        cfg = cls(
             vault=root,
             system=data["system"],
             id_rules=data["id_rules"],
@@ -79,6 +95,8 @@ class Config:
             workflow=data["workflow"],
             agents=data["agents"],
         )
+        _LOADED[root] = cfg
+        return cfg
 
     # ---------- 路径 ----------
     @property

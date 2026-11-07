@@ -10,6 +10,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -96,7 +97,7 @@ def test_version_mismatch_is_ignored(tmp_path: Path) -> None:
 
 def test_deleted_file_is_pruned(tmp_path: Path) -> None:
     paths = _seed(tmp_path)
-    store = tmp_path / vault.CACHE_FILE
+    store = tmp_path / vault.MIRROR_FILE
     with vault.cached_docs(store):
         _read_all(paths)
 
@@ -104,9 +105,44 @@ def test_deleted_file_is_pruned(tmp_path: Path) -> None:
     with vault.cached_docs(store):
         _read_all(paths[:2])
 
-    payload = json.loads(gzip.decompress(store.read_bytes()))
-    assert str(paths[2]) not in payload["files"], "删掉的文件不该留在缓存里"
-    assert str(paths[0]) in payload["files"]
+    db = sqlite3.connect(str(store))
+    try:
+        rels = {row[0] for row in db.execute("SELECT rel FROM doc")}
+    finally:
+        db.close()
+    assert str(paths[2]) not in rels, "删掉的文件不该留在镜像里"
+    assert str(paths[0]) in rels
+
+
+def test_mirror_roundtrip_keeps_parsed_fields(tmp_path: Path) -> None:
+    """镜像存的是解析结果，读回来必须和读盘解析的一致——否则就是静默改语义。"""
+    paths = _seed(tmp_path, count=3)
+    store = tmp_path / vault.MIRROR_FILE
+
+    fresh = {p: vault._load_doc(p) for p in paths}
+    with vault.cached_docs(store):
+        _read_all(paths)
+
+    with vault.cached_docs(store) as cache:
+        assert cache.misses == 0, "镜像齐全时不该再读盘"
+        for p in paths:
+            doc = vault.read_doc(p)
+            assert doc.meta == fresh[p].meta
+            assert doc.body == fresh[p].body
+            assert doc.raw == fresh[p].raw
+
+
+def test_corrupt_mirror_falls_back_to_disk(tmp_path: Path) -> None:
+    """镜像写坏了只能退化直读，不能报错——它本来就是可丢弃的加速层。"""
+    paths = _seed(tmp_path, count=2)
+    store = tmp_path / vault.MIRROR_FILE
+    store.parent.mkdir(parents=True, exist_ok=True)
+    store.write_bytes(b"not a sqlite file at all")
+
+    with vault.cached_docs(store) as cache:
+        assert cache.misses == 0 and cache.hits == 0
+        assert vault.read_text(paths[0]) == paths[0].read_text(encoding="utf-8")
+        assert cache.misses == 1
 
 
 def test_read_many_returns_identical_text(tmp_path: Path) -> None:

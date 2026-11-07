@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,24 @@ DEFAULT_TEMPROOT = Path("/tmp/nv_pytest")
 
 def _temproot() -> Path:
     return Path(os.environ.get("NOVEL_TEST_TMP", str(DEFAULT_TEMPROOT)))
+
+
+def _pin_tempdir() -> None:
+    """把 `tempfile` 的默认目录钉死，跳过它的可用性探测。
+
+    探测方式是「在候选目录建一个文件再删掉」，而带文件守卫的宿主会拦掉那一步，
+    于是 `gettempdir()` 直接抛 `No usable temporary directory found`，
+    整个 pytest 连收集都进不去。这里直接指定目录，省掉探测。
+    """
+    root = _temproot()
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+    tempfile.tempdir = str(root)
+
+
+_pin_tempdir()
 
 
 def pytest_configure(config: pytest.Config) -> None:

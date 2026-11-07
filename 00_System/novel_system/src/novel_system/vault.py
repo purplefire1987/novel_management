@@ -8,12 +8,10 @@ from __future__ import annotations
 import contextlib
 import gzip
 import hashlib
-import io
 import json
 import os
 import shutil
-import subprocess
-import tarfile
+import sqlite3
 import tempfile
 import time
 from dataclasses import dataclass
@@ -25,8 +23,34 @@ import yaml
 
 FM_RE_BYTES = b"---"
 
-CACHE_VERSION = 1
-CACHE_FILE = ".novel_system/doc_cache.json.gz"
+CACHE_VERSION = 2
+
+# 内容镜像：全库正文的 sqlite 副本。
+#
+# 为什么不是 json.gz：宿主的 `open()` 要过一次 IPC 中转，单次约 20ms，与文件大小
+# 无关；但 sqlite 打开一个库文件只要一次 open，之后读 1000 多行是纯内存操作。
+# 实测 1120 份档案：逐份读 21.8s、tar 批量 0.75s、sqlite 一次 open 取全库 0.004s。
+#
+# 为什么不是 WAL：受限环境里 `-wal`/`-shm` 两个附属文件会被拦（disk I/O error），
+# 用 `journal_mode=MEMORY` 把回滚日志放内存里，单文件即可读写。
+MIRROR_FILE = ".novel_system/doc_mirror.sqlite"
+CACHE_FILE = MIRROR_FILE  # 旧名，兼容既有调用
+
+MIRROR_SCHEMA = """
+CREATE TABLE IF NOT EXISTS doc(
+    rel   TEXT PRIMARY KEY,
+    mtime INTEGER NOT NULL,
+    size  INTEGER NOT NULL,
+    meta  TEXT NOT NULL,
+    body  TEXT NOT NULL,
+    raw   TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT NOT NULL);
+"""
+
+
+def _is_mirror(path: Path) -> bool:
+    return path.name.endswith((".sqlite", ".db"))
 
 
 class VaultError(RuntimeError):
@@ -86,103 +110,29 @@ def render_doc(meta: dict[str, Any], body: str) -> str:
     return f"---\n{yaml_text}\n---\n\n{body}"
 
 
-# ------------------------------------------------------------------ 批量读盘
-# 受限宿主里每个 open() 都要过一次 IPC 中转，单次约 20ms——这个开销与文件大小
-# 无关，纯粹是「开一次文件」的固定成本。所以逐文件读全库是 20 秒起步，而把清单
-# 交给一个原生进程（tar）读出来，同样的活只要 0.15 秒：原生进程走的是系统调用，
-# 不经过那层中转。
-#
-# 这是纯粹的性能通道，不改变语义：拆包失败、文件读不到、编码不对，一律退回
-# 逐文件读，让上层照常报它本来会报的错。
-BULK_BATCH = 400
-
-
-def _read_batch_via_tar(paths: list[Path], scratch: Path | None = None) -> dict[Path, str]:
-    tar = shutil.which("tar")
-    if not tar:
-        return {}
-    try:
-        base = Path(os.path.commonpath([str(p.parent) for p in paths]))
-    except (ValueError, OSError):
-        return {}
-
-    names: list[str] = []
-    lookup: dict[str, Path] = {}
-    for path in paths:
-        rel = os.path.relpath(path, base)
-        # 含换行的文件名没法用「一行一个」的清单传递，交给逐文件通路
-        if "\n" in rel or "\r" in rel:
-            return {}
-        names.append(rel)
-        lookup[rel] = path
-
-    env = None
-    if scratch is not None:
-        # 宿主的中转层会为子进程读到的每个文件留一份中转副本，放在 TMPDIR 里。
-        # 指到 Vault 内部（已在 .gitignore 与定期清理范围内），不往系统临时目录倒垃圾。
-        try:
-            scratch.mkdir(parents=True, exist_ok=True)
-            env = dict(os.environ, TMPDIR=str(scratch))
-        except OSError:
-            env = None
-
-    try:
-        proc = subprocess.run(
-            [tar, "-cf", "-", "-C", str(base), "-T", "-"],
-            input="\n".join(names).encode("utf-8"),
-            capture_output=True,
-            check=False,
-            env=env,
-        )
-    except OSError:
-        return {}
-    # bsdtar 遇到个别读不了的文件会返回 1，但其余内容照样输出，所以不因退出码放弃
-    if not proc.stdout:
-        return {}
-
-    out: dict[Path, str] = {}
-    try:
-        with tarfile.open(fileobj=io.BytesIO(proc.stdout), mode="r:") as archive:
-            for member in archive:
-                if not member.isfile():
-                    continue
-                key = lookup.get(member.name) or lookup.get(member.name.lstrip("./"))
-                if key is None:
-                    continue
-                handle = archive.extractfile(member)
-                if handle is None:
-                    continue
-                try:
-                    out[key] = handle.read().decode("utf-8")
-                except UnicodeDecodeError:
-                    continue  # 让逐文件通路去抛它原本要抛的错
-    except (tarfile.TarError, OSError, EOFError):
-        return {}
-    return out
-
-
 def read_many(paths: Iterable[Path], scratch: Path | None = None) -> dict[Path, str]:
     """批量读一批文件的原文，返回 `{路径: 内容}`。
 
-    命中不了（没装 tar、清单里有怪名字、文件正好被删）的路径不会出现在结果里，
-    调用方对缺项退回 `read_text()` 即可。返回的字典只保证「读到的」正确。
+    读不到的路径不会出现在结果里，调用方对缺项退回 `read_text()` 即可。
+    返回的字典只保证「读到的」正确。
 
-    `scratch` 给中转层当 TMPDIR 用：宿主会为子进程读过的每个文件留一份中转副本，
-    指到 Vault 内部总比堆在系统临时目录好收。
+    这里曾经走「一个 tar 进程批量吐出来」的路子：读 1120 份只要 0.75 秒，比逐份
+    快 30 倍。但中转层会给子进程读到的**每个**文件在临时目录留一份副本，一次全库
+    扫描就是 1000 多个；而这些副本的清理比读还贵（实测单次 unlink 约 140ms，
+    且会被安全守卫逐项拦下），一次 `rebuild-index` 因此能挂十几分钟。
+    所以退回逐份直读——慢，但只发生一次：读到的内容会进内容镜像，
+    之后所有命令都是从镜像里取，不再碰硬盘。
+
+    `scratch` 仅为兼容旧调用保留，当前实现不再产生中转副本。
     """
-    wanted: list[Path] = []
-    seen: set[Path] = set()
-    for path in paths:
-        if path in seen:
-            continue
-        seen.add(path)
-        wanted.append(path)
-    if not wanted:
-        return {}
-
     out: dict[Path, str] = {}
-    for start in range(0, len(wanted), BULK_BATCH):
-        out.update(_read_batch_via_tar(wanted[start : start + BULK_BATCH], scratch))
+    for path in paths:
+        if path in out:
+            continue
+        try:
+            out[path] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue  # 交给调用方的单文件通路去抛它本来要抛的错
     return out
 
 
@@ -207,13 +157,14 @@ class DocCache:
     20ms 的读盘——体检从二十几秒降到一秒以内，代价只是多一个缓存文件。
     """
 
-    __slots__ = ("_docs", "hits", "misses", "dirty")
+    __slots__ = ("_docs", "hits", "misses", "dirty", "persist")
 
     def __init__(self) -> None:
         self._docs: dict[Path, tuple[int, int, Doc]] = {}
         self.hits = 0
         self.misses = 0
         self.dirty = False
+        self.persist: Path | None = None
 
     def get(self, path: Path) -> Doc:
         try:
@@ -300,7 +251,60 @@ class DocCache:
 
         只做「填表」，不在这里判断新鲜度——指纹比对留给 `get()`，
         这样文件被外部改过时照常重读，缓存不会比直读更旧。
+
+        按后缀分派：`.sqlite`/`.db` 走内容镜像，其余走老的 gzip+json。
         """
+        if _is_mirror(path):
+            return self._load_mirror(path)
+        return self._load_gzip(path)
+
+    def _load_mirror(self, path: Path) -> int:
+        """从 sqlite 镜像整表读回。一次 open，之后全是内存操作。
+
+        存的是**解析结果**（meta 转成 JSON）而不是原文：只存原文的话，每次载入
+        都要重新 `yaml.safe_load` 一遍全部 frontmatter——1069 份要 1.2 秒，
+        比省下来的读盘还贵。JSON 反序列化一个扁平字典是微秒级。
+        """
+        try:
+            db = sqlite3.connect(str(path))
+        except sqlite3.Error:
+            return 0
+        try:
+            db.execute("PRAGMA journal_mode=MEMORY")
+            meta = dict(db.execute("SELECT k, v FROM meta").fetchall())
+            if meta.get("version") != str(CACHE_VERSION):
+                return 0
+            rows = db.execute("SELECT rel, mtime, size, meta, body, raw FROM doc").fetchall()
+        except sqlite3.Error:
+            return 0
+        finally:
+            db.close()
+
+        dropped = 0
+        for rel, mtime, size, meta_json, body, raw in rows:
+            p = Path(rel)
+            # 已经删掉的文件不必留在内存里；也顺手标脏，让退出时的保存把它清掉
+            if not p.exists():
+                dropped += 1
+                continue
+            try:
+                front = json.loads(meta_json)
+            except (TypeError, ValueError):
+                dropped += 1
+                continue
+            if not isinstance(front, dict):
+                dropped += 1
+                continue
+            self._docs[p] = (
+                int(mtime),
+                int(size),
+                Doc(path=p, meta=front, body=body, raw=raw),
+            )
+        if dropped:
+            self.dirty = True
+        return len(self._docs)
+
+    def _load_gzip(self, path: Path) -> int:
         try:
             payload = json.loads(gzip.decompress(path.read_bytes()))
         except (OSError, ValueError, EOFError, gzip.BadGzipFile):
@@ -334,6 +338,53 @@ class DocCache:
 
     def save(self, path: Path) -> bool:
         """落盘。只有本次真的读过盘才写，纯读取的复查不会改动缓存文件。"""
+        if _is_mirror(path):
+            return self._save_mirror(path)
+        return self._save_gzip(path)
+
+    def _save_mirror(self, path: Path) -> bool:
+        """整表重写镜像。1120 行约 0.02 秒，不值得为了增量再记一本脏页账。"""
+        if not self.dirty and path.exists():
+            return False
+        rows = [
+            (
+                str(p),
+                mtime,
+                size,
+                json.dumps(doc.meta, ensure_ascii=False),
+                doc.body,
+                doc.raw,
+            )
+            for p, (mtime, size, doc) in self._docs.items()
+            # 已删除的文件不必留在镜像里；stat 在受限宿主上是免费的
+            if p.exists()
+        ]
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            db = sqlite3.connect(str(path))
+            try:
+                db.execute("PRAGMA journal_mode=MEMORY")
+                db.execute("PRAGMA synchronous=OFF")
+                # 反正整表重写，顺带确保结构是最新的（旧版镜像只有 4 列）
+                db.execute("DROP TABLE IF EXISTS doc")
+                db.executescript(MIRROR_SCHEMA)
+                db.execute("DELETE FROM doc")
+                db.executemany(
+                    "INSERT INTO doc(rel, mtime, size, meta, body, raw) VALUES(?,?,?,?,?,?)",
+                    rows,
+                )
+                db.execute(
+                    "INSERT OR REPLACE INTO meta(k, v) VALUES('version', ?)",
+                    (str(CACHE_VERSION),),
+                )
+                db.commit()
+            finally:
+                db.close()
+        except (sqlite3.Error, TypeError, ValueError):
+            return False
+        return True
+
+    def _save_gzip(self, path: Path) -> bool:
         if not self.dirty and path.exists():
             return False
         payload = {
@@ -363,15 +414,20 @@ _CACHE: DocCache | None = None
 def cached_docs(persist: Path | None = None) -> Iterator[DocCache]:
     """在 `with` 块内让 `read_doc` 走缓存。
 
-    只包住「一次重建 / 一次发布 / 一次体检」这种连续读全库的流程；脱离块一律直读，
-    避免长驻进程里缓存无界增长或跨操作串味。
+    给了 `persist` 就在进出时读写内容镜像：进时载入、出时只在「本次读过盘」才保存。
+    反复跑同一份没改动的库会落到毫秒级，改了哪个文件就只重读哪个文件。
 
-    给了 `persist` 就在进出时读写磁盘缓存：进时载入、出时只在「本次读过盘」才保存。
-    反复跑同一份没改动的库会落到 1 秒以内，改了哪个文件就只重读哪个文件。
+    嵌套调用同一份镜像时直接复用外层：命令入口开一个，里面的 Config 加载、
+    体检、索引各再请求一次，不该为此反复整表读写。
     """
     global _CACHE
     prev = _CACHE
+    if persist is not None and prev is not None and prev.persist == persist:
+        yield prev
+        return
+
     cache = DocCache()
+    cache.persist = persist
     if persist is not None:
         cache.load(persist)
     _CACHE = cache

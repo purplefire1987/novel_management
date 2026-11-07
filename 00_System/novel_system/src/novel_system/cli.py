@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -10,7 +11,8 @@ from typing import Any
 
 import yaml
 
-from .config import Config, ConfigError
+from . import vault
+from .config import Config, ConfigError, find_vault
 from .gitops import GitError
 from .orchestrator import Orchestrator
 from .transaction import TransactionError
@@ -996,11 +998,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def mirror_scope(args: argparse.Namespace) -> Any:
+    """命令入口挂上内容镜像，返回可 `with` 的作用域。
+
+    受限宿主里每次 `open()` 约 20ms，与文件大小无关。整条命令共用一份镜像后，
+    Config 的 5 份 YAML、各个校验器、投影同步读同一批文件都只碰内存。
+    镜像缺失或损坏时静默退化成直读——它是加速层，不是必需品。
+    """
+    try:
+        root = find_vault(Path(args.vault) if getattr(args, "vault", None) else None)
+    except (ConfigError, OSError):
+        return contextlib.nullcontext()
+    return vault.cached_docs(root / vault.MIRROR_FILE)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        return int(args.func(args) or 0)
+        with mirror_scope(args):
+            return int(args.func(args) or 0)
     except WorkflowError as exc:
         print(f"\n[工作流拒绝] {exc}", file=sys.stderr)
         return 3
