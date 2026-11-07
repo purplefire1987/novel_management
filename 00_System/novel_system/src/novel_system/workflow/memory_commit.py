@@ -853,6 +853,10 @@ def _regression_audit(
     issues: list[Issue] = []
 
     # 1) 索引一致性：文件哈希必须与索引记录一致
+    #
+    # 这一步每次 apply 都要过一遍全库（上千份实体）。走缓存取原文：同一份文件
+    # 在这一轮里只读一次盘，指纹变了照样重读，与直读等价。不走缓存时，
+    # 受限宿主每份要过一次 IPC 中转，光这一项就能吃掉十几秒。
     for row in index_after.all_entities():
         path = cfg.abs(str(row.get("file_path") or ""))
         if not path.exists():
@@ -860,7 +864,7 @@ def _regression_audit(
                 Issue("MAJOR", "index", f"索引指向的文件不存在：{row.get('file_path')}", refs=[str(row["id"])])
             )
             continue
-        current = vault.file_hash(path)
+        current = vault.file_hash(path, use_cache=True)
         if row.get("content_hash") and current != row.get("content_hash"):
             issues.append(
                 Issue(

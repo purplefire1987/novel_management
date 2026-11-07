@@ -7,10 +7,9 @@
 
 from __future__ import annotations
 
-import gzip
-import json
 import os
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -78,17 +77,46 @@ def test_changed_file_is_reread(tmp_path: Path) -> None:
         assert "改过" in bodies[1]
 
 
+def test_file_hash_matches_disk_with_and_without_cache(tmp_path: Path) -> None:
+    """审计用的 `file_hash(use_cache=True)` 不许比直读更旧。
+
+    记忆落盘后的回归审计要对全库上千份实体各算一次哈希，所以它开了缓存；
+    但缓存一旦给出过期内容，「索引与文件不一致」这条告警就会被吞掉——
+    而那正是审计唯一的职责。冷缓存、命中、外部改动三种状态都得与直读对齐。
+    """
+    paths = _seed(tmp_path)
+    store = tmp_path / vault.MIRROR_FILE
+    with vault.cached_docs(store):
+        direct = [vault.file_hash(p) for p in paths]
+        assert [vault.file_hash(p, use_cache=True) for p in paths] == direct, "冷缓存应与直读一致"
+
+        _read_all(paths)  # 填缓存
+        assert [vault.file_hash(p, use_cache=True) for p in paths] == direct, "命中缓存应与直读一致"
+
+        paths[0].write_text(DOC.replace("CHAR-0001", "CHAR-0000").replace("甲", "换过"), encoding="utf-8")
+        stat = paths[0].stat()
+        os.utime(paths[0], ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+
+        current = vault.file_hash(paths[0], use_cache=True)
+        assert current == vault.file_hash(paths[0]), "缓存失效后应与直读一致"
+        assert current != direct[0], "外部改过的文件不能给出旧哈希"
+
+    assert vault.file_hash(tmp_path / "缺.md", use_cache=True) == "", "缺文件仍返回空串"
+
+
 def test_version_mismatch_is_ignored(tmp_path: Path) -> None:
     paths = _seed(tmp_path, count=1)
-    store = tmp_path / vault.CACHE_FILE
-    store.parent.mkdir(parents=True, exist_ok=True)
-    store.write_bytes(
-        gzip.compress(
-            json.dumps(
-                {"version": vault.CACHE_VERSION + 1, "files": {str(paths[0]): [0, 0, DOC]}}
-            ).encode("utf-8")
-        )
-    )
+    store = tmp_path / vault.MIRROR_FILE
+    with vault.cached_docs(store):
+        _read_all(paths)
+
+    # 把版本号改高一级：格式变了，旧镜像一律不认
+    db = sqlite3.connect(str(store))
+    try:
+        db.execute("UPDATE meta SET v=? WHERE k='version'", (str(vault.CACHE_VERSION + 1),))
+        db.commit()
+    finally:
+        db.close()
 
     with vault.cached_docs(store) as cache:
         _read_all(paths)
@@ -110,16 +138,47 @@ def test_deleted_file_is_pruned(tmp_path: Path) -> None:
         rels = {row[0] for row in db.execute("SELECT rel FROM doc")}
     finally:
         db.close()
-    assert str(paths[2]) not in rels, "删掉的文件不该留在镜像里"
-    assert str(paths[0]) in rels
+    assert paths[2].relative_to(tmp_path).as_posix() not in rels, "删掉的文件不该留在镜像里"
+    assert paths[0].relative_to(tmp_path).as_posix() in rels
+
+
+def test_mirror_stores_relative_paths(tmp_path: Path) -> None:
+    """镜像按 Vault 根存相对路径——整棵树搬走以后还能继续用，绝对路径会全指空。"""
+    paths = _seed(tmp_path)
+    store = tmp_path / vault.MIRROR_FILE
+    with vault.cached_docs(store):
+        _read_all(paths)
+
+    db = sqlite3.connect(str(store))
+    try:
+        rels = {row[0] for row in db.execute("SELECT rel FROM doc")}
+    finally:
+        db.close()
+    assert rels == {p.relative_to(tmp_path).as_posix() for p in paths}
+    assert not any(rel.startswith("/") for rel in rels), "不该出现绝对路径"
 
 
 def test_mirror_roundtrip_keeps_parsed_fields(tmp_path: Path) -> None:
-    """镜像存的是解析结果，读回来必须和读盘解析的一致——否则就是静默改语义。"""
+    """镜像存的是解析结果，读回来必须和读盘解析的一致——否则就是静默改语义。
+
+    特意留一个不带引号的日期：YAML 会把它解析成 `date` 对象，JSON 编不进去。
+    早年这里用 `default=str` 糊过去，结果同一个字段「第一次读是 date、第二次是 str」，
+    类型悄悄变了却没人发现。日期必须原样还原。
+    """
     paths = _seed(tmp_path, count=3)
     store = tmp_path / vault.MIRROR_FILE
+    dated = tmp_path / "01_Core_Memory/Characters/CHAR-0009_带日期.md"
+    dated.write_text(
+        DOC.replace("id: CHAR-0001", "id: CHAR-0009").replace(
+            "name: 甲", "name: 甲\ncreated_at: 2026-02-01"
+        ),
+        encoding="utf-8",
+    )
+    paths.append(dated)
 
     fresh = {p: vault._load_doc(p) for p in paths}
+    assert isinstance(fresh[dated].meta["created_at"], date), "前置条件：YAML 认成 date"
+
     with vault.cached_docs(store):
         _read_all(paths)
 

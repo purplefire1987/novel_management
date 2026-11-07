@@ -15,7 +15,7 @@ import sqlite3
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
@@ -23,7 +23,7 @@ import yaml
 
 FM_RE_BYTES = b"---"
 
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 # 内容镜像：全库正文的 sqlite 副本。
 #
@@ -33,6 +33,10 @@ CACHE_VERSION = 2
 #
 # 为什么不是 WAL：受限环境里 `-wal`/`-shm` 两个附属文件会被拦（disk I/O error），
 # 用 `journal_mode=MEMORY` 把回滚日志放内存里，单文件即可读写。
+#
+# `rel` 存**相对 Vault 根**的路径（v3 起），不存绝对路径：整棵树搬到别的目录后，
+# 镜像仍然指向正确的位置，只要指纹对得上就能直接用。绝对路径只在旧镜像里出现，
+# 载入时仍按绝对路径处理，不至于读到别的地方去。
 MIRROR_FILE = ".novel_system/doc_mirror.sqlite"
 CACHE_FILE = MIRROR_FILE  # 旧名，兼容既有调用
 
@@ -51,6 +55,64 @@ CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT NOT NULL);
 
 def _is_mirror(path: Path) -> bool:
     return path.name.endswith((".sqlite", ".db"))
+
+
+def mirror_root(store: Path) -> Path:
+    """由镜像文件路径反推 Vault 根：`<root>/.novel_system/doc_mirror.sqlite`。
+
+    镜像里存的是相对路径，取回时得有个基准。约定成「上一级若是 `.novel_system`
+    就再上一级」，这样镜像落在哪儿都不用额外传参，也不怕 Vault 整体搬家。
+
+    基准要**解析成真实路径**：`cfg.vault` 走的是 `Path.resolve()`，而调用方给的
+    目录可能带软链（macOS 的 `/tmp` 就是 `/private/tmp`）。不解析的话，镜像里的键
+    和调用方的路径是两套字符串，命中率直接归零——查了半天才发现是 `/tmp` 的锅。
+    """
+    parent = store.parent
+    return (parent.parent if parent.name == ".novel_system" else parent).resolve()
+
+
+def _rel_key(path: Path, root: Path) -> str:
+    """镜像里的键：相对路径。落在 Vault 外的（理论上没有）退回绝对路径。"""
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _meta_dump(meta: dict[str, Any]) -> str:
+    """把 frontmatter 编成 JSON。
+
+    YAML 会把 `created_at: 2026-02-01` 解析成 `date` 对象，而 JSON 不认；
+    直接 `default=str` 又会让「镜像读回来的 meta」和「盘上解析出来的 meta」类型不一致
+    ——同一个字段一处是 date、一处是 str，比崩掉更难查。所以给日期打一个显式标记，
+    读回时原样还原。
+    """
+    return json.dumps(meta, ensure_ascii=False, default=_meta_default)
+
+
+def _meta_default(obj: Any) -> Any:
+    if isinstance(obj, (datetime, date)):
+        return {"$date": obj.isoformat()}
+    return str(obj)
+
+
+def _meta_load(text: str) -> dict[str, Any]:
+    meta = json.loads(text)
+    return _revive_dates(meta) if isinstance(meta, dict) else {}
+
+
+def _revive_dates(value: Any) -> Any:
+    if isinstance(value, dict):
+        if len(value) == 1 and "$date" in value:
+            iso = str(value["$date"])
+            try:
+                return date.fromisoformat(iso) if len(iso) == 10 else datetime.fromisoformat(iso)
+            except ValueError:
+                return iso
+        return {k: _revive_dates(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_revive_dates(v) for v in value]
+    return value
 
 
 class VaultError(RuntimeError):
@@ -116,6 +178,9 @@ def read_many(paths: Iterable[Path], scratch: Path | None = None) -> dict[Path, 
     读不到的路径不会出现在结果里，调用方对缺项退回 `read_text()` 即可。
     返回的字典只保证「读到的」正确。
 
+    缓存里有新鲜的条目就直接白拿（`peek`，只 stat 不读盘）：批量通路是索引重建、
+    资产录入的入口，它绕开缓存的话，同一批文件会先被镜像填一遍、再被这里读一遍。
+
     这里曾经走「一个 tar 进程批量吐出来」的路子：读 1120 份只要 0.75 秒，比逐份
     快 30 倍。但中转层会给子进程读到的**每个**文件在临时目录留一份副本，一次全库
     扫描就是 1000 多个；而这些副本的清理比读还贵（实测单次 unlink 约 140ms，
@@ -126,9 +191,15 @@ def read_many(paths: Iterable[Path], scratch: Path | None = None) -> dict[Path, 
     `scratch` 仅为兼容旧调用保留，当前实现不再产生中转副本。
     """
     out: dict[Path, str] = {}
+    cache = _CACHE
     for path in paths:
         if path in out:
             continue
+        if cache is not None:
+            hit = cache.peek(path)
+            if hit is not None:
+                out[path] = hit.raw
+                continue
         try:
             out[path] = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -242,6 +313,23 @@ class DocCache:
         self._docs.pop(path, None)
         self.dirty = True
 
+    def peek(self, path: Path) -> Doc | None:
+        """缓存里有新鲜的这一份就返回，没有就返回 None。
+
+        和 `get()` 的区别是**不读盘、不计命中率**：给批量通路用，让它能白拿
+        已经读过的文件，没读过的照旧走自己的读盘逻辑。
+        """
+        hit = self._docs.get(path)
+        if hit is None:
+            return None
+        try:
+            st = path.stat()
+        except OSError:
+            return None
+        if hit[0] != st.st_mtime_ns or hit[1] != st.st_size:
+            return None
+        return hit[2]
+
     def stats(self) -> dict[str, int]:
         return {"hits": self.hits, "misses": self.misses, "size": len(self._docs)}
 
@@ -281,14 +369,18 @@ class DocCache:
             db.close()
 
         dropped = 0
+        root = mirror_root(path)
         for rel, mtime, size, meta_json, body, raw in rows:
             p = Path(rel)
+            # 旧镜像存的是绝对路径，原样用；新镜像存相对路径，按 Vault 根取回
+            if not p.is_absolute():
+                p = root / p
             # 已经删掉的文件不必留在内存里；也顺手标脏，让退出时的保存把它清掉
             if not p.exists():
                 dropped += 1
                 continue
             try:
-                front = json.loads(meta_json)
+                front = _meta_load(meta_json)
             except (TypeError, ValueError):
                 dropped += 1
                 continue
@@ -346,12 +438,13 @@ class DocCache:
         """整表重写镜像。1120 行约 0.02 秒，不值得为了增量再记一本脏页账。"""
         if not self.dirty and path.exists():
             return False
+        root = mirror_root(path)
         rows = [
             (
-                str(p),
+                _rel_key(p, root),
                 mtime,
                 size,
-                json.dumps(doc.meta, ensure_ascii=False),
+                _meta_dump(doc.meta),
                 doc.body,
                 doc.raw,
             )
@@ -419,10 +512,14 @@ def cached_docs(persist: Path | None = None) -> Iterator[DocCache]:
 
     嵌套调用同一份镜像时直接复用外层：命令入口开一个，里面的 Config 加载、
     体检、索引各再请求一次，不该为此反复整表读写。
+
+    内层**不指定** `persist` 时同样复用外层（内层只是「这一小段想共用缓存」，
+    没打算换存储）：否则 `orch.rebuild_index()` 里那句 `cached_docs()` 会新建
+    一个空缓存，把入口刚warm好的全库读盘全部作废，等于白读一遍。
     """
     global _CACHE
     prev = _CACHE
-    if persist is not None and prev is not None and prev.persist == persist:
+    if prev is not None and (persist is None or prev.persist == persist):
         yield prev
         return
 
@@ -466,9 +563,28 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def file_hash(path: Path) -> str:
+def file_hash(path: Path, *, use_cache: bool = False) -> str:
+    """文件内容哈希。
+
+    `use_cache=True` 时，缓存里有这份文件且指纹仍新鲜就直接拿它的原文算哈希，
+    省掉一次读盘。只给**批量审计**用（`_regression_audit` 每次要过一遍全库
+    上千份实体，受限宿主里每份 8~20ms）；那里比的是「索引记录 vs 文件现状」，
+    缓存的新鲜度由 `(mtime_ns, size)` 把关，与直读等价。
+
+    事务的并发保护（`transaction.py`）**不能**开这个口子：那里要发现的是
+    「别人在我们身后把文件改了」，不能拿本进程内存里的副本冒充磁盘现状。
+
+    这里用 `peek()` 而不是 `get()`：peek 只 stat、不解析，未命中就老老实实
+    直读。否则一份 frontmatter 坏掉的档案会在算哈希时抛 `VaultError`——
+    直读是不会抛的，审计不该因此崩掉。
+    """
     if not path.exists():
         return ""
+    cache = _CACHE
+    if use_cache and cache is not None:
+        hit = cache.peek(path)
+        if hit is not None:
+            return sha256_text(hit.raw)
     return sha256_text(path.read_text(encoding="utf-8"))
 
 

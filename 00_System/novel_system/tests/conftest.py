@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 from pathlib import Path
@@ -57,7 +58,9 @@ DEFAULT_TEMPROOT = Path("/tmp/nv_pytest")
 
 
 def _temproot() -> Path:
-    return Path(os.environ.get("NOVEL_TEST_TMP", str(DEFAULT_TEMPROOT)))
+    # 解析成真实路径：macOS 上 `/tmp` 指向 `/private/tmp`，两套字符串混用会让
+    # 内容镜像的键对不上（命中率直接归零），也会让断言里的路径比较莫名其妙地失败。
+    return Path(os.environ.get("NOVEL_TEST_TMP", str(DEFAULT_TEMPROOT))).resolve()
 
 
 def _pin_tempdir() -> None:
@@ -146,11 +149,160 @@ def _seed_index(src_root: Path, dst_root: Path) -> None:
             shutil.copy2(source, dst_dir / name)
 
 
+def _scan_targets(root: Path) -> list[Path]:
+    """写进镜像的东西：全库 Markdown + 5 份配置。"""
+    return [*vault.iter_markdown(root), *(root / "00_System" / "Config").glob("*.yaml")]
+
+
+def _mirror_usable(store: Path, root: Path) -> bool:
+    """仓库里那份镜像还能不能直接拿来用。
+
+    条件很严：版本对得上，且**每一行**的 `(mtime_ns, size)` 都还和盘上的文件一致。
+    放宽一点就会出事——测试是拿它当「盘上内容」用的，镜像一旦比盘旧，整个套件
+    就在验一份不存在的事实。宁可退回扫一遍（20 秒），也不接受可能发霉的种子。
+    """
+    if not store.is_file():
+        return False
+    try:
+        db = sqlite3.connect(f"file:{store}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return False
+    try:
+        if dict(db.execute("SELECT k, v FROM meta").fetchall()).get("version") != str(
+            vault.CACHE_VERSION
+        ):
+            return False
+        rows = db.execute("SELECT rel, mtime, size FROM doc").fetchall()
+    except sqlite3.Error:
+        return False
+    finally:
+        db.close()
+    if not rows:
+        return False
+    for rel, mtime, size in rows:
+        path = Path(rel)
+        path = root / path if not path.is_absolute() else path
+        try:
+            st = path.stat()
+        except OSError:
+            return False
+        if st.st_mtime_ns != int(mtime) or st.st_size != int(size):
+            return False
+    return True
+
+
+def _build_mirror(root: Path) -> None:
+    """扫一遍全库，落一份内容镜像。
+
+    只在仓库镜像不可用时才走：受限宿主里 `open()` 要过一次 IPC 中转，单次约 19ms，
+    1120 份就是 21 秒。
+    """
+    store = root / vault.MIRROR_FILE
+    with vault.cached_docs(store) as cache:
+        cache.prefetch(_scan_targets(root))
+
+
+def _top_up(store: Path, root: Path) -> int:
+    """把镜像里缺的文件补上，返回补了几份。
+
+    仓库镜像只包含「命令行真正读过」的文件（模板、归档这些不参与索引，常年缺席），
+    而测试会去读它们。缺多少补多少，通常几十份，不到一秒。
+    """
+    db = sqlite3.connect(str(store))
+    try:
+        db.execute("PRAGMA journal_mode=MEMORY")
+        have = {row[0] for row in db.execute("SELECT rel FROM doc")}
+        added = 0
+        for path in _scan_targets(root):
+            rel = path.relative_to(root).as_posix()
+            if rel in have:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+                st = path.stat()
+                meta, body = vault.split_frontmatter(text)
+            except (OSError, UnicodeDecodeError, vault.VaultError):
+                continue
+            db.execute(
+                "INSERT OR REPLACE INTO doc(rel, mtime, size, meta, body, raw) VALUES(?,?,?,?,?,?)",
+                (rel, st.st_mtime_ns, st.st_size, vault._meta_dump(meta), body, text),
+            )
+            added += 1
+        db.commit()
+    finally:
+        db.close()
+    return added
+
+
 @pytest.fixture(scope="session")
-def vault_template(test_root: Path) -> Path:
+def mirror_seed(test_root: Path) -> Path:
+    """给模板用的内容镜像种子。
+
+    快路：仓库里那份镜像还是新鲜的，拷一份、补上缺的几十份即可（~1 秒）。
+    慢路：镜像过期或不存在，老老实实扫一遍全库（~21 秒）。
+    """
+    live = VAULT_SRC / vault.MIRROR_FILE
+    if _mirror_usable(live, VAULT_SRC):
+        stage = test_root / "mirror"
+        stage.mkdir(parents=True, exist_ok=True)
+        store = stage / "doc_mirror.sqlite"
+        shutil.copy2(live, store)
+        _top_up(store, VAULT_SRC)
+        return store
+
+    stage_root = test_root / "mirror" / "NovelVault"
+    _copy_tree(VAULT_SRC, stage_root)
+    _build_mirror(stage_root)
+    return stage_root / vault.MIRROR_FILE
+
+
+def _seed_mirror(src_root: Path, dst_root: Path) -> None:
+    """把镜像种进用例副本，并按下标重钉指纹。
+
+    为什么要重钉：镜像里存的是 `st_mtime_ns`，而 openrsync（macOS 自带的那个）
+    最高只认到秒，`rsync -a` 复制出来的文件 mtime 后 9 位被抹平。指纹对不上，
+    缓存就整份失效，等于没种。`stat` 在受限宿主上不收费，1120 次也就几十毫秒，
+    比重新读一遍盘便宜三个数量级。
+
+    内容正确性由「副本是源目录的 rsync 拷贝」保证：文件字节一致，只是时间戳被截断。
+    形状对不上的行（副本里根本没有这份文件）直接删掉，别留一条永远命不中的死行。
+    """
+    src = src_root / vault.MIRROR_FILE if src_root.is_dir() else src_root
+    if not src.is_file():
+        return
+    target = dst_root / vault.MIRROR_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, target)
+
+    db = sqlite3.connect(str(target))
+    try:
+        db.execute("PRAGMA journal_mode=MEMORY")
+        rows = db.execute("SELECT rel, mtime, size FROM doc").fetchall()
+        stale: list[tuple[int, int, str]] = []
+        gone: list[tuple[str]] = []
+        for rel, mtime, size in rows:
+            try:
+                st = (dst_root / rel).stat()
+            except OSError:
+                gone.append((rel,))
+                continue
+            if st.st_mtime_ns != int(mtime) or st.st_size != int(size):
+                stale.append((st.st_mtime_ns, st.st_size, rel))
+        if gone:
+            db.executemany("DELETE FROM doc WHERE rel=?", gone)
+        if stale:
+            db.executemany("UPDATE doc SET mtime=?, size=? WHERE rel=?", stale)
+        db.commit()
+    finally:
+        db.close()
+
+
+@pytest.fixture(scope="session")
+def vault_template(test_root: Path, mirror_seed: Path) -> Path:
     dst = test_root / "template" / "NovelVault"
     _copy_tree(VAULT_SRC, dst)
     _seed_index(VAULT_SRC, dst)
+    _seed_mirror(mirror_seed, dst)
     return dst
 
 
@@ -176,7 +328,28 @@ def vault_dir(test_root: Path, vault_template: Path, request: pytest.FixtureRequ
     dst = test_root / "cases" / safe / "NovelVault"
     _copy_tree(vault_template, dst)
     _seed_index(vault_template, dst)
+    _seed_mirror(vault_template / vault.MIRROR_FILE, dst)
     return dst
+
+
+@pytest.fixture(autouse=True)
+def _mirror_scope(request: pytest.FixtureRequest):
+    """用例跑在内容镜像的作用域里，和线上命令入口的姿势保持一致。
+
+    线上每个命令都由 `cli.mirror_scope` 挂一份镜像，所以「读全库」是 1 次 open。
+    测试如果不挂，跑的就是一条线上不存在的冷路径——每个用例把 1100 份档案按
+    19ms/份读上三五遍，慢的不是被测代码，是这个缺口。
+
+    只对用到临时 Vault 的用例生效：那类用例要么直接要 `vault_dir`，要么通过
+    `cfg`/`orch` 间接要，名字都在 `fixturenames` 里。手搓小 Vault 的用例
+    （缓存自身的单元测试）不受影响，否则会把要验证的冷启动路径盖掉。
+    """
+    if "vault_dir" not in request.fixturenames:
+        yield None
+        return
+    root = request.getfixturevalue("vault_dir")
+    with vault.cached_docs(root / vault.MIRROR_FILE) as cache:
+        yield cache
 
 
 @pytest.fixture

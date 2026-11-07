@@ -142,10 +142,19 @@ class Config:
         return self.system_dir / "tmp"
 
     def ensure_dirs(self) -> None:
+        """补齐运行目录。
+
+        每个目录先 `is_dir()` 再决定要不要 `mkdir`：已经存在的目录再调一次 mkdir，
+        在受限宿主里要过一次 IPC 中转（实测 ~5ms/次），而 Config 在一个命令里会被
+        构造十几次、每次补 9 个目录，白花掉的半秒足够跑完整个用例。`stat` 不走中转。
+        """
         for d in (self.system_dir, self.staging_dir, self.backup_dir, self.logs_dir, self.scratch_dir):
-            d.mkdir(parents=True, exist_ok=True)
+            if not d.is_dir():
+                d.mkdir(parents=True, exist_ok=True)
         for sub in ("preflight", "draft", "memory", "outline"):
-            (self.staging_dir / sub).mkdir(parents=True, exist_ok=True)
+            d = self.staging_dir / sub
+            if not d.is_dir():
+                d.mkdir(parents=True, exist_ok=True)
 
     # ---------- 取值辅助 ----------
     def rel(self, path: Path) -> str:
