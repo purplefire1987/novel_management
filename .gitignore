@@ -267,3 +267,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# WorkBuddy 工作区数据（记忆、会话缓存），属本机运行时产物，不入库
+.workbuddy/
