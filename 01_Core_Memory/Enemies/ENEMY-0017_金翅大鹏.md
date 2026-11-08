@@ -5,10 +5,11 @@ name: 金翅大鹏
 title: 金翅大鹏
 aliases: []
 subtype: 生物
+race: 云鹏
 world: 九州
 canon_status: confirmed
 created_at: '2026-11-03'
-updated_at: '2026-11-03'
+updated_at: '2026-11-08'
 source_refs:
 - 10_Change_Log/Ingest/ASSETS-20261103-224145
 import_batch: ASSETS-20261103-224145

@@ -215,6 +215,12 @@ profiles:
         filename: 种族表
         title: 九州·种族志
         dir: 01_Core_Memory/World/九州/总表
+        # ⚠ 该页已改为「手写三级结构」：## 属 › ### 族 › 关联双链 + race_groups。
+        #   layout: sections 只能产出「一行一个 ##」的平铺结构，group_by 是拆成多份文件，
+        #   两者都表达不了「一个文件内按属分组」。因此：
+        #   1) 重跑 `novel import-assets jiuzhou-assets --force` 会把本页拍平、并可能重排 ID —— 不要跑；
+        #   2) 维护本页请直接改 Markdown，改完 `novel rebuild-index` 刷索引；
+        #   3) 族名单的机器可读副本在 frontmatter 的 race_groups，改动时与正文同步。
         layout: sections
         name_column: 名称
         lead: 九州诸族的天赋、弱点、寿命与风俗——跨种族角色卡的外挂修正来源。

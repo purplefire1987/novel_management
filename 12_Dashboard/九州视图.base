@@ -7,6 +7,10 @@ properties:
     displayName: 名称
   aliases:
     displayName: 别名
+  race:
+    displayName: 种族
+  race_groups:
+    displayName: 族系（属›族）
   canon_status:
     displayName: 状态
   updated_at:
@@ -21,6 +25,7 @@ views:
     order:
       - file.name
       - id
+      - race
       - aliases
       - canon_status
       - updated_at
@@ -105,6 +110,7 @@ views:
     order:
       - file.name
       - id
+      - race
       - canon_status
       - updated_at
     sort:
@@ -125,6 +131,21 @@ views:
         direction: ASC
     columnSize:
       file.name: 291
+  - type: table
+    name: 种族
+    filters:
+      and:
+        - type == "world"
+        - subtype == "种族表"
+        - '!file.inFolder("99_Archive")'
+    order:
+      - file.name
+      - id
+      - canon_status
+      - updated_at
+    sort:
+      - property: id
+        direction: ASC
   - type: table
     name: 大纲与卷
     filters:

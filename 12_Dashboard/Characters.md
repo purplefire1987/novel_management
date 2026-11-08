@@ -5,7 +5,7 @@ type: dashboard
 # 人物总览
 
 ```dataview
-TABLE id, canon_status, aliases
+TABLE id, race, canon_status, aliases
 FROM "01_Core_Memory/Characters"
 WHERE type = "character"
 SORT id ASC
