@@ -57,6 +57,7 @@ quality_gates:
     - state_transition_valid
     - canon_change_approved
     - continuity_checked
+    - scene_value_shift
     - index_consistent
     - audit_logged
     - git_committed
