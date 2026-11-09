@@ -60,6 +60,7 @@ quality_gates:
     - scene_value_shift
     - scene_forced_response
     - chapter_hook
+    - cast_motive
     - index_consistent
     - audit_logged
     - git_committed
