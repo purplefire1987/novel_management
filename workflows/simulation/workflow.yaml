@@ -1,0 +1,40 @@
+# 随机模拟工作流
+id: simulation
+version: 1
+description: 可复现的推演。结果只是候选，不自动成为事实。
+
+start_conditions:
+  - 模拟目的明确（NPC 行动 / 冲突结果 / 概率事件）
+  - 授权范围已确定
+
+inputs:
+  - 参与方状态与约束
+  - 随机种子、概率表、边界条件
+
+steps:
+  - id: declare_params
+    owner: dice_mistress
+    output: 参数清单
+    gate: 种子、概率表、约束全部写明
+  - id: run
+    owner: dice_mistress
+    output: 07_Staging/simulations/
+    gate: 判定过程可复算
+  - id: interpret
+    owner: editor
+    gate: 区分「随机结果」与「规则必然」
+  - id: author_adopt
+    owner: author
+    gate: 作者决定是否采纳为剧情走向
+
+quality_gates:
+  - 同输入同种子必得同结果
+  - 未采纳的模拟不得进入 Canon
+  - 不越权读取其他项目
+
+failure_handling:
+  - 参数缺失：不猜，先补参数
+  - 结果与 Canon 冲突：报告并停止
+
+author_approval_points:
+  - author_adopt

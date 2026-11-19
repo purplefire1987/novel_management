@@ -1,0 +1,60 @@
+# 正文生产工作流
+id: manuscript_production
+version: 1
+description: 从大纲到定稿的完整链路。任何一步未过质量门，不得进入下一步。
+
+start_conditions:
+  - 项目已初始化，且 00_Project/project.yaml 存在
+  - 目标章节在细纲中有明确条目
+
+inputs:
+  - 02_Planning/Chapter_Outlines/ 下对应章节细纲
+  - 01_Canon/ 相关实体档案
+  - 06_Memory/Hot/ 上一章结束状态
+
+steps:
+  - id: outline_check
+    owner: editor
+    output: 07_Staging/plans/
+    gate: 细纲能追到卷级粗纲；伏笔标注埋设章与回收章
+  - id: preflight
+    owner: researcher
+    output: 07_Staging/preflight/
+    gate: 每条事实有出处；缺口单独列出
+  - id: draft
+    owner: writer
+    output: 03_Manuscripts/Drafts/
+    gate: 字数达标；未引入资料包外的重要新设定
+  - id: self_review
+    owner: writer
+    output: 自检说明
+    gate: 人物状态、称呼、时间与资料包一致
+  - id: editorial_review
+    owner: editor
+    output: 07_Staging/reviews/
+    gate: 结构、节奏、伏笔回收达成；问题逐条可定位
+  - id: author_approval
+    owner: author
+    output: 批准记录
+    gate: 作者明确批准（沉默不算批准）
+  - id: memory_extraction
+    owner: memory_keeper
+    output: 07_Staging/memory/
+    gate: 每条提案带源章节
+  - id: publish
+    owner: version_manager
+    output: 03_Manuscripts/Final/
+    gate: 有批准记录；连续性签字绑定正文 sha256
+
+quality_gates:
+  - 未获作者批准不得进入 Final/
+  - 索引与 Markdown 冲突时以 Markdown 为准
+  - 正文改动后旧签字自动失效，需重签
+
+failure_handling:
+  - 任一 gate 未过：停在当前步，输出差异清单，不进入下一步
+  - 发现 Canon 冲突：交世界架构师出冲突报告，等作者裁定
+
+author_approval_points:
+  - author_approval（必须）
+  - 任何 Canon 变更（必须）

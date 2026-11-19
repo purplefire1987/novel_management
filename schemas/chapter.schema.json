@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/chapter.schema.json",
+  "title": "章节（草稿 / 修订 / 定稿）",
+  "type": "object",
+  "required": ["chapter_id", "project_id", "stage", "status"],
+  "properties": {
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^CH-[0-9]{4}$",
+      "description": "全局唯一；与卷、序号解耦，避免卷内重编号引发连锁改动"
+    },
+    "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "volume": { "type": "integer", "minimum": 1 },
+    "order_in_volume": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string" },
+    "stage": {
+      "type": "string",
+      "enum": ["draft", "revision", "final"],
+      "description": "draft 在 03_Manuscripts/Drafts；final 必须经作者批准"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "drafting", "drafted", "revising", "approved", "published", "withdrawn"]
+    },
+    "word_count": { "type": "integer", "minimum": 0 },
+    "approved_by": {
+      "type": "string",
+      "description": "只有作者可批准；Agent 自批无效"
+    },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "continuity_signoff": {
+      "type": "object",
+      "description": "连续性签字绑正文 sha256；正文改一字节即失效",
+      "properties": {
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "signer": { "type": "string" },
+        "signed_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

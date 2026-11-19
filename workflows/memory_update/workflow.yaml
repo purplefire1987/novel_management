@@ -1,0 +1,43 @@
+# 记忆更新工作流
+id: memory_update
+version: 1
+description: 章节定稿后，把正文中的新事实沉淀进记忆层与账本。
+
+start_conditions:
+  - 章节已定稿且作者已批准
+  - 正文 sha256 已记录
+
+inputs:
+  - 定稿章节
+  - 现有 06_Memory/ 与 05_Ledgers/
+
+steps:
+  - id: extract
+    owner: memory_keeper
+    output: 07_Staging/memory/
+    gate: 每条事实带源章节编号
+  - id: contradiction_check
+    owner: memory_keeper
+    gate: 与旧记录冲突处单列，不擅自择一
+  - id: author_review
+    owner: author
+    gate: 作者确认采纳哪些
+  - id: apply
+    owner: memory_keeper
+    output: 06_Memory/ 与 05_Ledgers/
+    gate: 只写已采纳条目
+  - id: reindex
+    owner: version_manager
+    gate: rebuild-index 通过
+
+quality_gates:
+  - 只从定稿提取，草稿不算事实
+  - 每条事实可追到章节
+  - 冲突不隐瞒
+
+failure_handling:
+  - 提取出与设定矛盾的事实：转 canon_change 流程
+  - 索引失败：回滚记忆层变更
+
+author_approval_points:
+  - author_review

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/config.schema.json",
+  "title": "novel-system 配置",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "system": {
+      "type": "object",
+      "properties": { "config_version": { "type": "integer", "minimum": 1 } },
+      "required": ["config_version"]
+    },
+    "author": {
+      "type": "object",
+      "properties": { "author_id": { "type": "string", "minLength": 1 } },
+      "required": ["author_id"]
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public_repo": { "type": "string" },
+        "author_vault": { "type": "string" },
+        "runtime": { "type": "string" }
+      }
+    },
+    "active_project": {
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string", "pattern": "^$|^[a-z0-9][a-z0-9-]*$" }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "private_remote_allowed": { "type": "boolean", "const": false },
+        "public_repo_may_read_vault": { "type": "boolean", "const": false },
+        "cross_project_access": { "type": "boolean", "const": false },
+        "agent_canon_write": { "type": "boolean", "const": false }
+      }
+    },
+    "layout": { "type": "object" }
+  },
+  "required": ["system", "author", "paths", "privacy"]
+}

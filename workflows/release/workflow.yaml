@@ -1,0 +1,43 @@
+# 版本审查与发布工作流
+id: release
+version: 1
+description: 把已批准内容转为正式状态，并保证可回滚。
+
+start_conditions:
+  - 变更集已获作者批准
+  - 备份可用且校验通过
+
+inputs:
+  - 待发布文件清单
+  - 当前 Canon 与章节状态
+
+steps:
+  - id: diff
+    owner: version_manager
+    output: Diff 报告
+    gate: 逐项列出改动与影响面
+  - id: dry_run
+    owner: version_manager
+    gate: 预演通过，无越界写入
+  - id: publish
+    owner: version_manager
+    output: 正式文件 + 变更日志
+    gate: 二次确认；写入原子化
+  - id: verify
+    owner: version_manager
+    gate: validate 与 rebuild-index 均通过
+  - id: signoff
+    owner: editor
+    gate: 连续性签字绑定正文 sha256
+
+quality_gates:
+  - 无批准记录不得发布
+  - 发布后可回滚：备份点、回滚命令、影响范围齐全
+  - 不以强推或历史重写处理误提交
+
+failure_handling:
+  - 预演发现越界：停止发布
+  - 发布后校验失败：回滚到发布前快照并报告
+
+author_approval_points:
+  - publish（二次确认）

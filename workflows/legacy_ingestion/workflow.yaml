@@ -1,0 +1,48 @@
+# 旧稿录入工作流
+id: legacy_ingestion
+version: 1
+description: 把旧稿解析为项目内的章节与实体。原文保全优先于格式整齐。
+
+start_conditions:
+  - 作者指定源稿文件并确认可读
+  - 导入配置已就绪（切分规则、编码、实体识别规则）
+
+inputs:
+  - 源稿文件（只读）
+  - 现有 Canon（用于去重）
+
+steps:
+  - id: fingerprint
+    owner: ingestor
+    output: 源文件 sha256 + 行数
+    gate: 指纹已记录，后续任何比对以此为准
+  - id: split_preview
+    owner: ingestor
+    output: 切分预演报告
+    gate: 列出每个切分点与不确定处
+  - id: author_confirm_split
+    owner: author
+    gate: 作者确认切分方式
+  - id: extract
+    owner: ingestor
+    output: 07_Staging/ingest/
+    gate: 每段可追到源文件 + 行号
+  - id: dedupe
+    owner: ingestor
+    gate: 与现有实体比对，重名与近似单独列出，不自动合并
+  - id: author_approve_import
+    owner: author
+    gate: 作者批准入库范围
+
+quality_gates:
+  - 禁止手抄原文：必须程序化复制，手抄会漏字
+  - 原文用字不改；格式统一另行处理
+  - 解析失败处标注为缺口，不补全
+
+failure_handling:
+  - 编码或切分异常：停止，输出原始错误与已解析部分
+  - 与现有 Canon 冲突：列清单，等作者裁定
+
+author_approval_points:
+  - author_confirm_split
+  - author_approve_import

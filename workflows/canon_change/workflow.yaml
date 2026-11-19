@@ -1,0 +1,43 @@
+# Canon 变更工作流
+id: canon_change
+version: 1
+description: 任何对已确认设定的修改。Agent 只能提案，作者批准后由 CLI 落盘。
+
+start_conditions:
+  - 变更原因明确（正文冲突 / 作者改主意 / 新证据）
+
+inputs:
+  - 目标文件与现状
+  - 变更依据（章节位置、作者原话）
+
+steps:
+  - id: impact_analysis
+    owner: version_manager
+    output: 影响面报告
+    gate: 列出受影响的实体、章节、索引项
+  - id: proposal
+    owner: world_architect
+    output: 07_Staging/proposals/canon/
+    gate: 提案含 before/after 与依据
+  - id: conflict_check
+    owner: editor
+    gate: 与其他设定不矛盾；矛盾处单列
+  - id: author_approval
+    owner: author
+    gate: 作者明确批准
+  - id: apply
+    owner: version_manager
+    output: Canon 文件 + 变更日志
+    gate: 写入前备份；写入后重跑 validate 与 rebuild-index
+
+quality_gates:
+  - 未经批准不得写入 Canon
+  - 写入必须可回溯（备份 + 变更日志）
+  - 索引不得反向覆盖事实源
+
+failure_handling:
+  - 影响面过大：拆分变更，分批批准
+  - 写入后校验失败：立即回滚到备份，报告差异
+
+author_approval_points:
+  - author_approval

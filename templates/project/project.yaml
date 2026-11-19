@@ -1,0 +1,13 @@
+project_id: ""
+project_name: ""
+project_slug: ""
+author_id: ""
+created_at: ""
+project_status: draft
+canon_root: "01_Canon"
+planning_root: "02_Planning"
+manuscript_root: "03_Manuscripts"
+staging_root: "07_Staging"
+archive_root: "90_Archive"
+timezone: "Asia/Shanghai"
+schema_version: 1

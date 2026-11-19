@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/entity.schema.json",
+  "title": "实体档案（人物、地点、组织、物品、生物、体系、规则、世界）",
+  "type": "object",
+  "required": ["id", "type", "name", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(CHAR|LOC|ORG|ITEM|CREATURE|SYS|RULE|WORLD)-[0-9]{4}$",
+      "description": "稳定 ID：类型前缀 + 四位序号，一经分配不得复用"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["character", "location", "organization", "item", "creature", "system", "rule", "world"]
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "aliases": { "type": "array", "items": { "type": "string" } },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "proposed", "confirmed", "deprecated"],
+      "description": "confirmed 仅表示作者已确认；不等于已进入正文"
+    },
+    "canon_scope": {
+      "type": "string",
+      "enum": ["in_world", "meta"],
+      "description": "in_world 才是世界内事实；meta 为写作约定"
+    },
+    "summary": { "type": "string" },
+    "source_refs": {
+      "type": "array",
+      "description": "来源必须可定位；无来源的推断不得写成事实",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["manuscript", "import", "author_note", "agent_proposal"] },
+          "locator": { "type": "string" },
+          "quote": { "type": "string" },
+          "file_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

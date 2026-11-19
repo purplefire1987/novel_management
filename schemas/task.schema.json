@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/task.schema.json",
+  "title": "任务记录（Agent 交接的最小单元）",
+  "type": "object",
+  "required": ["task_id", "project_id", "task_type", "status", "created_at"],
+  "properties": {
+    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{6}$" },
+    "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "outline",
+        "preflight",
+        "draft",
+        "revision",
+        "review",
+        "memory_update",
+        "ingest",
+        "simulation",
+        "release"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "blocked", "awaiting_author", "done", "cancelled"]
+    },
+    "assigned_to": {
+      "type": "string",
+      "enum": [
+        "editor_in_chief",
+        "world_architect",
+        "editor",
+        "dice_mistress",
+        "researcher",
+        "writer",
+        "memory_keeper",
+        "ingestor",
+        "version_manager"
+      ]
+    },
+    "input_files": { "type": "array", "items": { "type": "string" } },
+    "output_files": { "type": "array", "items": { "type": "string" } },
+    "output_scope": { "type": "string", "description": "允许写入的目录前缀，越界即失败" },
+    "write_mode": { "type": "string", "enum": ["read_only", "staging", "draft", "proposal"] },
+    "approval_state": {
+      "type": "string",
+      "enum": ["not_required", "pending_author", "approved", "rejected"]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "closed_at": { "type": "string", "format": "date-time" },
+    "notes": { "type": "string" }
+  }
+}

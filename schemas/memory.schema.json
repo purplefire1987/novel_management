@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/memory.schema.json",
+  "title": "记忆层（热 / 短期 / 长期）",
+  "type": "object",
+  "required": ["layer", "project_id", "updated_at"],
+  "properties": {
+    "layer": {
+      "type": "string",
+      "enum": ["hot", "short_term", "long_term"],
+      "description": "hot 供写作时直接取用；long_term 为跨卷沉淀"
+    },
+    "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "volume": { "type": "integer" },
+        "chapter_range": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^CH-[0-9]{4}$" }
+        },
+        "entities": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^(CHAR|LOC|ORG|ITEM|CREATURE)-[0-9]{4}$" }
+        }
+      }
+    },
+    "facts": {
+      "type": "array",
+      "description": "每条事实都必须能追到正文位置",
+      "items": {
+        "type": "object",
+        "required": ["statement", "source_chapter"],
+        "properties": {
+          "statement": { "type": "string" },
+          "source_chapter": { "type": "string", "pattern": "^CH-[0-9]{4}$" },
+          "confidence": { "type": "string", "enum": ["explicit", "inferred"] },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,33 @@
+# 公共仓库：只装可公开复用的代码、模板、Schema、文档与虚构示例。
+# 任何私人作品内容都不得进入本仓库——目录隔离是第一道防线，本文件只是第二道。
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 编辑器与系统
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 运行时（真实运行目录在 Vault 之外，这里只防误建）
+runtime/
+*.log
+
+# 本地个人配置
+config/local.yaml
+.env
+
+# 测试与临时目录（pytest 的 basetemp 也落在这里）
+.tmp/

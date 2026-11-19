@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/project.schema.json",
+  "title": "小说项目元数据",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "project_id",
+    "project_name",
+    "project_slug",
+    "author_id",
+    "created_at",
+    "project_status",
+    "schema_version"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "不可变且唯一；只允许小写字母、数字、连字符"
+    },
+    "project_name": { "type": "string", "minLength": 1 },
+    "project_slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "author_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "project_status": {
+      "type": "string",
+      "enum": ["draft", "active", "paused", "completed", "archived"]
+    },
+    "canon_root": { "type": "string", "default": "01_Canon" },
+    "planning_root": { "type": "string", "default": "02_Planning" },
+    "manuscript_root": { "type": "string", "default": "03_Manuscripts" },
+    "staging_root": { "type": "string", "default": "07_Staging" },
+    "archive_root": { "type": "string", "default": "90_Archive" },
+    "timezone": { "type": "string", "default": "Asia/Shanghai" },
+    "schema_version": { "type": "integer", "minimum": 1 }
+  },
+  "propertyNames": { "not": { "pattern": "\\.\\." } }
+}

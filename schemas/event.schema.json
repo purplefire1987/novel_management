@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/event.schema.json",
+  "title": "世界内事件（时间线事实）",
+  "type": "object",
+  "required": ["event_id", "project_id", "summary", "source_chapter"],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^EVT-[0-9]{6}$",
+      "description": "纯序号，不得把章节号编进 ID——章节会重排，事件不会"
+    },
+    "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "summary": { "type": "string", "minLength": 1 },
+    "world_time": {
+      "type": "string",
+      "description": "世界内时间；允许模糊（如「第三年春」），但不得与已确认时间线矛盾"
+    },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "participants": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(CHAR|ORG|CREATURE|LOC)-[0-9]{4}$" }
+    },
+    "location": { "type": "string", "pattern": "^LOC-[0-9]{4}$" },
+    "consequences": { "type": "array", "items": { "type": "string" } },
+    "source_chapter": { "type": "string", "pattern": "^CH-[0-9]{4}$" },
+    "derived_from": {
+      "type": "string",
+      "enum": ["manuscript", "author_note"],
+      "description": "只能来自正文或作者手记；Agent 推演不构成事件"
+    }
+  }
+}
