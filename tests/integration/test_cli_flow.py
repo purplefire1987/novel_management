@@ -130,3 +130,70 @@ def test_doctor_fails_when_runtime_inside_vault(paths: tuple[Path, Path]) -> Non
     inside = vault / "runtime"
     inside.mkdir()
     assert main(["doctor", "--vault", str(vault), "--runtime", str(inside)]) == 1
+
+
+def test_cli_accepts_relative_vault_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """人在终端敲 `novel --vault vault` 是常事，相对路径按 cwd 解析。"""
+    monkeypatch.chdir(tmp_path)
+    assert main(["init-author", "--vault", "vault", "--runtime", "runtime", "--confirm"]) == 0
+    assert (tmp_path / "vault" / "00_System" / "Vault_Config.yaml").exists()
+    assert (tmp_path / "runtime" / "index").is_dir()
+
+
+# --------------------------------------------------------------------------
+# 素材库查重（R-04 的回归测试）
+#
+# 素材按分类分目录存放，ID 却是「全库连续编号，不按分类分段」，
+# 所以查重必须跨子目录一起看。只扫 Canon 六类会让重号永远隐形。
+# --------------------------------------------------------------------------
+
+def _new_project(vault: Path, runtime: Path) -> Path:
+    _init_author(vault, runtime)
+    main(
+        [
+            "init-project",
+            "--vault",
+            str(vault),
+            "--runtime",
+            str(runtime),
+            "--id",
+            "novel-001",
+            "--name",
+            "Sample Novel",
+            "--confirm",
+        ]
+    )
+    return vault / "10_Projects" / "novel-001_sample-novel"
+
+
+def _asset(root: Path, sub: str, filename: str, raw_id: str) -> None:
+    directory = root / "04_Story_Assets" / sub
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / filename).write_text(
+        f"---\nid: {raw_id}\ntype: story_asset\n---\n\n# 示例素材\n", encoding="utf-8"
+    )
+
+
+def test_validate_detects_asset_id_collision_across_subdirs(paths: tuple[Path, Path]) -> None:
+    vault, runtime = paths
+    root = _new_project(vault, runtime)
+    _asset(root, "Battles", "ASSET-0001_示例甲.md", "ASSET-0001")
+    _asset(root, "Settings", "ASSET-0001_示例乙.md", "ASSET-0001")
+    assert main(["validate", "--vault", str(vault), "--runtime", str(runtime)]) == 1
+
+
+def test_validate_ignores_asset_id_placeholder(paths: tuple[Path, Path]) -> None:
+    """模板里的 `id: {{id}}` 是占位符，不是身份，不能算重号。"""
+    vault, runtime = paths
+    root = _new_project(vault, runtime)
+    _asset(root, "Templates", "素材卡模板.md", '"{{id}}"')
+    _asset(root, "Templates", "剧情卡模板.md", '"{{id}}"')
+    assert main(["validate", "--vault", str(vault), "--runtime", str(runtime)]) == 0
+
+
+def test_validate_passes_when_asset_ids_are_unique(paths: tuple[Path, Path]) -> None:
+    vault, runtime = paths
+    root = _new_project(vault, runtime)
+    _asset(root, "Battles", "ASSET-0001_示例甲.md", "ASSET-0001")
+    _asset(root, "Settings", "ASSET-0002_示例乙.md", "ASSET-0002")
+    assert main(["validate", "--vault", str(vault), "--runtime", str(runtime)]) == 0

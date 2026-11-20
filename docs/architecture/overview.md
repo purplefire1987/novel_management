@@ -36,6 +36,31 @@ CLI 不从代码里取路径，一律走 `novel_system.config.load()`：
 
 所有写入路径经 `ensure_inside(child, vault)` 校验，`..` 与符号链接逃逸一律拒绝。
 
+## 写入链路：为什么提案只能落在 staging
+
+一项内容从 Agent 手里到正式区，必须经过五个物理位置：
+
+```
+Agent 产出            →  07_Staging/<TASK-ID>/<分栏>/...   （stage）
+作者看 diff           →  只在终端显示，不写盘             （diff）
+作者批准              →  <runtime>/approvals/APR-*.json    （approve，绑 sha256）
+发布                  →  01_Canon / 03_Manuscripts/...     （publish，旧版先归档）
+操作留痕              →  <runtime>/logs/ops.jsonl          （全部写命令）
+```
+
+每道关口拦的是不同的事：
+
+| 关口 | 拦什么 | 实现位置 |
+|---|---|---|
+| `stage` | 目标不在正式区、路径越界、无任务 | `staging/` |
+| `approve` | 非作者代办、带着冲突硬批 | `audit/ensure_actor` + `cli/flow.py` |
+| `publish` | 没批准、批准后被换内容、批准范围外的新增、Canon 缺二次确认 | `release/` |
+| `adopt` | 把作者手改当脏数据回滚 | `baseline/` |
+
+关键设计：**批准绑定内容而不是绑定任务**。批准记录里存每个文件当时的 sha256，发布时逐个重算比对——
+「批的是 A，发的是 B」在哈希这一层就不成立。同时 `stage` 会记下目标正式文件当时的 `base_sha256`，
+所以「提案生成之后作者又改过正式文件」能被识别为冲突，而不是被静默覆盖。
+
 ## 未采纳的方案
 
 - **公仓内嵌私人目录 + gitignore**：已被证明不可靠，见上。

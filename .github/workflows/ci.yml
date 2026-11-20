@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  privacy:
+    name: privacy scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 扫工作区
+        run: python3 scripts/privacy_scan.py --repo . --fail-on warn
+      - name: 扫提交信息
+        run: python3 scripts/privacy_scan.py --repo . --commits 50
+
+  test:
+    name: test (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: 安装
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,yaml]"
+      - name: 单元 / 集成 / 安全 / 验收测试
+        run: pytest -q
+      - name: 端到端冒烟
+        run: python3 scripts/selfcheck.py .tmp/selfcheck
+      - name: Schema 自校验
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          bad = []
+          for p in sorted(pathlib.Path("schemas").glob("*.json")):
+              try:
+                  json.loads(p.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  bad.append(f"{p}: {exc}")
+          for p in [pathlib.Path("config/config.schema.json")]:
+              try:
+                  json.loads(p.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  bad.append(f"{p}: {exc}")
+          print("\n".join(bad) or "schema ok")
+          sys.exit(1 if bad else 0)
+          PY
+
+  guard:
+    name: 边界守卫
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 仓库内不得出现私人目录
+        run: |
+          if find . -maxdepth 2 -type d \( -name "10_Projects" -o -name "01_Canon" -o -name "03_Manuscripts" \) -not -path "./examples/*" | grep -q .; then
+            echo "发现私人目录形态，公仓不得包含作品内容"; exit 1
+          fi
+      - name: 代码里不得硬编码家目录
+        run: |
+          if grep -rn "/Users/\|/home/[a-z]" --include="*.py" src/ | grep -v "example\|test"; then
+            echo "发现硬编码绝对路径"; exit 1
+          fi

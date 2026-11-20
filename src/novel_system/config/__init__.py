@@ -188,6 +188,8 @@ class Config:
     privacy: dict = field(default_factory=dict)
     layout: dict = field(default_factory=dict)
     sources: list[str] = field(default_factory=list)
+    # 任务记录必须带作者，否则无法回答「这条任务是给谁的作品做的」。
+    author_id: str = "author-local"
 
     # ---- 必需路径 ----
     def require_vault(self) -> Path:
@@ -216,16 +218,53 @@ class Config:
     def projects_dir(self) -> Path:
         return self.require_vault() / self.layout.get("projects_dir", "10_Projects")
 
+    def project_candidates(self) -> list[tuple[str, Path]]:
+        """列出 Vault 内的项目：(project_id, 目录)。以 project.yaml 为准，读不到才退回目录名。"""
+        base = self.projects_dir
+        out: list[tuple[str, Path]] = []
+        if not base.is_dir():
+            return out
+        for path in sorted(base.iterdir()):
+            if not path.is_dir() or path.name.startswith("."):
+                continue
+            meta = read_yaml(path / "00_Project" / "project.yaml")
+            out.append((str(meta.get("project_id") or path.name), path))
+        return out
+
+    def resolve_project_id(self, project_id: str | None = None) -> str:
+        """显式 > 配置的 active_project > 报错。
+
+        这里**不做**「Vault 里只有一个项目，那就用它的」这种推断。
+        单项目时推断看起来无害，但等到第二个项目建起来，同一条命令的语义就变了；
+        写入类命令一旦选错项目，改的是另一部书的 Canon。
+
+        要让日常命令不必带 --project，正确做法是在配置里写死 active_project
+        （`novel init-project` 建第一个项目时会自动写入），而不是让程序去猜。
+        """
+        if project_id:
+            return project_id
+        if self.project_id:
+            return self.project_id
+        candidates = self.project_candidates()
+        if not candidates:
+            raise ConfigError("Vault 内没有项目：先运行 novel init-project")
+        raise ConfigError(
+            "未指定项目。请用 --project 指定，或在 Vault_Config.yaml 的 "
+            f"active_project.project_id 写死（当前可选：{[c[0] for c in candidates]}）"
+        )
+
     def project_root(self, project_id: str | None = None) -> Path:
-        pid = project_id or self.require_project()
-        vault = self.require_vault()
-        base = vault / self.layout.get("projects_dir", "10_Projects")
+        pid = self.resolve_project_id(project_id)
+        for cid, path in self.project_candidates():
+            if cid == pid:
+                return path
+        base = self.projects_dir
         matches = sorted(p for p in base.glob(f"{pid}*") if p.is_dir()) if base.exists() else []
         if len(matches) == 1:
             return matches[0]
         if len(matches) > 1:
             raise ConfigError(f"项目 ID {pid} 命中多个目录：{[m.name for m in matches]}")
-        return base / pid
+        raise ConfigError(f"项目不存在：{pid}（{base} 下没有对应目录）")
 
     def runtime_dir(self, *parts: str) -> Path:
         return self.require_runtime().joinpath(*parts)
@@ -259,6 +298,34 @@ def _user_config_path() -> Path:
     return base / "novel-system" / "config.yaml"
 
 
+# Vault_Config.yaml 允许两套写法：本仓库内部的 layout.*/paths.runtime，以及
+# V4.0 §4.2 交付物里实际使用的 layouts.*/runtime_root。后者必须能读，
+# 否则真实 Vault 的 runtime 永远解析不到，所有写入命令都无处落盘。
+_LAYOUT_ALIASES = {
+    "system": "vault_system_dir",
+    "projects": "projects_dir",
+    "shared_assets": "shared_assets_dir",
+    "archive": "vault_archive_dir",
+}
+
+
+def _normalize_vault_config(raw: dict) -> dict:
+    """把 V4.0 写法折算成内部约定。不覆盖作者已显式写的键。"""
+    out: dict = {}
+    layouts = raw.get("layouts")
+    if isinstance(layouts, dict):
+        layout = {
+            _LAYOUT_ALIASES[key]: str(value)
+            for key, value in layouts.items()
+            if key in _LAYOUT_ALIASES and value
+        }
+        if layout:
+            out["layout"] = layout
+    if raw.get("runtime_root"):
+        out["paths"] = {"runtime": str(raw["runtime_root"])}
+    return out
+
+
 def load(
     vault: str | None = None,
     runtime: str | None = None,
@@ -285,6 +352,7 @@ def load(
         vault_cfg = vault_path / (data.get("layout") or {}).get("vault_system_dir", "00_System") / "Vault_Config.yaml"
         vault_data = read_yaml(vault_cfg)
         if vault_data:
+            data = _merge(data, _normalize_vault_config(vault_data))
             data = _merge(data, vault_data)
             sources.append(str(vault_cfg))
 
@@ -298,6 +366,8 @@ def load(
 
     project_id = project or (data.get("active_project") or {}).get("project_id") or ""
 
+    author_id = str((data.get("author") or {}).get("author_id") or "author-local")
+
     return Config(
         public_repo=repo,
         author_vault=vault_path,
@@ -306,4 +376,5 @@ def load(
         privacy=dict(data.get("privacy") or {}),
         layout=dict(data.get("layout") or {}),
         sources=sources,
+        author_id=author_id,
     )

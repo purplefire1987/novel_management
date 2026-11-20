@@ -31,3 +31,7 @@ config/local.yaml
 
 # 测试与临时目录（pytest 的 basetemp 也落在这里）
 .tmp/
+
+# 原子写留下的临时文件：受限环境下可能删不掉，绝不能进仓库
+*.tmp
+.*.tmp
