@@ -32,7 +32,7 @@ V4.0 重建后，旧 CLI（`novel_system/cli.py`，1215 行）随旧公仓归档
 | 18 | `search` | 全文检索章节正文 | 无 | **该迁移**：写到 80 万字以后，「这句话我在哪章写过」只能靠它 |
 | 19 | `find` | 按名称/别名/概要查实体档案（录入前必查） | 无 | **该迁移**：防重复建档的第一道闸，也是写作时最常用的查询 |
 | 20 | `show` | 查看实体详情（摘要 + 关联 + 出处） | 无（`cat` 也能看，但没有聚合） | 该迁移，优先级低于 19 |
-| 21 | `new` | 新建实体，ID 由系统生成 | 无 | **该迁移**：目前没有任何命令能安全地分配新 ID |
+| 21 | `new` | 新建实体，ID 由系统生成 | **`novel allocate-id`**（0.5.0 起） | 已覆盖：只发号，不建文件 |
 | 22 | `ingest` | 录入原始 txt/md 稿件：切章 + 建大纲 + 建正文 + 批次提交 | 无 | **该迁移**：旧稿入库的唯一入口 |
 | 23 | `annotate` | 给已发布章节补「作者备注」结构化标注 | 无 | 该迁移，但可先手工写 frontmatter 过渡 |
 | 24 | `import-assets` | 按 profile 分类录入 Excel 资产库（人物/势力/物品/地点/生物） | 无 | **该迁移**：966 份 Canon 就是这么来的，没有它就没法再导入 |
@@ -45,23 +45,25 @@ V4.0 重建后，旧 CLI（`novel_system/cli.py`，1215 行）随旧公仓归档
 
 ## 统计（30 条逐条对上，不重不漏）
 
-- **该迁移 15 条**：#3 style、#7 preflight、#11 commit-memory、#12 apply-memory、#13 audit、
-  #17 rollback、#18 search、#19 find、#20 show、#21 new、#22 ingest、#23 annotate、
+- **该迁移 14 条**：#3 style、#7 preflight、#11 commit-memory、#12 apply-memory、#13 audit、
+  #17 rollback、#18 search、#19 find、#20 show、#22 ingest、#23 annotate、
   #24 import-assets、#25 import-lore、#30 dice
-- **已覆盖 7 条**：#1 doctor、#2 integrity、#4 rebuild-index、#6 status、#10 publish、#16 adopt、#28 log
+- **已覆盖 8 条**：#1 doctor、#2 integrity、#4 rebuild-index、#6 status、#10 publish、#16 adopt、
+  #21 new（`allocate-id`，0.5.0 起；只发号不建文件）、#28 log
 - **部分覆盖 3 条**：#9 review（需要 `08_Reviews/` 写通道）、#14 sign、#15 sign-status
   （与 `publish` 的内容指纹校验部分重叠，但「审校通过」是独立声明，不能等同）
 - **不建议迁移 5 条**：#5 index-md、#8 write（生成动作归 Agent）、#26 history、#27 snapshot
   （git 已做得更好）、#29 export-schemas
 
-7 + 15 + 3 + 5 = 30
+8 + 14 + 3 + 5 = 30（#21 `new` 已由 `allocate-id` 覆盖，从「该迁移」移入「已覆盖」）
 
 ## 迁移顺序建议
 
 按「缺了会立刻卡住」排序，不按代码复杂度：
 
-1. **`find` + `new`** —— 一组。没有它们，任何新实体都只能手抄 ID，而手抄必撞号
-   （`ASSET-0001` 双占用就是这么来的）。
+1. ~~**`new`**~~ —— **已有 `novel allocate-id`**（0.5.0）。取号同时看现存最大号与审计
+   历史最大号，本前缀有重号直接拒绝，锁文件防并发。手抄 ID 撞号（`ASSET-0001` 就是这样来的）
+   这条路已经堵住。**`find` 仍缺**——按 ID 反查文件目前只能 grep。
 2. **`search`** —— 只读、无写入风险，纯收益。
 3. **`preflight`** —— 主笔写每章前都要用。
 4. **`commit-memory` + `apply-memory`** —— 记忆闭环。

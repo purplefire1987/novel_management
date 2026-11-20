@@ -2,6 +2,48 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.5.0 — 2026-11-20
+
+完成 PRD §23 **T02：Schema、ID 与哈希**。六项交付（第 8 章模型 / JSON Schema /
+fixture / 稳定 ID 分配 / 字节规范化 / 包哈希）与三条验收全部到位。
+
+**兼容性影响**：`schemas/` 由 6 份增至 22 份，全部加 `additionalProperties: false`。
+`entity` 的 `required` 从 `[id,type,name,status]` 改为 `[id,type,name]`——库内 966 份
+档案都有 `canon_status` 而多数没有 `status`，旧 required 会让它们全部非法。
+
+### 新增
+
+- **`schemas/` 22 类契约**（PRD §8.4 的 18 类 P0 + 现有 6 类加严）：
+  `entity`/`event`/`chapter`/`memory`/`project`/`task` 之外，补
+  `artifact`/`source_ref`/`assertion`/`state_change`/`knowledge`/`revelation`/
+  `foreshadowing`/`dependency`/`issue`/`approval`/`change_request`/
+  `import_manifest`/`release_plan`/`release_manifest`/`transaction_journal`/
+  `execution_receipt`。共享片段在 `_common.schema.json` 的 `$defs`。
+- **`schema.py`**：纯标准库的 draft 2020-12 子集校验器。支持
+  `$ref/$defs/type/enum/const/pattern/format/长度/数值/items/required/properties/
+  additionalProperties/oneOf/anyOf/allOf/not`；不支持的 keyword 当注解忽略并在
+  模块 docstring 列明。**不引入 jsonschema 或 pydantic**（见 ADR-011）。
+- **`ids.py`**：稳定 ID 分配。取号同时看现存最大号与审计历史最大号（删档不补号）；
+  本前缀有重号即拒绝；锁文件防并发；每次分配写 `<runtime>/id-allocations.jsonl`。
+  复合型 ID（`EVT-CH-0001-001`）识别为不合法，不计入号段。
+- **`canonical.py`**：UTF-8 去 BOM / CRLF→LF；规范化 JSON（键排序、紧凑、中文不转义、
+  禁 NaN/Infinity）；`package_hash` 与 `diff_paths`。
+- **`frontmatter.py`**：把原本只在 `cli/_common.py` 里的解析挪到底层，成为唯一实现。
+  行为变化：缩进的嵌套行不再被当成顶层键（旧实现把 `source_refs` 下的
+  `file_sha256` 读成了顶层键）。已在真实库 1085 份文件上全量比对：新结果是旧结果的
+  严格子集，`id`/`type`/`status`/`title`/`canon_status` 零差异。
+
+### 命令行（15 → 18 条）
+
+新增 `schema list`、`schema check`、`allocate-id`、`package-hash`。
+`allocate-id` 默认预演，`--confirm` 才发号。
+
+### 测试
+
+新增 167 条（schema 契约 93、canonical 27、ids 32、CLI 集成 15），全量 312 通过。
+schema 契约测试对**每一类**都做三件事：删一个必填键、塞一个未知字段、用 invalid 样本，
+少一环就红。
+
 ## 0.4.2 — 2026-11-20
 
 补齐 PRD §23 **T01 工程骨架**的两项缺件：运行日志与 Mock LLM。至此 T01 七项交付

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/release_plan.schema.json",
+  "title": "发布计划（作者审批的对象）",
+  "$comment": "字段依据 PRD §17.2。作者批准的是这份计划规范化 JSON 的哈希（canonical.package_hash），所以字段顺序不影响结果。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["release_id", "base_release", "changes", "schema_version"],
+  "properties": {
+    "release_id": { "type": "string", "pattern": "^REL-[0-9]{4,6}$" },
+    "base_release": {
+      "type": ["string", "null"],
+      "description": "基线发布；首次发布为 null"
+    },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "op", "content_hash"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "description": "项目内相对路径，不接受绝对路径" },
+          "op": { "type": "string", "enum": ["add", "modify", "delete", "replace"] },
+          "content_hash": { "$ref": "_common.schema.json#/$defs/sha256" }
+        }
+      }
+    },
+    "removals": { "type": "array", "items": { "type": "string" } },
+    "text_approvals": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" },
+      "description": "正文批准引用；缺一条就不能发布对应正文"
+    },
+    "memory_approvals": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" }
+    },
+    "change_requests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^CR-[0-9]{4,6}$" }
+    },
+    "nonblocking_issues": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^ISSUE-[0-9]{4,6}$" },
+      "description": "计划放行的非阻断问题；BLOCKER 不得出现在这里"
+    },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "index_config_version": {
+      "type": "string",
+      "description": "索引构建配置版本；换了分词或字段映射就必须变"
+    },
+    "prepared_at": { "type": "string", "format": "date-time" }
+  }
+}

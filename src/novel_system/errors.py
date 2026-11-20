@@ -31,3 +31,15 @@ class ApprovalError(NovelError):
     """缺少有效批准、批准已失效。"""
 
     code = 4
+
+
+class CanonicalError(NovelError):
+    """无法规范化：含 NaN/Infinity、类型不可序列化、编码不合法。"""
+
+    code = 2
+
+
+class SchemaError(NovelError):
+    """数据不满足契约：缺字段、非法枚举、未知字段。"""
+
+    code = 1

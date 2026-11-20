@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/change_request.schema.json",
+  "title": "变更请求（含 RETCON）",
+  "$comment": "字段依据 PRD §19.2。§19.2 只列了中文条目、没给 YAML 示例，字段名由本实现按条目含义命名，已在 known_risks 标注。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["change_id", "change_type", "reason", "release_strategy"],
+  "properties": {
+    "change_id": { "type": "string", "pattern": "^CR-[0-9]{4,6}$" },
+    "change_type": {
+      "type": "string",
+      "enum": ["RETCON", "CORRECTION", "EXTENSION", "WITHDRAWAL"]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "old_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": { "$ref": "_common.schema.json#/$defs/anyId" },
+        "content_hash": { "$ref": "_common.schema.json#/$defs/sha256" }
+      }
+    },
+    "new_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": { "$ref": "_common.schema.json#/$defs/anyId" },
+        "content_hash": { "$ref": "_common.schema.json#/$defs/sha256" }
+      }
+    },
+    "impacted_story_scope": { "type": "array", "items": { "type": "string" } },
+    "impacted_text": { "type": "array", "items": { "type": "string" } },
+    "impacted_knowledge": { "type": "array", "items": { "type": "string" } },
+    "impacted_revelations": { "type": "array", "items": { "type": "string" } },
+    "impacted_plans": { "type": "array", "items": { "type": "string" } },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "_common.schema.json#/$defs/anyId" }
+    },
+    "migration_plan": { "type": "string" },
+    "required_approvals": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "需要哪些批准；缺一项就不能执行"
+    },
+    "release_strategy": {
+      "type": "string",
+      "enum": ["NEXT_RELEASE", "IMMEDIATE", "DEFERRED"],
+      "description": "PRD 只写『发布策略』，这三种取值是本实现的最小集合"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PROPOSED", "APPROVED", "APPLIED", "REJECTED"]
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/execution_receipt.schema.json",
+  "title": "执行回执（发布切换成功的对外凭证）",
+  "$comment": "PRD §8.4 只列类型名，§17.4 步骤 19 写『写入成功回执』、§18.2 要求切换后崩溃能补回执。字段按这两条反推，已在 known_risks 标注为『推断』。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["receipt_id", "release_id", "manifest_hash", "created_at"],
+  "properties": {
+    "receipt_id": { "type": "string", "pattern": "^RCPT-[0-9]{4,6}$" },
+    "release_id": { "type": "string", "pattern": "^REL-[0-9]{4,6}$" },
+    "base_release": { "type": ["string", "null"] },
+    "manifest_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
+    "canon_revision": { "type": "string" },
+    "index_build_id": { "type": "string", "pattern": "^IDX-[0-9]{4,6}$" },
+    "active_since": { "type": "string", "format": "date-time" },
+    "repaired": {
+      "type": "boolean",
+      "description": "true 表示这条回执是恢复程序补写的，不是发布时当场写的"
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "刷新 Obsidian 镜像失败等非致命问题记在这里；失败不撤销已成功的发布"
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

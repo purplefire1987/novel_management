@@ -3,6 +3,7 @@
   "$id": "https://example.invalid/novel-system/chapter.schema.json",
   "title": "章节（草稿 / 修订 / 定稿）",
   "type": "object",
+  "additionalProperties": false,
   "required": ["chapter_id", "project_id", "stage", "status"],
   "properties": {
     "chapter_id": {

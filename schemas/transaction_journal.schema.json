@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/transaction_journal.schema.json",
+  "title": "事务日志（发布过程的逐步留痕）",
+  "$comment": "PRD §8.4 只列了这个类型名，§17.4 给了 22 步、§18.2 要求恢复程序基于它交叉验证，但没有字段表。这里的字段是按那两节的要求反推的，已在 known_risks 标注为『推断』。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["txn_id", "release_id", "state", "steps", "created_at"],
+  "properties": {
+    "txn_id": { "type": "string", "pattern": "^TXN-[0-9]{4,6}$" },
+    "release_id": { "type": "string", "pattern": "^REL-[0-9]{4,6}$" },
+    "base_release": { "type": ["string", "null"] },
+    "release_plan_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
+    "state": {
+      "type": "string",
+      "enum": ["PREPARED", "VALIDATED", "READY_TO_ACTIVATE", "ACTIVE", "SUPERSEDED", "ABORTED"],
+      "description": "与 §11.4 发布状态同构；ACTIVE 最终以正式指针为准，不以本字段为准"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "status"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 1, "maximum": 22, "description": "§17.4 的步骤号" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "done", "failed", "skipped"] },
+          "at": { "type": "string", "format": "date-time" },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

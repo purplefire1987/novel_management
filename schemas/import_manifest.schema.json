@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/import_manifest.schema.json",
+  "title": "原稿导入清单",
+  "$comment": "字段依据 PRD §12.3。MUST NOT 用单个 success 覆盖所有维度——所以每个验收维度都是独立字段，没有总括的成功标记。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["import_id", "created_at", "files", "raw_bytes_preserved"],
+  "properties": {
+    "import_id": { "type": "string", "pattern": "^IMP-[0-9]{4,6}$" },
+    "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "_common.schema.json#/$defs/sha256" },
+          "bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "raw_bytes_preserved": {
+      "type": "boolean",
+      "description": "原始字节是否 100% 一致保存；false 必须在 known_limits 里说明"
+    },
+    "chapters_parsed": { "type": "integer", "minimum": 0 },
+    "paragraphs_mapped": { "type": "integer", "minimum": 0 },
+    "paragraphs_unmapped": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "未映射段落必须显式列出，不许静默丢弃"
+    },
+    "chapters_extracted": { "type": "array", "items": { "type": "string" } },
+    "chapters_pending": { "type": "array", "items": { "type": "string" } },
+    "refs_valid": { "type": "boolean" },
+    "sample_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sample_size": { "type": "integer", "minimum": 0 },
+        "seed": { "type": "string" },
+        "accuracy": { "type": "number", "minimum": 0, "maximum": 1 },
+        "note": { "type": "string" }
+      }
+    },
+    "blocking_conflicts": { "type": "integer", "minimum": 0 },
+    "known_limits": { "type": "array", "items": { "type": "string" } },
+    "parse_errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

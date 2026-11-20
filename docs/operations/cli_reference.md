@@ -1,6 +1,6 @@
 # CLI 参考
 
-对应 V4.0 §5.3 的 16 项命令，另加 3 条地图命令（§8），共 19 条。全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
+对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§8），共 19 条。全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
 novel --vault ~/vault status       # 等价
@@ -220,7 +220,64 @@ novel maps build --confirm                          # 连档案一起重跑（�
 
 ---
 
-## 9. 退出码
+## 9. 契约与发号
+
+### `novel schema list [--schema-dir <目录>]`
+
+列出可校验的类型（当前 22 类）与每类的必填字段。schema 默认从**仓库根 `schemas/`**
+读取；装成包后可放 `novel_system/schemas/`，或用 `NOVEL_SCHEMAS` 环境变量指定。
+
+### `novel schema check <类型> <文件…>`
+
+按类型校验 JSON 文件。`-` 表示从 stdin 读。
+
+- 退出 **1**：读懂了，但内容不合契约（缺字段、非法枚举、未知字段、ID 形态错）。
+- 退出 **2**：读不懂输入（不是合法 JSON、文件不存在、类型名不存在）——这是用法问题，不是数据问题。
+
+```bash
+novel schema list
+novel schema check entity tmp/char.json
+cat tmp/approval.json | novel schema check approval -
+```
+
+未知字段默认拒绝（PRD §8.4）。要扩展只能写进 `extensions` 字段，不能就地加键。
+
+### `novel allocate-id --type <类型> [--count N] [--confirm] [--allow-dirty]`
+
+分配稳定 ID（PRD §8.1）。`--type` 收 `CHARACTER`／`character`／`CHAR` 三种写法。
+
+- **默认预演**，只报「将分配什么号」；`--confirm` 才写 `<runtime>/id-allocations.jsonl`。
+- 取号同时看**现存文件最大号**与**审计里发过的最大号**。删档后不会从洞里补号——
+  补号等于让历史引用指向另一个对象。
+- 本前缀已有重号时**拒绝发号**（`ASSET-0001` 即此），`--allow-dirty` 可强行发。
+  其它前缀的重号不会阻塞（`ASSET` 撞号不该让 `CHAR` 也发不出号）。
+- 发号用锁文件 `<runtime>/locks/id-allocate.lock` 防并发；锁被占时直接报错，
+  不静默降级（PRD §8.1 明令禁止「无锁扫描最大号加一」）。
+- 复合型 ID（`EVT-CH-0001-001`）不计入号段，命令会提示有几个、在哪些文件。
+
+```bash
+novel allocate-id --type CHARACTER                 # 预演
+novel allocate-id --type CHARACTER --confirm       # 真发号，写审计
+novel allocate-id --type FORESHADOW --count 3      # 一次三个
+```
+
+### `novel package-hash <文件|-> [--check <哈希>] [--canonical]`
+
+算规范化 JSON 的 sha256（PRD §17.3）。键排序、无多余空白、不转义中文、禁 NaN/Infinity。
+
+审批与发布绑定的就是这个值，所以缩进、键序、文件里的换行都不影响结果。
+
+```bash
+novel package-hash tmp/release_plan.json
+novel package-hash tmp/release_plan.json --check <批准时记下的哈希>
+novel package-hash tmp/release_plan.json --canonical   # 同时看规范化后的原文
+```
+
+`--check` 不一致退 **1**；JSON 里有 NaN/Infinity 退 **2**（那不是合法 JSON）。
+
+---
+
+## 10. 退出码
 
 | 码 | 含义 |
 |---|---|
@@ -236,7 +293,7 @@ novel maps build --confirm                          # 连档案一起重跑（�
 
 ---
 
-## 10. 目录与文件落在哪
+## 11. 目录与文件落在哪
 
 | 内容 | 位置 | 可否重建 |
 |---|---|---|

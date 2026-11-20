@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/issue.schema.json",
+  "title": "问题（审核发现的具体缺陷）",
+  "$comment": "字段依据 PRD §14.3。BLOCKER 不允许直接 WAIVED 后发布——那条规则在发布校验里执行，schema 只保证状态取值合法。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["issue_id", "severity", "category", "description", "status"],
+  "properties": {
+    "issue_id": { "type": "string", "pattern": "^ISSUE-[0-9]{4,6}$" },
+    "severity": {
+      "type": "string",
+      "enum": ["BLOCKER", "NON_BLOCKING", "SUGGESTION"]
+    },
+    "category": { "type": "string", "minLength": 1 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": { "$ref": "_common.schema.json#/$defs/anyId" },
+        "block_id": { "$ref": "_common.schema.json#/$defs/blockId" }
+      }
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "$ref": "_common.schema.json#/$defs/sourceRef" }
+    },
+    "suggested_actions": { "type": "array", "items": { "type": "string" } },
+    "status": {
+      "type": "string",
+      "enum": ["OPEN", "RESOLVED", "WAIVED"]
+    },
+    "waived_by": {
+      "type": "string",
+      "description": "豁免必须留人；BLOCKER 的豁免要由发布校验额外拦截"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "resolved_at": { "type": "string", "format": "date-time" }
+  }
+}

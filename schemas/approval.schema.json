@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/approval.schema.json",
+  "title": "审批（作者对精确对象的决定）",
+  "$comment": "字段依据 PRD §14.4。审批绑定 target_hash：对象改一个字节，这条批准就失效。MVP 不识别『口头同意』。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approval_id",
+    "actor_type",
+    "target_type",
+    "target_id",
+    "target_hash",
+    "decision"
+  ],
+  "properties": {
+    "approval_id": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" },
+    "actor_type": {
+      "type": "string",
+      "enum": ["AUTHOR", "SYSTEM"],
+      "description": "正文批准只接受 AUTHOR；SYSTEM 仅用于自动校验留痕"
+    },
+    "actor_id": { "type": "string" },
+    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "target_type": {
+      "type": "string",
+      "enum": ["ARTIFACT", "PROPOSAL", "RELEASE", "PLAN", "CHANGE_REQUEST"]
+    },
+    "target_id": { "type": "string", "minLength": 1 },
+    "target_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
+    "decision": {
+      "type": "string",
+      "enum": ["APPROVE", "APPROVE_WITH_NOTES", "CHANGES_REQUIRED", "REJECT"]
+    },
+    "approved_scope": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "批准覆盖的范围，如 CHAPTER_TEXT；范围外的内容不算获批"
+    },
+    "notes": { "type": "array", "items": { "type": "string" } },
+    "approved_at": { "type": "string", "format": "date-time" }
+  }
+}

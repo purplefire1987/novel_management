@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/revelation.schema.json",
+  "title": "读者揭示（读者在第几段知道了什么）",
+  "$comment": "字段依据 PRD §9.6。读者知道不代表人物知道——这两件事分别记录，不得互相推断。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proposition_ref", "narrative_position", "revelation_mode"],
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/anyId" },
+    "artifact_type": { "const": "REVELATION" },
+    "title": { "type": "string" },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+
+    "proposition_ref": { "type": "string", "pattern": "^AST-[0-9]{4,6}$" },
+    "narrative_position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chapter_id"],
+      "properties": {
+        "chapter_id": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+        "scene_id": { "type": "string", "pattern": "^SCENE-[0-9]{4,6}$" },
+        "block_id": { "$ref": "_common.schema.json#/$defs/blockId" }
+      }
+    },
+    "revelation_mode": {
+      "type": "string",
+      "minLength": 1,
+      "description": "PRD §9.6 只示例了 EXPLICIT，未给完整枚举；这里不擅自封闭取值"
+    },
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" }
+  }
+}

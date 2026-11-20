@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/assertion.schema.json",
+  "title": "客观断言（世界内事实的最小单元）",
+  "$comment": "字段依据 PRD §9.4。通用元数据字段与其它 schema 必须一致，由 test_schema_contract.py 守着。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "artifact_type",
+    "artifact_status",
+    "schema_version",
+    "subject_id",
+    "predicate",
+    "value",
+    "epistemic_type",
+    "review_status"
+  ],
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/anyId" },
+    "artifact_type": { "const": "ASSERTION" },
+    "title": { "type": "string", "minLength": 1 },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "extensions": {
+      "type": "object",
+      "description": "唯一允许的扩展口（PRD §8.4）；扩展不得影响硬规则"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+
+    "epistemic_type": { "const": "OBJECTIVE_ASSERTION" },
+    "subject_id": { "$ref": "_common.schema.json#/$defs/entityRef" },
+    "predicate": { "type": "string", "minLength": 1 },
+    "value": {},
+    "review_status": { "$ref": "_common.schema.json#/$defs/reviewStatus" },
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" }
+  }
+}

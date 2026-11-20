@@ -284,46 +284,69 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         pp = ProjectPaths.resolve(cfg, pid)
         heading(f"实体与链接 · {pid}")
 
-        # 查重范围 = Canon 六类 + 素材库。素材虽然按分类分目录存放，ID 却是
-        # 「全库连续编号，不按分类分段」（素材卡模板原话），必须跨目录一起看。
-        # 只扫 Canon 正是 ASSET-0001 双占用长期没人发现的原因。
-        scan_roots: list[tuple[str, Path]] = [(kind, pp.canon / kind) for kind in CANON_KINDS]
-        scan_roots.append(("Story_Assets", pp.assets))
+        # 查重范围 = 整个项目，排除 07_Staging（Agent 提案区，同名 ID 是常态）。
+        # 素材虽然按分类分目录存放，ID 却是「全库连续编号，不按分类分段」（素材卡模板原话），
+        # 必须跨目录一起看。只扫 Canon 正是 ASSET-0001 双占用长期没人发现的原因。
+        #
+        # 但「归档目录里引用了同一个 ID」与「正式区里两份档案抢同一个 ID」不是一回事：
+        # 前者是历史事实，后者会让「按 ID 取对象」产生歧义。所以分开报——
+        # 正式区内的冲突算失败，牵连到归档的只算警告。
+        from ..storage import iter_files as _iter_files
 
-        ids: dict[str, str] = {}
+        def _formal(path: Path) -> bool:
+            try:
+                return pp.is_control_path(path)
+            except OSError:
+                return False
+
+        ids: dict[str, tuple[Path, bool]] = {}
         dup = 0
+        soft_dup = 0
         misnamed: list[str] = []
         counted: dict[str, int] = {}
-        for label, base in scan_roots:
-            if not base.is_dir():
+        for path in _iter_files(pp.root, skip_dirs=("07_Staging",)):
+            if path.suffix.lower() != ".md":
                 continue
-            n = 0
-            for path in sorted(base.rglob("*.md")):
-                meta = read_frontmatter(path)
-                eid = str(meta.get("id") or "").strip()
-                # 模板里的 `id: {{id}}` 是占位符，不是身份；判据与 rebuild-index 保持一致
-                if not eid or "{{" in eid:
-                    continue
-                n += 1
-                if eid in ids:
-                    fail(f"ID 重复：{eid}（{ids[eid]} 与 {path.relative_to(pp.root)}）")
+            rel = path.relative_to(pp.root)
+            if any(part.startswith(".") for part in rel.parts):
+                continue
+            meta = read_frontmatter(path)
+            eid = str(meta.get("id") or "").strip()
+            # 模板里的 `id: {{id}}` 是占位符，不是身份；判据与 rebuild-index 保持一致
+            if not eid or "{{" in eid:
+                continue
+            formal = _formal(path)
+            area = pp.define_area(path)
+            area = Path(area).name if area else "（非正式区）"
+            counted[area] = counted.get(area, 0) + 1
+            if eid in ids:
+                other, other_formal = ids[eid]
+                if formal and other_formal:
+                    fail(f"ID 重复：{eid}（{other.relative_to(pp.root)} 与 {rel}）")
                     dup += 1
                 else:
-                    ids[eid] = str(path.relative_to(pp.root))
-                # 目录名不可靠（World/Creatures 是合法层级），只看文件名与 id 是否错位
-                file_prefix = path.stem.split("_")[0].split("-")[0]
-                if "-" in path.stem and file_prefix and not eid.startswith(file_prefix + "-"):
-                    misnamed.append(f"{path.relative_to(pp.root)}: id={eid} 与文件名前缀 {file_prefix}- 不符")
-            if n:
-                counted[label] = n
+                    warn(
+                        f"ID 重复但含非正式区：{eid}"
+                        f"（{other.relative_to(pp.root)} 与 {rel}）——历史引用，不计失败"
+                    )
+                    soft_dup += 1
+            else:
+                ids[eid] = (path, formal)
+            # 目录名不可靠（World/Creatures 是合法层级），只看文件名与 id 是否错位
+            file_prefix = path.stem.split("_")[0].split("-")[0]
+            if "-" in path.stem and file_prefix and not eid.startswith(file_prefix + "-"):
+                misnamed.append(f"{rel}: id={eid} 与文件名前缀 {file_prefix}- 不符")
+
         problems += dup
-        canon_n = sum(v for k, v in counted.items() if k != "Story_Assets")
-        assets_n = counted.get("Story_Assets", 0)
-        summary = (
-            f"实体 {len(ids)} 份（Canon {canon_n} / 素材 {assets_n}），重复 {dup} 份"
-            + (f"，id 与文件名错位 {len(misnamed)} 份" if misnamed else "")
-        )
+        parts = " / ".join(f"{k} {v}" for k, v in sorted(counted.items()))
+        summary = f"带 id 的档案 {len(ids)} 份（{parts}），重复 {dup} 份"
+        if soft_dup:
+            summary += f"（另 {soft_dup} 份含非正式区，只警告）"
+        if misnamed:
+            summary += f"，id 与文件名错位 {len(misnamed)} 份"
         (fail if dup else ok)(summary)
+        for item in misnamed[:5]:
+            warn(item)
         for line in misnamed[:5]:
             warn(line)
         if len(misnamed) > 5:

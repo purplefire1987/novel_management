@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/release_manifest.schema.json",
+  "title": "发布清单（构建后的不可变事实）",
+  "$comment": "字段依据 PRD §17.2。清单不写入其自身引用的 00_Canon commit——写进去就成了自引用，哈希永远算不出来。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "release_id",
+    "release_plan_hash",
+    "canon_revision",
+    "index_build_id",
+    "index_bytes_hash",
+    "files",
+    "created_at"
+  ],
+  "properties": {
+    "release_id": { "type": "string", "pattern": "^REL-[0-9]{4,6}$" },
+    "base_release": { "type": ["string", "null"] },
+    "release_plan_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
+    "canon_revision": { "type": "string", "minLength": 1 },
+    "index_build_id": { "type": "string", "pattern": "^IDX-[0-9]{4,6}$" },
+    "index_bytes_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "_common.schema.json#/$defs/sha256" },
+          "bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "approval_refs": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" }
+    },
+    "tool_version": { "type": "string", "minLength": 1 },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

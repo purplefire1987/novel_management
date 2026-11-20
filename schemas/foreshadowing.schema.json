@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/foreshadowing.schema.json",
+  "title": "伏笔（埋设、提示与回收）",
+  "$comment": "字段依据 PRD §10.4。OVERDUE 是按叙述位置算出来的告警，不是持久状态——所以 state 的枚举里没有它。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "state", "surface_meaning", "true_meaning", "window_policy"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^FORESHADOW-[0-9]{4,6}$" },
+    "artifact_type": { "const": "FORESHADOWING" },
+    "title": { "type": "string", "minLength": 1 },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+
+    "state": {
+      "type": "string",
+      "enum": ["PLANNED", "PLANTED", "HINTED", "TRIGGERED", "PAID_OFF", "ABANDONED"],
+      "description": "持久生命周期。OVERDUE 不在此列——它由叙述位置实时算出"
+    },
+    "plant_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "埋设来源：哪一章哪一段",
+      "properties": {
+        "chapter_id": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+        "block_id": { "$ref": "_common.schema.json#/$defs/blockId" }
+      }
+    },
+    "surface_meaning": { "type": "string", "minLength": 1, "description": "读者表层看到的解释" },
+    "true_meaning": { "type": "string", "minLength": 1, "description": "真实含义；不得提前泄露给读者" },
+    "reveal_scope": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "可揭示范围；明确禁止提前揭示属于阻断规则"
+    },
+    "target_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from_chapter": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+        "to_chapter": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" }
+      }
+    },
+    "window_policy": {
+      "type": "string",
+      "enum": ["ADVISORY", "HARD"],
+      "description": "ADVISORY 超期只告警（默认）；HARD 超期阻断，修改需批准"
+    },
+    "trigger_conditions": {
+      "type": "array",
+      "description": "结构化触发条件——只有这部分由 Python 判定真伪",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "field": { "type": "string" },
+          "value": {}
+        }
+      }
+    },
+    "trigger_description": {
+      "type": "string",
+      "description": "自然语言触发说明。由 LLM 提出建议，不得声称已被形式化验证"
+    },
+    "state_source": { "$ref": "_common.schema.json#/$defs/sourceRef" },
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" }
+  }
+}

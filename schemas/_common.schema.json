@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/_common.schema.json",
+  "title": "共享定义：来源引用与 ID 形态",
+  "$comment": "只放能被 $ref 安全复用的片段。通用元数据（id/artifact_type/...）故意不抽成 $defs：JSON Schema 的 additionalProperties:false 不会继承父级 properties，抽出来会导致每份 schema 都把所有字段判成未知字段。那 8 个字段在每份 schema 里各写一遍，一致性由 tests/unit/test_schema_contract.py 守着。",
+  "$defs": {
+    "anyId": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z]*(?:-[A-Z]+)*-[0-9]{4,6}$",
+      "description": "规范 ID：字母段前缀 + 4–6 位编号。EVT-CH-0001-001 这类复合形态不合法（PRD §8.1）"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "blockId": {
+      "type": "string",
+      "pattern": "^[a-z][0-9]{3,5}$",
+      "description": "块 ID，如 p0042。同一产物内唯一"
+    },
+    "sourceRef": {
+      "description": "判别联合（PRD §9.1）：来源不能只存自由文本路径，必须能定位到版本或哈希",
+      "oneOf": [
+        { "$ref": "#/$defs/canonSource" },
+        { "$ref": "#/$defs/candidateSource" },
+        { "$ref": "#/$defs/rawSource" },
+        { "$ref": "#/$defs/authorDecisionSource" }
+      ]
+    },
+    "canonSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "artifact_id"],
+      "properties": {
+        "kind": { "const": "CANON" },
+        "artifact_id": { "$ref": "#/$defs/anyId" },
+        "source_revision": { "type": "string", "description": "Git commit；为空表示以当前 00_Canon 为准" },
+        "block_id": { "$ref": "#/$defs/blockId" },
+        "quote": { "type": "string", "minLength": 1 }
+      }
+    },
+    "candidateSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "artifact_id", "content_hash"],
+      "properties": {
+        "kind": { "const": "APPROVED_CANDIDATE" },
+        "artifact_id": { "$ref": "#/$defs/anyId" },
+        "content_hash": { "$ref": "#/$defs/sha256" },
+        "approval_id": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" },
+        "block_id": { "$ref": "#/$defs/blockId" },
+        "quote": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rawSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "RAW" },
+        "import_id": { "type": "string", "minLength": 1 },
+        "file_sha256": { "$ref": "#/$defs/sha256" },
+        "locator": { "type": "string", "minLength": 1 },
+        "quote": { "type": "string", "minLength": 1 }
+      }
+    },
+    "authorDecisionSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "decision_id"],
+      "properties": {
+        "kind": { "const": "AUTHOR_DECISION" },
+        "decision_id": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" },
+        "content_hash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sourceRefList": {
+      "type": "array",
+      "description": "正式发布的记录必须至少有一条可定位来源或作者决定；空数组只能出现在模板里",
+      "items": { "$ref": "#/$defs/sourceRef" }
+    },
+    "epistemicType": {
+      "type": "string",
+      "enum": [
+        "OBJECTIVE_ASSERTION",
+        "CHARACTER_BELIEF",
+        "REPORTED_CLAIM",
+        "INFERENCE",
+        "PLAN"
+      ]
+    },
+    "reviewStatus": {
+      "type": "string",
+      "enum": ["CLEAR", "NEEDS_REVIEW", "DISPUTED"]
+    },
+    "artifactStatus": {
+      "type": "string",
+      "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "SUPERSEDED", "WITHDRAWN"]
+    },
+    "entityRef": {
+      "type": "string",
+      "pattern": "^(CHAR|LOC|FAC|ITEM|CREATURE|WORLD|SYS|SKL|FATE|ASSET)-[0-9]{4,6}$"
+    }
+  }
+}

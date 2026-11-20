@@ -2,24 +2,62 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/novel-system/entity.schema.json",
   "title": "实体档案（人物、地点、组织、物品、生物、体系、规则、世界）",
+  "$comment": "字段面按库内实情收敛：966 份档案里 type/canon_status/subtype/world 是 100% 出现的，schema 不认它们就等于全部非法。PRD §8.2 要求的 artifact_type/artifact_status 另以可选字段并存，迁移见 known_risks。",
   "type": "object",
-  "required": ["id", "type", "name", "status"],
+  "additionalProperties": false,
+  "required": ["id", "type", "name"],
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^(CHAR|LOC|ORG|ITEM|CREATURE|SYS|RULE|WORLD)-[0-9]{4}$",
-      "description": "稳定 ID：类型前缀 + 四位序号，一经分配不得复用"
+      "pattern": "^(CHAR|LOC|FAC|ORG|ITEM|CREATURE|SYS|RULE|WORLD|SKL|FATE|ASSET)-[0-9]{4,6}$",
+      "description": "稳定 ID：类型前缀 + 四位序号（PRD 写六位，库内实为四位，两种都接受），一经分配不得复用"
     },
     "type": {
       "type": "string",
-      "enum": ["character", "location", "organization", "item", "creature", "system", "rule", "world"]
+      "enum": [
+        "character",
+        "location",
+        "faction",
+        "organization",
+        "item",
+        "creature",
+        "system",
+        "rule",
+        "world",
+        "skill",
+        "destiny",
+        "story_asset",
+        "template"
+      ],
+      "description": "v1.0 的类型名。PRD 六类为 character/location/organization/item/creature/system/rule/world，其余为遗留类型，迁移时归并"
     },
+    "artifact_type": {
+      "type": "string",
+      "description": "PRD §8.2 的字段名。与 type 并存，迁移期二者择一填写"
+    },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+
     "name": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
     "aliases": { "type": "array", "items": { "type": "string" } },
+    "subtype": {
+      "type": "string",
+      "description": "中文子类（人物／生物／物品／方术……）。库内 32 种，不设枚举——枚举会成为治理负担"
+    },
+    "world": { "type": "string", "description": "所属世界名" },
+    "category": { "type": "string", "description": "素材分类（battle/dialogue/setting……），仅 04_Story_Assets 使用" },
+    "canon_status": {
+      "type": "string",
+      "enum": ["draft", "proposed", "confirmed", "deprecated", "archived"],
+      "description": "v1.0 遗留状态。PRD §8.3 明令禁止再用一个字段混表产物状态／信息性质／审核状态，迁移后由 artifact_status + epistemic_type + review_status 取代"
+    },
     "status": {
       "type": "string",
-      "enum": ["draft", "proposed", "confirmed", "deprecated"],
-      "description": "confirmed 仅表示作者已确认；不等于已进入正文"
+      "description": "与 canon_status 并存的旧写法；两者都合法，迁移期不强制择一"
     },
     "canon_scope": {
       "type": "string",
@@ -27,20 +65,21 @@
       "description": "in_world 才是世界内事实；meta 为写作约定"
     },
     "summary": { "type": "string" },
-    "source_refs": {
-      "type": "array",
-      "description": "来源必须可定位；无来源的推断不得写成事实",
-      "items": {
-        "type": "object",
-        "required": ["kind"],
-        "properties": {
-          "kind": { "type": "string", "enum": ["manuscript", "import", "author_note", "agent_proposal"] },
-          "locator": { "type": "string" },
-          "quote": { "type": "string" },
-          "file_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
-        }
-      }
-    },
-    "updated_at": { "type": "string", "format": "date-time" }
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+
+    "import_batch": { "type": "string", "description": "导入批次号（v1.0 遗留）" },
+    "grade": { "type": ["string", "integer"], "description": "品阶（v1.0 遗留，仅武修／玄法一类使用）" },
+    "school": { "type": "string", "description": "流派（v1.0 遗留）" },
+    "race": { "type": "string", "description": "种族（v1.0 遗留）" },
+    "race_groups": { "type": "array", "items": { "type": "string" } },
+    "generated_by": { "type": "string" },
+    "volume_id": { "type": "string" },
+    "extensions": {
+      "type": "object",
+      "description": "唯一允许的扩展口（PRD §8.4）"
+    }
   }
 }

@@ -3,6 +3,7 @@
   "$id": "https://example.invalid/novel-system/task.schema.json",
   "title": "任务记录（Agent 交接的最小单元）",
   "type": "object",
+  "additionalProperties": false,
   "required": ["task_id", "project_id", "author_id", "task_type", "status", "created_at"],
   "properties": {
     "task_id": { "type": "string", "pattern": "^TASK-[0-9]{6}$" },

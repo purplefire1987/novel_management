@@ -3,6 +3,7 @@
   "$id": "https://example.invalid/novel-system/memory.schema.json",
   "title": "记忆层（热 / 短期 / 长期）",
   "type": "object",
+  "additionalProperties": false,
   "required": ["layer", "project_id", "updated_at"],
   "properties": {
     "layer": {

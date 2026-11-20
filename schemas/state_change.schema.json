@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/state_change.schema.json",
+  "title": "状态变化（实体某字段的一次取值迁移）",
+  "$comment": "字段依据 PRD §9.7。MVP 只对注册字段做确定性冲突检查：life_status/location/owner/injury_status/ability_available/resource_quantity。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "artifact_type", "entity_id", "field", "effective_event"],
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/anyId" },
+    "artifact_type": { "const": "STATE_CHANGE" },
+    "title": { "type": "string" },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+
+    "entity_id": { "$ref": "_common.schema.json#/$defs/entityRef" },
+    "field": {
+      "type": "string",
+      "enum": [
+        "life_status",
+        "location",
+        "owner",
+        "injury_status",
+        "ability_available",
+        "resource_quantity"
+      ],
+      "description": "只允许已注册字段；未注册字段不得声称已做确定性校验"
+    },
+    "old_value": {},
+    "new_value": {},
+    "effective_event": { "type": "string", "pattern": "^EVT-[0-9]{4,6}$" },
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" }
+  }
+}

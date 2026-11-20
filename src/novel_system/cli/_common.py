@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from .. import config as cfg_mod
+from .. import frontmatter as fm
 from ..approvals import ApprovalStore
 from ..audit import OperationLog
 from ..backup import BackupStore
@@ -42,23 +43,8 @@ def slugify(name: str) -> str:
 
 
 def read_frontmatter(path: Path) -> dict:
-    """只读 `---` 之间的简单 key: value。够索引与校验使用。"""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return {}
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    if end < 0:
-        return {}
-    meta: dict = {}
-    for line in text[3:end].splitlines():
-        if ":" not in line or line.lstrip().startswith("#"):
-            continue
-        key, _, value = line.partition(":")
-        meta[key.strip()] = value.strip().strip("\"'")
-    return meta
+    """转发到 frontmatter 模块——解析只有那一份实现。"""
+    return fm.read(path)
 
 
 def project(cfg: cfg_mod.Config, args: argparse.Namespace) -> ProjectPaths:

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/source_ref.schema.json",
+  "title": "来源引用（单条）",
+  "$comment": "PRD §9.1 的四类判别联合。这份文件只是给共享定义一个独立入口，实现仍在 _common.schema.json，避免两处定义漂移。",
+  "$ref": "_common.schema.json#/$defs/sourceRef"
+}

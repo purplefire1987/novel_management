@@ -21,6 +21,7 @@
 | [ADR-008](ADR-008-workbuddy-plugin-registration.md) | WorkBuddy 插件注册与升级策略 | 已接受 |
 | [ADR-009](ADR-009-backup-and-restore.md) | 备份与恢复策略 | 已接受 |
 | [ADR-010](ADR-010-license-and-governance.md) | 公共仓库的许可证与贡献治理 | 已接受（GPL-3.0-only） |
+| [ADR-011](ADR-011-schema-as-contract.md) | 字段契约以 JSON Schema 为真源，校验器自实现 | 已接受 |
 
 ## 这些 ADR 里最重要的三句话
 

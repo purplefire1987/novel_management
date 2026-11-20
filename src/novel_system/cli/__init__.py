@@ -18,9 +18,9 @@ from pathlib import Path
 from .. import config as cfg_mod
 from .. import logs
 from ..errors import NovelError
-from . import backup_cmd, flow, init, maps_cmd, read
+from . import backup_cmd, flow, id_cmd, init, maps_cmd, read, schema_cmd
 
-__version__ = "0.4.2"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
+__version__ = "0.5.0"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
 
 HANDLERS = {
     "doctor": read.cmd_doctor,
@@ -38,6 +38,9 @@ HANDLERS = {
     "backup": backup_cmd.cmd_backup,
     "restore": backup_cmd.cmd_restore,
     "maps": maps_cmd.cmd_maps,
+    "schema": schema_cmd.cmd_schema,
+    "allocate-id": id_cmd.cmd_allocate_id,
+    "package-hash": schema_cmd.cmd_package_hash,
 }
 
 
@@ -170,6 +173,34 @@ def build_parser() -> argparse.ArgumentParser:
     p_mbuild.add_argument("--xlsx", default=None, help="资产表路径（build 不读，仅为参数一致）")
     p_mbuild.add_argument("--maps-only", action="store_true", help="只重画图，不碰州域／府／城邑档案")
     p_mbuild.add_argument("--confirm", action="store_true", help="执行写入")
+
+    # ---- schema（T02 契约）----
+    p_schema = sub.add_parser("schema", help="查看与校验数据契约（JSON Schema）", parents=[common])
+    schema_sub = p_schema.add_subparsers(dest="schema_command", required=True)
+
+    p_slist = schema_sub.add_parser("list", help="列出可校验类型", parents=[common])
+    p_slist.add_argument("--schema-dir", default=None, help="schema 目录，默认自动定位")
+
+    p_scheck = schema_sub.add_parser("check", help="按类型校验 JSON 文件（- 读 stdin）", parents=[common])
+    p_scheck.add_argument("type", help="类型名，如 entity／assertion／approval")
+    p_scheck.add_argument("files", nargs="*", help="JSON 文件；`-` 表示 stdin")
+    p_scheck.add_argument("--schema-dir", default=None)
+
+    # ---- allocate-id ----
+    p_alloc = sub.add_parser("allocate-id", help="分配稳定 ID（默认预演，--confirm 落盘）", parents=[common])
+    p_alloc.add_argument("--type", required=True, help="CHARACTER／LOCATION／EVENT……或直接给前缀 CHAR")
+    p_alloc.add_argument("--count", type=int, default=1, help="一次分配几个（默认 1）")
+    p_alloc.add_argument("--reason", default="", help="分配原因，写进审计")
+    p_alloc.add_argument("--confirm", action="store_true", help="真正发号并写审计；缺省只预演")
+    p_alloc.add_argument("--allow-dirty", action="store_true", help="本前缀已有重号仍发号（不推荐）")
+    p_alloc.add_argument("--json", action="store_true", help="附带 JSON 输出")
+    p_alloc.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
+
+    # ---- package-hash ----
+    p_ph = sub.add_parser("package-hash", help="算规范化 JSON 的 sha256（审批与发布绑这个值）", parents=[common])
+    p_ph.add_argument("path", help="JSON 文件；`-` 读 stdin")
+    p_ph.add_argument("--check", default=None, help="比对期望哈希，不一致退出 1")
+    p_ph.add_argument("--canonical", action="store_true", help="同时打印规范化 JSON 原文")
 
     return parser
 

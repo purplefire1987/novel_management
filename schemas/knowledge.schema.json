@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/knowledge.schema.json",
+  "title": "人物认知（谁相信什么）",
+  "$comment": "字段依据 PRD §9.5。查不到记录时返回 NOT_RECORDED，不得解释为「人物不知道」；显式否定认知另行记录。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["holder_id", "epistemic_type", "attitude", "proposition"],
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/anyId" },
+    "artifact_type": { "const": "KNOWLEDGE" },
+    "title": { "type": "string" },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+
+    "holder_id": { "$ref": "_common.schema.json#/$defs/entityRef" },
+    "epistemic_type": { "const": "CHARACTER_BELIEF" },
+    "attitude": {
+      "type": "string",
+      "enum": ["KNOWS", "BELIEVES", "SUSPECTS", "DOUBTS"]
+    },
+    "proposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "predicate", "value"],
+      "properties": {
+        "subject_id": { "$ref": "_common.schema.json#/$defs/entityRef" },
+        "predicate": { "type": "string", "minLength": 1 },
+        "value": {}
+      }
+    },
+    "valid_from_event": { "type": "string", "pattern": "^EVT-[0-9]{4,6}$" },
+    "valid_until_event": { "type": "string", "pattern": "^EVT-[0-9]{4,6}$" },
+    "negated": {
+      "type": "boolean",
+      "description": "显式否定认知（正文明确写了『他不知道』）。缺省 false 表示普通认知"
+    },
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" }
+  }
+}

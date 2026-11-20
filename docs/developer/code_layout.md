@@ -8,10 +8,17 @@ cli/          只做参数解析与输出格式化，不写业务判断
   ├── read.py       doctor / status / validate / rebuild-index
   ├── init.py       init-author / init-project
   ├── flow.py       task / stage / diff / approve / adopt / publish
-  └── backup_cmd.py backup / restore
+  ├── backup_cmd.py backup / restore
+  ├── maps_cmd.py   maps paths / import-admin / build
+  ├── schema_cmd.py schema list / check、package-hash
+  └── id_cmd.py     allocate-id
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
 logs.py       运行日志：写 <runtime>/logs/novel.log，与 audit 的审计日志是两件事
+frontmatter.py frontmatter 的唯一解析实现（只顶层 key: value；嵌套归 T03）
+canonical.py  字节规范化（去 BOM、LF）与规范化 JSON 包哈希
+schema.py     JSON Schema 校验器（draft 2020-12 实用子集，零依赖）
+ids.py        稳定 ID 分配：前缀表、查重、加锁、审计
 storage/      哈希、原子写、不覆盖写、可验证复制
 audit/        操作日志（ops.jsonl）与操作者校验
 tasks/        任务记录与状态流转
@@ -77,6 +84,21 @@ cli → release / backup / staging / tasks / approvals / baseline
 3. 需要写盘的话，先确认走的是 `storage` 的安全写入；
 4. 写测试：一条成功路径、一条拒绝路径（越界 / 越权 / 缺确认，按命令性质选）；
 5. 更新 `docs/operations/cli_reference.md` 与 README 的命令表。
+
+## 加一个新类型（数据契约）
+
+1. 写 `schemas/<类型>.schema.json`，**必须**带 `additionalProperties: false`
+   与 `required`——否则「未知字段被拒绝」对它不成立；
+2. 通用元数据那 8 个字段（`artifact_type`/`artifact_status`/`schema_version`/
+   `created_by_task`/`derived_from`/`supersedes`/`tags`/`extensions`）在每份
+   schema 里各写一遍。**不要抽成 `$defs`**：`additionalProperties: false`
+   不继承父级 `properties`，抽出来会把所有字段判成未知字段；
+3. 在 `tests/fixtures/schemas/samples.json` 加一对 `valid` / `invalid` 样本；
+4. 跑 `pytest tests/unit/test_schema_contract.py`。少了样本它会直接说「缺样本」，
+   不用等谁想起来补。
+
+校验器支持哪些关键字、哪些故意不支持，见 `src/novel_system/schema.py` 的模块
+docstring。写了不支持的 keyword 不会报错，只是**不生效**——这点必须自己确认。
 
 ## 加一个新目录
 

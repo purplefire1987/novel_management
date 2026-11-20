@@ -1,0 +1,403 @@
+{
+  "$comment": "T02 字段契约样本（PRD §8.4：每类至少一个有效 fixture、一个无效 fixture）。tests/unit/test_schema_contract.py 逐条校验，并额外对每个 valid 派生『删必填键』『加未知字段』两种变体，确保三个验收项对每一类都成立。",
+  "entity": {
+    "valid": {
+      "id": "CHAR-0001",
+      "type": "character",
+      "name": "示例人物",
+      "subtype": "人物",
+      "canon_status": "confirmed",
+      "source_refs": [
+        {
+          "kind": "RAW",
+          "import_id": "IMP-0001",
+          "file_sha256": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+          "locator": "sheet:角色库/row:2",
+          "quote": "示例人物"
+        }
+      ],
+      "created_at": "2026-11-20T10:00:00Z",
+      "updated_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": { "id": "CHAR-0001", "type": "dragon", "name": "示例人物" }
+  },
+  "event": {
+    "valid": {
+      "event_id": "EVT-0001",
+      "summary": "示例事件",
+      "source_chapter": "CH-0001",
+      "participants": ["CHAR-0001"],
+      "created_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": { "event_id": "EVT-CH-0001-001", "summary": "复合型 ID 不合法" }
+  },
+  "artifact": {
+    "valid": {
+      "id": "FORESHADOW-0001",
+      "artifact_type": "FORESHADOWING",
+      "artifact_status": "DRAFT",
+      "schema_version": "2.1"
+    },
+    "invalid": {
+      "id": "FORESHADOW-0001",
+      "artifact_type": "FORESHADOWING",
+      "artifact_status": "FINISHED",
+      "schema_version": "2.1"
+    }
+  },
+  "source_ref": {
+    "valid": {
+      "kind": "CANON",
+      "artifact_id": "CH-0001",
+      "source_revision": "abc1234",
+      "block_id": "p0042",
+      "quote": "示例引文"
+    },
+    "invalid": { "kind": "CANON", "block_id": "p0042" }
+  },
+  "assertion": {
+    "valid": {
+      "id": "AST-0001",
+      "artifact_type": "ASSERTION",
+      "artifact_status": "APPROVED",
+      "schema_version": "2.1",
+      "subject_id": "CHAR-0002",
+      "predicate": "life_status",
+      "value": "ALIVE",
+      "epistemic_type": "OBJECTIVE_ASSERTION",
+      "review_status": "CLEAR",
+      "source_refs": []
+    },
+    "invalid": {
+      "id": "AST-0001",
+      "artifact_type": "ASSERTION",
+      "artifact_status": "APPROVED",
+      "schema_version": "2.1",
+      "subject_id": "CHAR-0002",
+      "predicate": "life_status",
+      "value": "ALIVE",
+      "epistemic_type": "GUESS",
+      "review_status": "CLEAR"
+    }
+  },
+  "state_change": {
+    "valid": {
+      "id": "CHANGE-0001",
+      "artifact_type": "STATE_CHANGE",
+      "entity_id": "ITEM-0007",
+      "field": "owner",
+      "old_value": "CHAR-0001",
+      "new_value": "CHAR-0003",
+      "effective_event": "EVT-0231"
+    },
+    "invalid": {
+      "id": "CHANGE-0001",
+      "artifact_type": "STATE_CHANGE",
+      "entity_id": "ITEM-0007",
+      "field": "mood",
+      "effective_event": "EVT-0231"
+    }
+  },
+  "knowledge": {
+    "valid": {
+      "holder_id": "CHAR-0001",
+      "epistemic_type": "CHARACTER_BELIEF",
+      "attitude": "BELIEVES",
+      "proposition": { "subject_id": "CHAR-0002", "predicate": "life_status", "value": "DEAD" },
+      "valid_from_event": "EVT-0102",
+      "source_refs": []
+    },
+    "invalid": {
+      "holder_id": "CHAR-0001",
+      "epistemic_type": "CHARACTER_BELIEF",
+      "attitude": "HOPES",
+      "proposition": { "subject_id": "CHAR-0002", "predicate": "life_status", "value": "DEAD" }
+    }
+  },
+  "revelation": {
+    "valid": {
+      "proposition_ref": "AST-0001",
+      "narrative_position": { "chapter_id": "CH-0001", "scene_id": "SCENE-0001", "block_id": "p0032" },
+      "revelation_mode": "EXPLICIT",
+      "source_refs": []
+    },
+    "invalid": {
+      "proposition_ref": "AST-0001",
+      "narrative_position": { "scene_id": "SCENE-0001" },
+      "revelation_mode": "EXPLICIT"
+    }
+  },
+  "foreshadowing": {
+    "valid": {
+      "id": "FORESHADOW-0001",
+      "state": "PLANNED",
+      "surface_meaning": "表层解释",
+      "true_meaning": "真实含义",
+      "window_policy": "ADVISORY",
+      "target_window": { "from_chapter": "CH-0010", "to_chapter": "CH-0020" }
+    },
+    "invalid": {
+      "id": "FORESHADOW-0001",
+      "state": "OVERDUE",
+      "surface_meaning": "表层解释",
+      "true_meaning": "真实含义",
+      "window_policy": "ADVISORY"
+    }
+  },
+  "dependency": {
+    "valid": {
+      "artifact_id": "PLAN-CH-0102",
+      "depends_on": [
+        {
+          "artifact_id": "RULE-0003",
+          "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+          "dependency_type": "HARD"
+        }
+      ],
+      "validation_status": "VALID"
+    },
+    "invalid": {
+      "artifact_id": "PLAN-CH-0102",
+      "depends_on": [{ "artifact_id": "RULE-0003", "dependency_type": "MAYBE" }],
+      "validation_status": "VALID"
+    }
+  },
+  "issue": {
+    "valid": {
+      "issue_id": "ISSUE-0102",
+      "severity": "BLOCKER",
+      "category": "KNOWLEDGE_BOUNDARY",
+      "target": { "artifact_id": "CH-0102", "block_id": "p0031" },
+      "description": "人物使用了尚未获得的信息",
+      "evidence_refs": [],
+      "suggested_actions": [],
+      "status": "OPEN"
+    },
+    "invalid": {
+      "issue_id": "ISSUE-0102",
+      "severity": "BLOCKER",
+      "category": "KNOWLEDGE_BOUNDARY",
+      "description": "人物使用了尚未获得的信息",
+      "status": "IGNORED"
+    }
+  },
+  "approval": {
+    "valid": {
+      "approval_id": "APR-0102",
+      "actor_type": "AUTHOR",
+      "task_id": "TASK-0102",
+      "target_type": "ARTIFACT",
+      "target_id": "CH-0102",
+      "target_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+      "decision": "APPROVE",
+      "approved_scope": ["CHAPTER_TEXT"],
+      "notes": []
+    },
+    "invalid": {
+      "approval_id": "APR-0102",
+      "actor_type": "AGENT",
+      "target_type": "ARTIFACT",
+      "target_id": "CH-0102",
+      "target_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+      "decision": "APPROVE"
+    }
+  },
+  "change_request": {
+    "valid": {
+      "change_id": "CR-0001",
+      "change_type": "RETCON",
+      "reason": "早期设定与正文冲突",
+      "old_record": { "artifact_id": "RULE-0003", "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d" },
+      "impacted_text": ["CH-0010"],
+      "required_approvals": ["AUTHOR"],
+      "release_strategy": "NEXT_RELEASE"
+    },
+    "invalid": {
+      "change_id": "CR-0001",
+      "change_type": "RETCON",
+      "release_strategy": "SOMEDAY"
+    }
+  },
+  "import_manifest": {
+    "valid": {
+      "import_id": "IMP-0001",
+      "created_at": "2026-11-20T10:00:00Z",
+      "files": [
+        {
+          "path": "原稿.md",
+          "sha256": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+          "bytes": 1024
+        }
+      ],
+      "raw_bytes_preserved": true,
+      "chapters_parsed": 30,
+      "paragraphs_mapped": 900,
+      "paragraphs_unmapped": [],
+      "blocking_conflicts": 0,
+      "known_limits": []
+    },
+    "invalid": {
+      "import_id": "IMP-0001",
+      "created_at": "2026-11-20T10:00:00Z",
+      "files": [],
+      "raw_bytes_preserved": true,
+      "success": true
+    }
+  },
+  "release_plan": {
+    "valid": {
+      "release_id": "REL-0001",
+      "base_release": "REL-0000",
+      "changes": [
+        {
+          "path": "01_Canon/Chapters/CH-0001.md",
+          "op": "modify",
+          "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d"
+        }
+      ],
+      "text_approvals": ["APR-0102"],
+      "schema_version": "2.1"
+    },
+    "invalid": {
+      "release_id": "REL-0001",
+      "base_release": "REL-0000",
+      "changes": [{ "path": "01_Canon/Chapters/CH-0001.md", "op": "rewrite" }],
+      "schema_version": "2.1"
+    }
+  },
+  "release_manifest": {
+    "valid": {
+      "release_id": "REL-0001",
+      "release_plan_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+      "canon_revision": "abc1234",
+      "index_build_id": "IDX-0001",
+      "index_bytes_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+      "files": [
+        {
+          "path": "01_Canon/Chapters/CH-0001.md",
+          "sha256": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+          "bytes": 2048
+        }
+      ],
+      "tool_version": "0.5.0",
+      "created_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": {
+      "release_id": "REL-0001",
+      "canon_revision": "abc1234",
+      "index_build_id": "IDX-0001",
+      "files": [],
+      "created_at": "2026-11-20"
+    }
+  },
+  "transaction_journal": {
+    "valid": {
+      "txn_id": "TXN-0001",
+      "release_id": "REL-0001",
+      "base_release": "REL-0000",
+      "state": "PREPARED",
+      "steps": [
+        { "step": 1, "name": "创建 release_id 与事务日志", "status": "done" },
+        { "step": 2, "name": "验证 base_release", "status": "pending" }
+      ],
+      "created_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": {
+      "txn_id": "TXN-0001",
+      "release_id": "REL-0001",
+      "state": "ALMOST_DONE",
+      "steps": [{ "step": 99, "status": "done" }],
+      "created_at": "2026-11-20T10:00:00Z"
+    }
+  },
+  "execution_receipt": {
+    "valid": {
+      "receipt_id": "RCPT-0001",
+      "release_id": "REL-0001",
+      "manifest_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
+      "canon_revision": "abc1234",
+      "index_build_id": "IDX-0001",
+      "active_since": "2026-11-20T10:00:00Z",
+      "repaired": false,
+      "warnings": [],
+      "created_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": {
+      "receipt_id": "RCPT-0001",
+      "release_id": "REL-0001",
+      "created_at": "2026-11-20T10:00:00Z"
+    }
+  },
+  "project": {
+    "valid": {
+      "project_id": "novel-001",
+      "project_name": "示例作品",
+      "project_slug": "demo",
+      "author_id": "author-local",
+      "created_at": "2026-11-20",
+      "project_status": "active",
+      "schema_version": "4.0.0",
+      "structure_note": "八类映射为六类"
+    },
+    "invalid": {
+      "project_id": "Novel 001",
+      "project_name": "示例作品",
+      "project_slug": "demo",
+      "author_id": "author-local",
+      "created_at": "2026-11-20",
+      "project_status": "active",
+      "schema_version": "4.0.0"
+    }
+  },
+  "chapter": {
+    "valid": {
+      "chapter_id": "CH-0001",
+      "project_id": "novel-001",
+      "stage": "final",
+      "status": "approved",
+      "word_count": 4200,
+      "approved_by": "author-local",
+      "approved_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": {
+      "chapter_id": "CH-0001",
+      "project_id": "novel-001",
+      "stage": "published",
+      "status": "approved"
+    }
+  },
+  "memory": {
+    "valid": {
+      "layer": "hot",
+      "project_id": "novel-001",
+      "scope": { "volume": 1, "chapter_range": ["CH-0001"], "entities": ["CHAR-0001"] },
+      "facts": [{ "statement": "示例事实", "source_chapter": "CH-0001", "confidence": "explicit" }],
+      "updated_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": {
+      "layer": "warm",
+      "project_id": "novel-001",
+      "updated_at": "2026-11-20T10:00:00Z"
+    }
+  },
+  "task": {
+    "valid": {
+      "task_id": "TASK-000001",
+      "project_id": "novel-001",
+      "author_id": "author-local",
+      "task_type": "draft",
+      "status": "pending",
+      "assigned_to": "writer",
+      "write_mode": "staging",
+      "created_at": "2026-11-20T10:00:00Z"
+    },
+    "invalid": {
+      "task_id": "TASK-000001",
+      "project_id": "novel-001",
+      "author_id": "author-local",
+      "task_type": "writing",
+      "status": "pending",
+      "created_at": "2026-11-20T10:00:00Z"
+    }
+  }
+}

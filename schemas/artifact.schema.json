@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/artifact.schema.json",
+  "title": "受控产物通用头（PRD §8.2）",
+  "$comment": "这份 schema 是『所有产物共有的那一段』的独立校验入口，用于检查某个文件是否至少有合法的头。具体类型（断言、认知、伏笔……）另有各自的 schema，字段更严。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "artifact_type", "artifact_status", "schema_version"],
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/anyId" },
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "CHARACTER",
+        "LOCATION",
+        "FACTION",
+        "ITEM",
+        "CREATURE",
+        "SYSTEM",
+        "RULE",
+        "WORLD",
+        "CHAPTER",
+        "PLAN_SERIES",
+        "PLAN_VOLUME",
+        "PLAN_CHAPTER",
+        "SCENE",
+        "EVENT",
+        "ASSERTION",
+        "STATE_CHANGE",
+        "KNOWLEDGE",
+        "REVELATION",
+        "FORESHADOWING",
+        "DEPENDENCY",
+        "ISSUE",
+        "APPROVAL",
+        "CHANGE_REQUEST",
+        "RELEASE",
+        "IMPORT",
+        "TASK"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
+    "supersedes": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "extensions": {
+      "type": "object",
+      "description": "唯一允许的扩展口（PRD §8.4）；扩展不得影响硬规则"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}
