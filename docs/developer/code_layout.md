@@ -11,6 +11,7 @@ cli/          只做参数解析与输出格式化，不写业务判断
   └── backup_cmd.py backup / restore
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
+logs.py       运行日志：写 <runtime>/logs/novel.log，与 audit 的审计日志是两件事
 storage/      哈希、原子写、不覆盖写、可验证复制
 audit/        操作日志（ops.jsonl）与操作者校验
 tasks/        任务记录与状态流转
@@ -19,7 +20,8 @@ staging/      staging 落盘与 manifest
 release/      发布四道闸与旧版归档
 baseline/     作者编辑基线（adopt）
 backup/       备份、校验、恢复
-indexing/ validation/ workflows/ agents/ adapters/ core/   预留扩展位
+adapters/     模型适配层；当前只有 MockLLM（确定性、不联网、不需密钥）
+indexing/ validation/ workflows/ agents/ core/   预留扩展位（T03–T09）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
@@ -43,6 +45,11 @@ cli → release / backup / staging / tasks / approvals / baseline
 
 **3. 业务模块不 print。** 输出只在 `cli/` 层。业务层返回结构化结果（`PublishResult` 之类），
 由 CLI 决定怎么显示。这样同一套逻辑可以被测试直接调用，不必解析 stdout。
+
+**4. 日志不写 stdout。** 运行日志只进 `<runtime>/logs/novel.log`（要看终端加
+`NOVEL_LOG_CONSOLE=1`，走 stderr）。stdout 是给作者的输出契约，混进日志就没法读了。
+写不进去（Runtime 只读、磁盘满、路径被普通文件占住）必须降级为空操作，**不许让命令失败**——
+日志是旁路，不能反过来决定命令成败。
 
 ## 几个容易踩的实现细节
 

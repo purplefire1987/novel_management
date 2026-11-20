@@ -2,6 +2,36 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.4.2 — 2026-11-20
+
+补齐 PRD §23 **T01 工程骨架**的两项缺件：运行日志与 Mock LLM。至此 T01 七项交付
+（pyproject / CLI / 配置 / 日志 / pytest / Mock LLM / 目录初始化）与三条验收全部到位。
+
+### 新增
+
+- **`logs.py` + `--log-level`**：每次命令在 `<runtime>/logs/novel.log` 留一对
+  `start` / `done`（含命令、项目、退出码、耗时）。`runtime_subdirs` 里早就有 `logs`，
+  此前没有任何代码往里写。级别取 `DEBUG`/`INFO`/`WARNING`/`ERROR`/`OFF`，
+  终端要看设 `NOVEL_LOG_CONSOLE=1`（走 stderr）。
+- **`adapters/mock.py`**：`LLMClient` 契约 + `MockLLM`（脚本化/回调/兜底三选一，
+  记录每次调用）。确定性、不联网、不读任何 API Key 环境变量。
+  真模型接入属 T08，此处只钉形状。
+- 16 条测试：日志 7 条（含「重复 setup 不叠 handler」「写不进去要降级」
+  「不碰 stdout」）、Mock 8 条（含 socket 打死仍可跑）、重复初始化 1 条
+  （逐文件 sha256 比对，比「退出码非 0」更强）。
+
+### 修复
+
+- 同一进程内多次调用（测试就是这样）原先没有日志设施；现按「先清 handler 再装」实现，
+  避免一条日志写 N 遍。
+
+### 兼容性
+
+- 无破坏性变更。终端输出一字未改；日志只进文件。
+- 新增全局参数 `--log-level`，默认 `INFO`；不想要日志传 `--log-level OFF`。
+
+---
+
 ## 0.4.1 — 2026-11-20
 
 `validate` 的 ID 查重扩到素材库。起因是真实 Vault 里 `ASSET-0001` 被

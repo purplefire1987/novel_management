@@ -10,13 +10,17 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
+import time
 from pathlib import Path
 
 from .. import config as cfg_mod
+from .. import logs
 from ..errors import NovelError
 from . import backup_cmd, flow, init, maps_cmd, read
 
-__version__ = "0.4.1"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
+__version__ = "0.4.2"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
 
 HANDLERS = {
     "doctor": read.cmd_doctor,
@@ -44,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--vault", help="作者 Vault 路径（覆盖环境变量与配置文件）")
     common.add_argument("--runtime", help="Runtime 路径（必须在 Vault 之外）")
     common.add_argument("--project", help="项目 ID（Vault 内多于一个项目时必需）")
+    common.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "OFF"],
+        help="写入 <runtime>/logs/novel.log 的级别；OFF 关闭",
+    )
 
     parser = argparse.ArgumentParser(
         prog="novel",
@@ -189,21 +199,51 @@ def main(argv: list[str] | None = None) -> int:
         print(f"配置错误：{exc}")
         return 2
 
+    # 日志在这里装配：此前的失败（参数、配置）还没 Runtime，写不进文件。
+    # 写不进也照跑——日志是旁路，不许反过来让命令失败。
+    logs.setup_logging(
+        cfg.runtime,
+        getattr(args, "log_level", "INFO"),
+        console=os.environ.get("NOVEL_LOG_CONSOLE") == "1",
+    )
+    log = logs.get_logger("cli")
+
     handler = HANDLERS.get(args.command)
     if handler is None:
         print(f"未知命令：{args.command}")
         return 2
+
+    log.info(
+        "start cmd=%s project=%s vault=%s argv=%d",
+        args.command,
+        args.project or "-",
+        cfg.author_vault or "-",
+        len(argv) if argv is not None else max(len(sys.argv) - 1, 0),
+    )
+    started = time.monotonic()
+    rc = 0
     try:
-        return handler(cfg, args)
+        rc = handler(cfg, args)
     except NovelError as exc:
+        log.warning("%s: %s", type(exc).__name__, exc)
         print(str(exc))
-        return exc.code
+        rc = exc.code
     except cfg_mod.ConfigError as exc:
+        log.warning("ConfigError: %s", exc)
         print(f"配置错误：{exc}")
-        return 2
+        rc = 2
     except KeyboardInterrupt:
+        log.info("interrupted cmd=%s", args.command)
         print("\n已中断")
-        return 130
+        rc = 130
+    except Exception:
+        # 未预期异常原样抛出，但先在日志里留全栈——终端只给作者看消息，栈进日志。
+        log.exception("crash cmd=%s", args.command)
+        raise
+    log.info(
+        "done cmd=%s rc=%s elapsed=%.3fs", args.command, rc, time.monotonic() - started
+    )
+    return rc
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # CLI 参考
 
-对应 V4.0 §5.3 的 16 项命令，另加 3 条地图命令（§8），共 19 条。全部命令支持 `--vault` / `--runtime` / `--project`，位置可放在子命令之前或之后。
+对应 V4.0 §5.3 的 16 项命令，另加 3 条地图命令（§8），共 19 条。全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
 novel --vault ~/vault status       # 等价
@@ -9,6 +9,20 @@ novel status --vault ~/vault
 
 未给 `--project` 时：配置里有 `active_project.project_id` 就用它；没有则报错并列出候选，**绝不按「只有一个项目」去推断**。
 `novel init-project` 建第一个项目时会自动写入 `active_project`，所以日常不必每次带 `--project`。
+
+### 运行日志
+
+每次命令跑完都会在 `<runtime>/logs/novel.log` 留一对记录：
+
+```
+2026-11-20 14:14:52 INFO  novel.cli | start cmd=status project=novel-001 vault=/path/to/vault
+2026-11-20 14:14:52 INFO  novel.cli | done cmd=status rc=0 elapsed=0.015s
+```
+
+- `--log-level` 取 `DEBUG` / `INFO`（默认）/ `WARNING` / `ERROR` / `OFF`。
+- 想在终端同时看见，设 `NOVEL_LOG_CONSOLE=1`；走 **stderr**，不污染 stdout。
+- 日志写不进去（Runtime 只读、盘满、路径被普通文件占住）会静默降级，**不会让命令失败**。
+- 这是运行日志，和 `audit/` 的审计日志（`ops.jsonl`，记谁改了哪个正式文件）是两回事：前者可丢，后者是证据。
 
 ---
 

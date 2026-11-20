@@ -43,6 +43,71 @@ def test_init_author_refuses_non_empty_dir(paths: tuple[Path, Path]) -> None:
     assert (vault / "existing.md").read_text(encoding="utf-8") == "已有内容"
 
 
+def _tree_digest(root: Path) -> dict[str, str]:
+    import hashlib
+
+    out: dict[str, str] = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            out[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return out
+
+
+def test_repeated_init_leaves_every_byte_untouched(paths: tuple[Path, Path]) -> None:
+    """T01 验收「重复初始化不破坏数据」，用逐文件 sha256 作判据。
+
+    只看「退出码非 0」不够——命令可以报了错又顺手改了一个文件。
+    这里比的是整棵树的内容指纹。
+    """
+    vault, runtime = paths
+    assert _init_author(vault, runtime) == 0
+    assert (
+        main(
+            [
+                "init-project",
+                "--vault",
+                str(vault),
+                "--runtime",
+                str(runtime),
+                "--id",
+                "novel-001",
+                "--name",
+                "试验作品",
+                "--confirm",
+            ]
+        )
+        == 0
+    )
+    # 项目目录名是 `<id>_<slug>`，不是裸 id。
+    matches = sorted((vault / "10_Projects").glob("novel-001*"))
+    assert len(matches) == 1, f"项目目录应唯一：{matches}"
+    project = matches[0]
+    (project / "01_Canon" / "Characters" / "CHAR-0001.md").write_text(
+        "---\nid: CHAR-0001\ntype: character\n---\n\n作者写的正文。\n", encoding="utf-8"
+    )
+
+    before = _tree_digest(vault)
+    assert _init_author(vault, runtime) != 0
+    assert (
+        main(
+            [
+                "init-project",
+                "--vault",
+                str(vault),
+                "--runtime",
+                str(runtime),
+                "--id",
+                "novel-001",
+                "--name",
+                "试验作品",
+                "--confirm",
+            ]
+        )
+        != 0
+    )
+    assert _tree_digest(vault) == before
+
+
 def test_init_project_creates_layout(paths: tuple[Path, Path]) -> None:
     vault, runtime = paths
     _init_author(vault, runtime)
