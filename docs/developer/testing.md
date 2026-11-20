@@ -34,6 +34,31 @@ tests/fixtures/      虚构夹具，不许出现任何真实作品内容
 - 夹具里的人名地名必须是明显虚构的（`CHAR-0001 林砚` 这种可以，真实人物不行）；
 - 不要在测试里写死 `/Users/xxx` 这类路径——CI 上不存在。
 
+## 不许真调模型
+
+T01 的验收之一是「测试不需要 API Key」。保证方式不是「碰巧没配密钥」，
+而是所有模型调用都走 `adapters/mock.py` 的 `MockLLM`：
+
+```python
+from novel_system.adapters import MockLLM
+
+llm = MockLLM(script=["第一段", "第二段"])     # 按序返回，用完回落
+llm = MockLLM(responder=lambda msgs: "...")  # 按输入生成，确定性
+llm = MockLLM(default="兜底")                 # 恒定输出
+
+assert llm.call_count == 1                    # 发了几次可断言
+assert llm.last_prompt() == "改这段"
+```
+
+三条硬要求，缺一不可：
+
+- **不联网**：`tests/unit/test_mock_llm.py` 把 `socket.socket` 打成抛异常，Mock 仍须正常返回；
+- **不读密钥**：不访问 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` 之类的环境变量；
+- **不落盘**：适配层只回文本，写盘是上层的事。
+
+真模型接入属 T08。届时新增的适配器同样要能被 Mock 替换——某个测试偷偷依赖网络，
+在 CI 上不是「慢」，是**不确定**。
+
 ## 一个测试要证明什么
 
 好的测试能回答「如果实现退化了，这条会不会红」。
