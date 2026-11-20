@@ -208,8 +208,8 @@ def test_like_escapes_wildcards(index: Path) -> None:
 def test_project_content_ranks_before_generated_dashboard(tmp_path: Path) -> None:
     """生成的看板页不能排在真正的档案前面。
 
-    真实库上搜「陈默」时，`00_System/Dashboards/工作台.md` 曾因为路径字典序
-    （`00_` < `10_`）霸占前三条，`CHAR-0001_陈默.md` 被挤到看不见。
+    真实库上搜一个两字人名时，`00_System/Dashboards/工作台.md` 曾因为路径字典序
+    （`00_` < `10_`）霸占前三条，`10_Projects/` 下那份人物档案被挤到看不见。
     看板是从档案派生的，让人先引用派生页等于在索引里造循环。
     """
     vault, runtime = tmp_path / "vault", tmp_path / "runtime"

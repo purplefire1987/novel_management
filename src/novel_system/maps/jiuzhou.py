@@ -7,7 +7,7 @@
    从没被解析成层级，地图一直是空的；上一版脚本只做到「州 → 城」两层。
 2. 资产库「地图库」表本来就有「府属 / 郡属」两列，但「府」从来没成为实体，
    只被压成城档案里的一个字段。三层一压扁，写作时就分不清「一府辖几县」
-   「府城与州城是否同城」，也查不到「示例郡在哪」。
+   「府城与州城是否同城」，也查不到某个郡在哪。
 
 本脚本做五件事，全部幂等：
 
@@ -131,6 +131,8 @@ def configure(paths: "MapPaths") -> None:
     global WORLD_NAME, UPPER_INSIDE, UPPER_OUTSIDE, MAP_PAGE, TREE_PAGE
     global WORLD_TABLE_LABEL, ADMIN_TABLE_LABEL, WORLD_ALIAS, ADMIN_ALIAS
     global XLSX_NAME, MISSING_NOTE, WORLD_REL, ADMIN_REL, WORLD_SHEET
+    global ADMIN_ALIASES, OFFICE_TABLE, OFFICE_NOTE
+    global STATE_CITIES, PAGE_SPECIAL_NOTE, PAGE_SAME_CITY, PAGE_LINKS
 
     VAULT = paths.vault
     WORLD_TABLE = paths.world_table
@@ -167,6 +169,16 @@ def configure(paths: "MapPaths") -> None:
     XLSX_NAME = str(naming.get("xlsx") or paths.xlsx.name)
     MISSING_NOTE = str(naming.get("missing_note") or "未记")
     WORLD_SHEET = str(naming.get("world_sheet") or WORLD_TABLE_LABEL)
+    ADMIN_ALIASES = [str(x) for x in (naming.get("admin_aliases") or [])]
+    OFFICE_TABLE = str(naming.get("office_table") or "")
+    OFFICE_NOTE = str(naming.get("office_note") or "")
+    STATE_CITIES = {
+        str(k): str(v) for k, v in (LAYOUT.get("state_cities") or {}).items()
+    }
+    page_notes = LAYOUT.get("page_notes") or {}
+    PAGE_SPECIAL_NOTE = str(page_notes.get("special_note") or "")
+    PAGE_SAME_CITY = str(page_notes.get("same_city_example") or "")
+    PAGE_LINKS = [str(x) for x in (page_notes.get("links") or [])]
     WORLD_REL = paths.world_table.relative_to(paths.vault).as_posix()
     ADMIN_REL = paths.admin_table.relative_to(paths.vault).as_posix()
 
@@ -377,9 +389,9 @@ _LOC_INDEX: dict[str, str] | None = None
 
 
 def loc_rel(loc_id: str) -> str:
-    """地点编号 → 档案相对库根的路径（`LOC-0045` → `…/LOC-0045_示例城.md`）。
+    """地点编号 → 档案相对库根的路径（`LOC-0045` → `…/LOC-0045_<地名>.md`）。
 
-    为什么不能直接拼 `{loc_id}.md`：档案名带后缀，形如 `LOC-0045_示例城.md`。
+    为什么不能直接拼 `{loc_id}.md`：档案名带后缀，形如 `LOC-0045_<地名>.md`。
     旧版对着不存在的 `LOC-0045.md` 拼路径，一张画布里 69 个城邑卡片全是死链，
     而且不报错——卡片在 Obsidian 里显示成空白，看着像「地图是空的」。
     """
@@ -667,8 +679,8 @@ tags:
 
 def fu_seat_note(fu: Fu, region: Region) -> str:
     """府治：州城所在府则与州城同城，其余原表未记。"""
-    # 只有示例州这一处有正文依据（「示例城即是示例府的府城，也是示例州的州城」），其余不猜
-    state_city = {"示例州": "示例都"}.get(region.name)
+    # 州城与府城同城的地点由版式配置的 state_cities 给出，没有列举的不猜
+    state_city = STATE_CITIES.get(region.name)
     seats = [j.seat for j in fu.jun]
     if state_city and state_city in seats:
         return f"与州城同城（{state_city}）"
@@ -677,7 +689,7 @@ def fu_seat_note(fu: Fu, region: Region) -> str:
 
 # ------------------------------------------------------------------ 生成：城
 def add_alias(text: str, alias: str) -> str:
-    """把郡名写进 aliases，让「查示例郡」能落到郡治那一页。已有则不动。"""
+    """把郡名写进 aliases，让「查某个郡」能落到郡治那一页。已有则不动。"""
     if re.search(rf"^- {re.escape(alias)}$", text, re.M):
         return text
     m = re.search(r"^aliases:[ \t]*(\[\])?[ \t]*$", text, re.M)
@@ -703,7 +715,7 @@ def update_city(path: Path, region: Region, fu: Fu | None, jun: Jun, alias: str 
     if alias:
         text = add_alias(text, alias)
 
-    chain = ["示例世界" if region.name not in OFF_MAINLAND else "示例世界之外", link(region.loc_id, region.name)]
+    chain = [UPPER_INSIDE if region.name not in OFF_MAINLAND else UPPER_OUTSIDE, link(region.loc_id, region.name)]
     if fu is not None:
         chain.append(link(fu.loc_id, fu.name))
     if jun.name:
@@ -847,10 +859,14 @@ def build_md(regions: list[Region]) -> str:
     if missing:
         miss_block = "\n> 待建档治所：" + "、".join(f"{s}（{st}·{fu}）" for st, fu, s in missing) + "\n"
 
+    _special_note = PAGE_SPECIAL_NOTE
+    _same_city = PAGE_SAME_CITY
+    _links = "\n".join(PAGE_LINKS)
+
     return f"""---
 type: map
-name: 示例世界地图
-title: 示例世界地图
+name: {MAP_PAGE}
+title: {MAP_PAGE}
 generated_by: novel maps build
 canon_status: confirmed
 created_at: '{TODAY}'
@@ -861,24 +877,24 @@ tags:
 - 总图
 ---
 
-# 示例世界地图
+# {MAP_PAGE}
 
-> 本页由 `00_System/scripts/build_jiuzhou_map.py` 从 [[WORLD-0029_示例世界表|示例世界·州域志]] 与
-> [[WORLD-0040_行政区划表|示例世界·行政区划表]] 生成，**请勿手改**。改设定改两张表，再重跑脚本。
-> 方位图见 [[示例世界地图.canvas|示例世界地图.canvas]]，层级树见 [[示例世界行政层级.canvas|示例世界行政层级.canvas]]。
+> 本页由 `00_System/scripts/build_jiuzhou_map.py` 从 [[{WORLD_TABLE_LABEL}|{WORLD_ALIAS}]] 与
+> [[{ADMIN_TABLE_LABEL}|{ADMIN_ALIAS}]] 生成，**请勿手改**。改设定改两张表，再重跑脚本。
+> 方位图见 [[{MAP_PAGE}.canvas|{MAP_PAGE}.canvas]]，层级树见 [[{TREE_PAGE}.canvas|{TREE_PAGE}.canvas]]。
 
 ## 格局
 
-示例世界大陆居中，环列 {len(ring)} 州：{ring_txt}。
-示例世界之外另有 {len(off)} 处：{off_txt}。
+{UPPER_INSIDE}大陆居中，环列 {len(ring)} 州：{ring_txt}。
+{UPPER_OUTSIDE}另有 {len(off)} 处：{off_txt}。
 
 | 州 | 方位 | 所辖府 | 府数 | 郡数 | 聚落 |
 | --- | --- | --- | --- | --- | --- |
 {table}
 
 合计 **{len(regions)}** 个大区、**{total_fu}** 个府、**{total_jun}** 个郡、**{total_place}** 处聚落。
-层级：**示例世界 › 州 › 府 › 郡 › 聚落**。郡管户籍与地理，**与聚落不是一对一**——一郡可辖多处聚落，
-形态也不止城（还有乡、洞天、奇地）。界外的洞天奇地不入行政序列，单挂「示例奇地」名下。
+层级：**{UPPER_INSIDE} › 州 › 府 › 郡 › 聚落**。郡管户籍与地理，**与聚落不是一对一**——一郡可辖多处聚落，
+形态也不止城（还有乡、洞天、奇地）。{_special_note}
 {info_block}{miss_block}
 ## 分州
 
@@ -889,20 +905,32 @@ tags:
 - 写场景先查本页「地貌 + 口语」，再进具体的聚落档案取细节。
 - 行政口径：**州 → 府 → 郡 → 聚落**。府设府尹、管刑名钱粮；郡是户籍与地理单位，
   一郡可辖多处聚落，别把「一郡」当成「一城」。
-- 州城与府城常常同城（例：[[LOC-0057_示例都|示例都]] 既是示例府府城，也是示例州州城），
-  写「进城」「过府」「下郡」时不要当成三个地方。
-- 方位看 [[示例世界地图.canvas|方位图]]；层级看 [[示例世界行政层级.canvas|行政层级图]]。
-- 新州、新府、新城先补进 [[WORLD-0040_行政区划表|行政区划表]] → 重跑脚本 → 档案与地图一起更新。
+{_same_city}
+- 方位看 [[{MAP_PAGE}.canvas|方位图]]；层级看 [[{TREE_PAGE}.canvas|行政层级图]]。
+- 新州、新府、新城先补进 [[{ADMIN_TABLE_LABEL}|行政区划表]] → 重跑脚本 → 档案与地图一起更新。
 
 ## 关联
 
-- **数据源**：[[WORLD-0029_示例世界表|示例世界·州域志]]、[[WORLD-0040_行政区划表|示例世界·行政区划表]]
-- **卷一舞台**：[[LOC-0057_示例都|示例都]]（示例州 › 示例府 › 示例郡）
-- **地理规则**：[[WORLD-0001_示例设定_甲|示例设定甲]]、[[WORLD-0002_示例设定_乙|示例设定乙]]
+- **数据源**：[[{WORLD_TABLE_LABEL}|{WORLD_ALIAS}]]、[[{ADMIN_TABLE_LABEL}|{ADMIN_ALIAS}]]
+{_links}
 """
 
 
 # ------------------------------------------------------------------ Canvas
+_CN_DIGITS = "〇一二三四五六七八九"
+
+
+def _cn_count(n: int) -> str:
+    """1–10 用中文数字：图上的字样是「八州环列」，不是「8 州环列」。"""
+    if 1 <= n <= 9:
+        return _CN_DIGITS[n]
+    if n == 10:
+        return "十"
+    if 11 <= n <= 19:
+        return "十" + _CN_DIGITS[n % 10]
+    return str(n)
+
+
 def build_canvas(regions: list[Region]) -> dict:
     """方位图：州居中环列，府贴州向外，城贴府。"""
     nodes: list[dict] = []
@@ -928,10 +956,14 @@ def build_canvas(regions: list[Region]) -> dict:
         edges.append({"id": f"e-{a}-{b}", "fromNode": a, "fromSide": "bottom",
                       "toNode": b, "toSide": "top", "color": color})
 
-    text_node("center", "# 示例世界\n大陆居中，八州环列", -150, -60, 300, 120, "1")
-
     radius = 2200
     inner = [r for r in regions if r.name not in OFF_MAINLAND and r.name != CENTER_REGION]
+    # 环列的州数按数据实际条数算，不写死
+    text_node(
+        "center",
+        f"# {UPPER_INSIDE}\n大陆居中，{_cn_count(len(inner))}州环列",
+        -150, -60, 300, 120, "1",
+    )
     for r in inner:
         _, dx, dy = REGIONS[r.name]
         cx, cy = dx * radius, dy * radius
@@ -1032,7 +1064,7 @@ def build_tree_canvas(regions: list[Region]) -> dict:
     W_JUN, H_JUN = 210, 46
     GAP_FU, GAP_JUN, GAP_STATE = 90, 34, 140
 
-    text_node("root", "# 示例世界\n州 › 府 › 郡", -600, 0, 320, 120, "1")
+    text_node("root", f"# {UPPER_INSIDE}\n州 › 府 › 郡", -600, 0, 320, 120, "1")
 
     y = 0
     for r in regions:

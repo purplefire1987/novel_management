@@ -137,19 +137,20 @@ Vault 路径、项目列表（含 Markdown 计数）、索引（库文件名 `bu
 |---|---|---|
 | 完整 ID（`CHAR-0001`）或别名 | 精确查 | 命中档案没有正文块时也会返回一条「ID 命中」，不是空结果 |
 | ≥ 3 字 | FTS5 `trigram` | `握住了刀柄` 这类长词走这里 |
-| < 3 字 | `LIKE` 子串 | `林砚` `周决` 这类两字词走这里——trigram 的窗口是三字符，两字切不出 token |
+| < 3 字 | `LIKE` 子串 | 两字的人名、地名走这里——trigram 的窗口是三字符，两字切不出 token |
 
 正文块搜不到时还会再走一次**名称路径**（frontmatter 的 `name`/`aliases`），
 此时 `mode=name` 并注明「正文里没有这个词；命中的是实体名或别名」。
-没有这一层，两字人名永远检不出来。
+实体名通常正文里也写着，这一层真正救的是**描述性别名**——实测 136 个别名里
+有 35 个在正文中一次都不出现。
 
 - `--limit N` 默认 20；
 - `--json` 输出 `{query, mode, hits[]}`，每条带 `path` / `block_id` / `line_start` / `text`；
 - `--show-index` 顺带打印用的是哪一份 build；
 - **结果分层**：`10_Projects/` 的作品内容排最前，其次 `90_Shared_Assets/`，
   最后是 `00_System/` 下的系统文档与生成看板。生成看板是从档案派生的，
-  让派生页排在事实源前面，等于让人引用摘要去改原文（真实库上搜「陈默」曾出现前三名
-  全是 `工作台.md` 摘录、`CHAR-0001_陈默.md` 看不见的情况）；
+  让派生页排在事实源前面，等于让人引用摘要去改原文（真实库上搜一个两字人名，
+  前三名全是 `工作台.md` 摘录、`10_Projects/` 下那份人物档案看不见）；
 - 没命中退出码 **1**，还没建索引退出码 **2**（`2` 是「你得先 rebuild-index」，
   不是「搜不到」，脚本里别混用）。
 
@@ -253,6 +254,11 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 - `地点目录` = `<project>/01_Canon/Locations/`
 - `输出目录` = `<vault>/00_System/Dashboards/Maps/`
 - `版式` = `<project>/00_Project/jiuzhou_layout.yaml`
+
+**作品名与页面文案全部来自这份版式配置**，代码里一个都不留（ADR-005 补充条款）。
+`naming` 管名字与文件名，`state_cities` 管「州城即府城」的对应，`page_notes` 管页面上的
+补充文案与关联条目；`special_states` / `special_kinds` / `anomalies` / `fu_notes` 管界外与补记。
+缺了不兜底：能省就省掉那一段，省不掉就报错。
 
 ### `novel maps import-admin [--xlsx <资产表>] [--confirm]`
 

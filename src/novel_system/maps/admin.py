@@ -36,6 +36,7 @@ def configure(paths: "MapPaths") -> None:
     global VAULT, XLSX, OUT, LAYOUT_FILE, STATE_ORDER
     global NON_ADMIN_STATES, NON_ADMIN_KINDS, ANOMALIES, WORLD_LABEL
     global WORLD_NAME, XLSX_REL, WORLD_REL
+    global MAP_PAGE, TREE_PAGE, ADMIN_ALIAS, ADMIN_ALIASES, OFFICE_TABLE, OFFICE_NOTE
     VAULT = paths.vault
     XLSX = paths.xlsx
     OUT = paths.admin_table
@@ -52,6 +53,15 @@ def configure(paths: "MapPaths") -> None:
     NON_ADMIN_STATES = set(layout.get("special_states") or [])
     NON_ADMIN_KINDS = dict(layout.get("special_kinds") or {})
     ANOMALIES = dict(layout.get("anomalies") or {})
+
+    # 命名与关联目标全部来自版式配置：代码里不留作品特有的名字（ADR-005）
+    naming = layout.get("naming") or {}
+    MAP_PAGE = str(naming.get("map_page") or "地图")
+    TREE_PAGE = str(naming.get("tree_page") or "层级")
+    ADMIN_ALIAS = str(naming.get("admin_alias") or "")
+    ADMIN_ALIASES = [str(x) for x in (naming.get("admin_aliases") or [])]
+    OFFICE_TABLE = str(naming.get("office_table") or "")
+    OFFICE_NOTE = str(naming.get("office_note") or "")
 
 #: 写盘时从既有档案里原样搬过去的 frontmatter 键。
 #:
@@ -162,8 +172,8 @@ def main(argv: list[str] | None = None) -> int:
                 skipped.append(name)
             continue
         if not name:
-            # 表里有一行只填了「示例州二 / 示例府二」，没有地名：那是对府本身的占位行，
-            # 不是郡，跳过（府级档案另由 build_jiuzhou_map.py 生成）。
+            # 表里有一行只填了州名与府名、没有地名：那是对府本身的占位行，
+            # 不是郡，跳过（府级档案另由地图页生成器建）。
             placeholders.append(f"{state}·{fu}")
             continue
 
@@ -262,12 +272,10 @@ def main(argv: list[str] | None = None) -> int:
         "---",
         "id: WORLD-0040",
         "type: world",
-        "name: 示例世界·行政区划表",
-        "title: 示例世界·行政区划表",
+        f"name: {ADMIN_ALIAS}",
+        f"title: {ADMIN_ALIAS}",
         "aliases:",
-        "- 行政区划",
-        "- 示例区划总表",
-        "- 示例总表",
+        *(f"- {alias}" for alias in ADMIN_ALIASES),
         "subtype: 总表",
         f"world: {WORLD_NAME}",
         "canon_status: confirmed",
@@ -285,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
         "- 地图库",
         "---",
         "",
-        "# 示例世界·行政区划表",
+        f"# {ADMIN_ALIAS}",
         "",
         f"> 来源：`{XLSX.name}` · 工作表「地图库」｜由 `novel maps import-admin` 生成，**请勿手改**。",
         "> 改设定请改原始「地图库」表，再重跑脚本；只读本页容易被下一次生成覆盖。",
@@ -382,8 +390,12 @@ def main(argv: list[str] | None = None) -> int:
         "## 关联",
         "",
         f"- **州域志**：[[{WORLD_LABEL}]]",
-        "- **地图**：[[示例世界地图|示例世界地图]]、[[示例世界行政层级.canvas|示例世界行政层级.canvas]]",
-        "- **官制**：[[WORLD-0027_示例官职表|示例官职表]]（州牧、府尹、郡丞的品级见该表）",
+        f"- **地图**：[[{MAP_PAGE}|{MAP_PAGE}]]、[[{TREE_PAGE}.canvas|{TREE_PAGE}.canvas]]",
+        *(
+            [f"- **官制**：[[{OFFICE_TABLE}|{OFFICE_TABLE.split('_', 1)[-1]}]]（{OFFICE_NOTE}）"]
+            if OFFICE_TABLE
+            else []
+        ),
         "",
     ]
 

@@ -146,8 +146,8 @@ def test_same_prefixed_filenames_are_not_collisions(tmp_path: Path) -> None:
     root = tmp_path / "v"
     for name, eid in (
         ("VOL-0001_示例细纲.md", "VOL-0001-S1-DETAIL"),
-        ("VOL-0001_示例章节规划表.md", "VOL-0001-PLAN"),
-        ("VOL-0001_设计.md", "VOL-0001-DESIGN"),
+        ("VOL-0001_示例章节表.md", "VOL-0001-PLAN"),
+        ("VOL-0001_示例设计.md", "VOL-0001-DESIGN"),
     ):
         _write(root / name, _card(eid))
     registry = IdRegistry(root)

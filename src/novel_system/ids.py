@@ -210,8 +210,8 @@ class IdRegistry:
 
             if raw_id:
                 # frontmatter 是权威。文件名与它不符只记下来，不额外占一个号——
-                # 无条件双记会制造假重复：VOL-0001_示例细纲.md 的 id 是
-                # VOL-0001-S1-DETAIL，五份文件各是不同对象，却被文件名判成同一个。
+                # 无条件双记会制造假重复：VOL-0001_<细纲>.md 的 id 是
+                # VOL-0001-S1-DETAIL，同一卷的五份文档各是不同对象，却被文件名判成同一个。
                 from_meta = split_id(raw_id)
                 if from_meta:
                     records.append(IdRecord(raw_id, from_meta[0], from_meta[1], rel, "frontmatter"))

@@ -66,8 +66,24 @@ naming:
   tree_page: 测试层级
   world_table: WORLD-0029
   admin_table: WORLD-0040
+  admin_alias: 测试区划表
+  admin_aliases:
+    - 测试区划
+    - 测试别名
+  office_table: WORLD-0009_测试官职
+  office_note: 测试品级见该表
   xlsx: 资产表.xlsx
   xlsx_path: 90_Archive/Raw_Sources/资产表.xlsx
+
+state_cities:
+  试验州: 灰石渡
+
+page_notes:
+  special_note: 界外条目不入行政序列。
+  same_city_example: |-
+    - 测试同城说明（例：[[LOC-0001_灰石渡|灰石渡]]），不要当成两个地方。
+  links:
+    - "- **测试关联**：[[LOC-0001_灰石渡|灰石渡]]"
 """
 
 
