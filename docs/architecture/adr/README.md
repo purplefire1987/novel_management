@@ -22,9 +22,15 @@
 | [ADR-009](ADR-009-backup-and-restore.md) | 备份与恢复策略 | 已接受 |
 | [ADR-010](ADR-010-license-and-governance.md) | 公共仓库的许可证与贡献治理 | 已接受（GPL-3.0-only） |
 | [ADR-011](ADR-011-schema-as-contract.md) | 字段契约以 JSON Schema 为真源，校验器自实现 | 已接受 |
+| [ADR-012](ADR-012-sqlite-index-and-cjk-search.md) | 索引改用 SQLite；中文检索按长度分派 | 已接受（部分取代 003） |
 
 ## 这些 ADR 里最重要的三句话
 
 1. **隔离靠目录结构，不靠 `.gitignore`**（ADR-001）。忽略规则会在改名时失效，且失效时不会报错。
 2. **批准绑定内容，不绑定任务**（ADR-006）。批的是 A、发的是 B，在 sha256 这一层就不成立。
 3. **索引可以随时删除**（ADR-003）。删不掉的「可重建物」其实是第二事实源。
+
+## 取代关系
+
+- **ADR-012 部分取代 ADR-003**：载体从 `index.json` 换成 SQLite + 多 build 指针。
+  ADR-003 的结论（索引纯派生、可随时删、不反向写事实源）**依然成立**，被换掉的只有那一个文件格式。

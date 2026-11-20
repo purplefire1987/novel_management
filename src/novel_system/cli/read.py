@@ -42,7 +42,31 @@ def cmd_doctor(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
         ok("PyYAML 可用")
     except ImportError:
-        warn("PyYAML 未安装，使用内置简易解析器（pip install -e \".[yaml]\" 可启用）")
+        warn(
+            "PyYAML 未安装：只能解析平铺 frontmatter；遇到嵌套（source_refs、aliases）"
+            '会直接报错并跳过该文件（pip install -e ".[yaml]" 可启用）'
+        )
+
+    heading("SQLite")
+    try:
+        import sqlite3
+
+        from ..indexing import detect_fts
+
+        conn = sqlite3.connect(":memory:")
+        try:
+            available, reason = detect_fts(conn)
+        finally:
+            conn.close()
+        if available:
+            ok(f"SQLite {sqlite3.sqlite_version}，FTS5 trigram 可用（中文子串检索正常）")
+        else:
+            warn(
+                f"SQLite {sqlite3.sqlite_version}，FTS5 trigram 不可用：{reason}"
+                "——索引会退化为 LIKE 子串扫描，结果对但大库上慢"
+            )
+    except Exception as exc:  # 探测本身失败也算问题
+        warn(f"SQLite 能力探测失败：{exc}")
 
     heading("路径")
     vault = cfg.author_vault
@@ -134,9 +158,29 @@ def cmd_status(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
     print(f"  Runtime: {cfg.runtime or '(未配置)'}")
     if cfg.runtime:
-        index = cfg.runtime / "index" / "index.json"
-        if index.exists():
-            print(f"    索引: 存在，{human_size(index.stat().st_size)}")
+        from ..indexing import locate
+        from ..errors import UsageError
+
+        try:
+            db = locate.active_db(cfg.runtime)
+        except UsageError:
+            db = None
+        pointer = locate.read_pointer(cfg.runtime)
+        if db is not None and db.exists():
+            # 指针里记的是相对 index/ 的路径（builds/<id>.sqlite），比裸文件名有用：
+            # 库不止一份，作者要能直接找到是哪一份。
+            shown = str(pointer.get("db") or db.name)
+            print(f"    索引: {human_size(db.stat().st_size)}（{shown}）")
+            revision = pointer.get("canon_revision") or "(工作树)"
+            print(
+                f"      {pointer.get('artifact_count', '?')} 份产物 / {pointer.get('block_count', '?')} 块，"
+                f"fts={pointer.get('fts_mode', '?')}，依据 {str(revision)[:12]}"
+            )
+            builds = locate.index_dir(cfg.runtime) / "builds"
+            if builds.is_dir():
+                print(f"      历史 build {len(list(builds.glob('*.sqlite')))} 份")
+        elif locate.manifest_path(cfg.runtime).exists():
+            print("    索引: 只有旧版 index.json；建议重跑 rebuild-index")
         else:
             print("    索引: 尚未生成")
 

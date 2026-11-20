@@ -61,22 +61,24 @@ active_project:
 
 ## 4. 命令
 
-V4.0 §5.3 的 16 项命令全部实现。另有七条不在 §5.3 内：三条地图命令
-（`maps paths` / `import-admin` / `build`，把原先散在 Vault 里的两个生成器收进系统），
-四条契约命令（`schema list` / `schema check` / `allocate-id` / `package-hash`，T02 产物）。
+V4.0 §5.3 的 16 项命令全部实现。另有九条不在 §5.3 内：三条地图命令
+（`maps paths` / `import-admin` / `build`，把原先散在 Vault 里的两个生成器收进系统）、
+四条契约命令（`schema list` / `schema check` / `allocate-id` / `package-hash`，T02 产物）、
+两条索引命令（`rebuild-index` / `search`，T03 产物）。
 
 | 命令 | 用途 | 写入 |
 |---|---|---|
-| `novel doctor` | 检查配置、依赖、路径边界、公仓/Vault 隔离、隐私开关 | 否 |
-| `novel status` | 展示 Vault、项目、任务、等待批准项、备份、最近操作 | 否 |
+| `novel doctor` | 检查配置、依赖、SQLite/FTS 能力、路径边界、公仓/Vault 隔离、隐私开关 | 否 |
+| `novel status` | 展示 Vault、项目、索引（build 与依据的 revision）、任务、等待批准项、备份、最近操作 | 否 |
 | `novel validate` | 校验结构、实体 ID、双链、跨项目引用；`--strict` 把警告计为失败 | 否 |
+| `novel search` | 中文/ID/别名检索；两字词走 LIKE，长词走 FTS trigram | 否 |
 | `novel schema list` | 列出可校验类型与必填字段 | 否 |
 | `novel schema check` | 按类型校验 JSON：缺字段/非法枚举/未知字段一律拒绝 | 否 |
 | `novel allocate-id` | 分配稳定 ID；默认预演，`--confirm` 才写审计 | 是（仅 Runtime） |
 | `novel package-hash` | 规范化 JSON 的 sha256；`--check` 比对期望值 | 否 |
 | `novel init-author` | 初始化作者 Vault（需确认） | 是 |
 | `novel init-project` | 创建小说项目骨架（需确认） | 是 |
-| `novel rebuild-index` | 从 Markdown 重建索引到 Runtime | 是（仅 Runtime） |
+| `novel rebuild-index` | 从 Markdown 建 SQLite 索引；`--canon-revision` 可指定 commit | 是（仅 Runtime） |
 | `novel task create` | 创建任务记录 | 是（仅 Runtime） |
 | `novel task inspect` | 查看任务详情、staging 产物与批准状态 | 否 |
 | `novel stage` | 把 Agent 产出写入 staging | 是（仅 staging） |
@@ -154,10 +156,11 @@ novel publish --task TASK-000001 --as author --confirm      # 写正式区
 
 ```text
 src/novel_system/
-  cli/            命令入口与分发（read / init / flow / backup_cmd / maps_cmd / schema_cmd / id_cmd）
+  cli/            命令入口与分发（read / init / index_cmd / flow / backup_cmd / maps_cmd / schema_cmd / id_cmd）
   config/         五级配置解析（含 V4.0 Vault_Config 写法兼容）
   paths.py        项目内目录解析与边界校验
-  frontmatter.py  frontmatter 解析（唯一实现，只顶层 key: value）
+  frontmatter.py  frontmatter 解析（只顶层 key: value，纯标准库）
+  markdown.py     Markdown 解析与块 ID（走 PyYAML，负责嵌套结构）
   canonical.py    字节规范化与规范化 JSON 包哈希
   schema.py       JSON Schema 校验器（draft 2020-12 实用子集，零依赖）
   ids.py          稳定 ID 分配（查重、加锁、审计）
@@ -169,7 +172,8 @@ src/novel_system/
   release/        发布四道闸与旧版归档
   baseline/       作者编辑基线（adopt）
   backup/         备份、校验、恢复
-  indexing/ validation/ workflows/ agents/ adapters/ core/   预留扩展位
+  indexing/       SQLite 索引（17 表；schema/source/builder/search/locate）
+  validation/ workflows/ agents/ adapters/ core/   预留扩展位（T04–T09）
 config/             默认配置与配置 Schema
 schemas/            22 类数据契约（JSON Schema，additionalProperties 一律 false）
 templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）

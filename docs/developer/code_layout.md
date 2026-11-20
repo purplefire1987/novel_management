@@ -5,8 +5,9 @@
 ```
 cli/          只做参数解析与输出格式化，不写业务判断
   ├── __init__.py   parser 与命令分发
-  ├── read.py       doctor / status / validate / rebuild-index
+  ├── read.py       doctor / status / validate / diff
   ├── init.py       init-author / init-project
+  ├── index_cmd.py  rebuild-index / search
   ├── flow.py       task / stage / diff / approve / adopt / publish
   ├── backup_cmd.py backup / restore
   ├── maps_cmd.py   maps paths / import-admin / build
@@ -15,7 +16,8 @@ cli/          只做参数解析与输出格式化，不写业务判断
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
 logs.py       运行日志：写 <runtime>/logs/novel.log，与 audit 的审计日志是两件事
-frontmatter.py frontmatter 的唯一解析实现（只顶层 key: value；嵌套归 T03）
+frontmatter.py frontmatter 的唯一解析实现（只顶层 key: value）
+markdown.py    Markdown 解析与块 ID：frontmatter（走 PyYAML）+ 按空行切块 + 行号回指
 canonical.py  字节规范化（去 BOM、LF）与规范化 JSON 包哈希
 schema.py     JSON Schema 校验器（draft 2020-12 实用子集，零依赖）
 ids.py        稳定 ID 分配：前缀表、查重、加锁、审计
@@ -28,7 +30,8 @@ release/      发布四道闸与旧版归档
 baseline/     作者编辑基线（adopt）
 backup/       备份、校验、恢复
 adapters/     模型适配层；当前只有 MockLLM（确定性、不联网、不需密钥）
-indexing/ validation/ workflows/ agents/ core/   预留扩展位（T03–T09）
+indexing/     SQLite 索引：schema 建表 / source 取文件 / builder 建库 / search 查询 / locate 定位
+validation/ workflows/ agents/ core/   预留扩展位（T04–T09）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
@@ -71,8 +74,29 @@ cli → release / backup / staging / tasks / approvals / baseline
 **批准记录存的是逐文件 sha256，不是任务级哈希。** 任务级哈希做不到「只批了一部分」的粒度，
 也没法在发布时定位到底是哪个文件被动了。
 
-**frontmatter 解析不强制 PyYAML。** 没有 PyYAML 时降级为纯标准库实现，
-已知差异：数字变字符串、嵌套映射读不到。这两个限制必须在文档里写明，不能让它变成静默的坑。
+**frontmatter 有两种解析器，别混用。** `frontmatter.py` 只认顶层 `key: value`，纯标准库，
+给 CLI 的只读命令用（`validate` 只需要拿 `id`，没必要为它拉起 YAML）。`markdown.py` 走 PyYAML，
+能读嵌套（`source_refs`、`aliases`），给索引用。没有 PyYAML 时 `markdown.py` **遇到嵌套直接抛
+`ParseError` 并跳过该文件**，不猜——猜错的表现是「某些档案的别名索引悄悄少了一半」。
+早期 `frontmatter.py` 的旧实现会把 `source_refs` 下的 `file_sha256` 读成顶层键，
+全量 1085 份比对确认是修正而非回归。
+
+**块 ID 只在产物内唯一，不是全库唯一。** 两份档案都有 `p0001` 是正常的，
+所以 `blocks` 的唯一键是 `(project, path, block_id)`。PRD §9.1 说的是「同一产物内唯一」，
+按全库唯一去建约束会让第二份档案直接插不进去。
+
+**FTS5 外部内容表要靠触发器同步。** `fts_blocks` 用 `content='blocks', content_rowid='id'`，
+不建触发器的话 `blocks` 有数据而 `fts_blocks` 空——查得到表、查不到结果，而且不报错。
+本版整库重建，没有 UPDATE/DELETE 路径，所以只需要一个 `after insert`。
+
+**`git -C <dir> rev-parse` 会向上找外层仓库。** Vault 若不是自己就是仓库根，
+建在公仓子目录下的临时库会认成公仓的 HEAD——索引会**谎报**自己依据某个从没读过的 revision。
+`source.py` 的 `_own_repo()` 先用 `--show-toplevel` 校验，不成立就报错而不是猜。
+
+**argparse 子命令的默认值会盖掉主命令已解析的值。** 解析子命令时新开一个 namespace，
+解析完把属性整体搬回主 namespace，于是子命令那份 `--vault` 的默认 `None` 抹掉了前面给的值。
+主命令用真实默认值、子命令一律 `argparse.SUPPRESS`。**危害不是报错而是静默错库**，
+回归测试在 `tests/unit/test_cli_arg_order.py`。
 
 **隐藏目录判定用 Vault 内相对路径。** 用绝对路径判会把 `.tmp/vault` 这种临时目录整树误判，
 导致索引 0 条——这个 bug 真实发生过一次。

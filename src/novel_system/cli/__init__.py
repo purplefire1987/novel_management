@@ -18,9 +18,9 @@ from pathlib import Path
 from .. import config as cfg_mod
 from .. import logs
 from ..errors import NovelError
-from . import backup_cmd, flow, id_cmd, init, maps_cmd, read, schema_cmd
+from . import backup_cmd, flow, id_cmd, index_cmd, init, maps_cmd, read, schema_cmd
 
-__version__ = "0.5.0"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
+__version__ = "0.6.0"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
 
 HANDLERS = {
     "doctor": read.cmd_doctor,
@@ -29,7 +29,8 @@ HANDLERS = {
     "diff": read.cmd_diff,
     "init-author": init.cmd_init_author,
     "init-project": init.cmd_init_project,
-    "rebuild-index": init.cmd_rebuild_index,
+    "rebuild-index": index_cmd.cmd_rebuild_index,
+    "search": index_cmd.cmd_search,
     "task": flow.cmd_task,
     "stage": flow.cmd_stage,
     "approve": flow.cmd_approve,
@@ -44,19 +45,39 @@ HANDLERS = {
 }
 
 
+def _add_global_args(parent: argparse.ArgumentParser, *, quiet_default: bool) -> None:
+    """把四个全局参数挂到 parent 上。
+
+    `quiet_default=True` 给子命令用，默认值取 SUPPRESS。
+    原因：argparse 解析子命令时会**新开一个 namespace**，解析完再把它的全部属性
+    搬回主 namespace，于是子命令那份的默认值会盖掉主命令刚解析出来的值——
+    `novel --vault X status` 里的 X 就是这样被 None 抹掉的。
+    用 SUPPRESS 让子命令「没写就不产生属性」，主命令那份才留得住。
+    """
+    missing = argparse.SUPPRESS if quiet_default else None
+    parent.add_argument(
+        "--vault", default=missing, help="作者 Vault 路径（覆盖环境变量与配置文件）"
+    )
+    parent.add_argument("--runtime", default=missing, help="Runtime 路径（必须在 Vault 之外）")
+    parent.add_argument("--project", default=missing, help="项目 ID（Vault 内多于一个项目时必需）")
+    parent.add_argument(
+        "--log-level",
+        default=argparse.SUPPRESS if quiet_default else "INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "OFF"],
+        help="写入 <runtime>/logs/novel.log 的级别；OFF 关闭",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     # 全局参数同时挂在主命令与子命令上，`novel --vault X status` 与
     # `novel status --vault X` 都成立——位置不同不该让命令失效。
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--vault", help="作者 Vault 路径（覆盖环境变量与配置文件）")
-    common.add_argument("--runtime", help="Runtime 路径（必须在 Vault 之外）")
-    common.add_argument("--project", help="项目 ID（Vault 内多于一个项目时必需）")
-    common.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "OFF"],
-        help="写入 <runtime>/logs/novel.log 的级别；OFF 关闭",
-    )
+    _add_global_args(common, quiet_default=False)
+
+    # 子命令那份必须用 SUPPRESS 做默认值，否则会把主命令解析到的值盖掉。
+    # 嵌套子命令（task create / maps paths / schema list|check）同理，共用这一份。
+    sub_common = argparse.ArgumentParser(add_help=False)
+    _add_global_args(sub_common, quiet_default=True)
 
     parser = argparse.ArgumentParser(
         prog="novel",
@@ -66,29 +87,42 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"novel {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("doctor", help="检查配置、依赖、路径、隔离与隐私开关", parents=[common])
-    sub.add_parser("status", help="查看 Vault、项目、任务、备份与最近操作", parents=[common])
+    sub.add_parser("doctor", help="检查配置、依赖、路径、隔离与隐私开关", parents=[sub_common])
+    sub.add_parser("status", help="查看 Vault、项目、任务、备份与最近操作", parents=[sub_common])
 
-    p_validate = sub.add_parser("validate", help="校验结构、实体 ID、双链与项目边界", parents=[common])
+    p_validate = sub.add_parser("validate", help="校验结构、实体 ID、双链与项目边界", parents=[sub_common])
     p_validate.add_argument("--strict", action="store_true", help="把断链等警告计为失败")
 
-    p_author = sub.add_parser("init-author", help="初始化作者 Vault", parents=[common])
+    p_author = sub.add_parser("init-author", help="初始化作者 Vault", parents=[sub_common])
     p_author.add_argument("--author-id", default="author-local")
     p_author.add_argument("--confirm", action="store_true", help="确认写入")
 
-    p_proj = sub.add_parser("init-project", help="创建小说项目骨架", parents=[common])
+    p_proj = sub.add_parser("init-project", help="创建小说项目骨架", parents=[sub_common])
     p_proj.add_argument("--id", help="项目 ID（小写字母、数字、连字符）")
     p_proj.add_argument("--name", help="项目显示名")
     p_proj.add_argument("--author-id", default="author-local")
     p_proj.add_argument("--confirm", action="store_true", help="确认写入")
 
-    sub.add_parser("rebuild-index", help="从 Markdown 重建索引到 Runtime", parents=[common])
+    p_rebuild = sub.add_parser(
+        "rebuild-index", help="从 Markdown 重建 SQLite 索引（可绑定 Git 提交）", parents=[sub_common]
+    )
+    p_rebuild.add_argument(
+        "--canon-revision",
+        default=None,
+        help="按指定 Git 提交建索引（不读工作树）；省略则按当前工作树",
+    )
+
+    p_search = sub.add_parser("search", help="在索引里检索（中文短词走子串，长词走 trigram）", parents=[sub_common])
+    p_search.add_argument("query", help="查询词；像 ID 的会走精确匹配")
+    p_search.add_argument("--limit", type=int, default=20, help="最多返回多少条（默认 20）")
+    p_search.add_argument("--json", action="store_true", help="输出 JSON，便于脚本消费")
+    p_search.add_argument("--show-index", action="store_true", help="附带索引的 revision 与 build id")
 
     # ---- task ----
-    p_task = sub.add_parser("task", help="创建或查看任务记录", parents=[common])
+    p_task = sub.add_parser("task", help="创建或查看任务记录", parents=[sub_common])
     task_sub = p_task.add_subparsers(dest="task_command", required=True)
 
-    p_tc = task_sub.add_parser("create", help="创建任务", parents=[common])
+    p_tc = task_sub.add_parser("create", help="创建任务", parents=[sub_common])
     p_tc.add_argument("--type", required=True, help="任务类型（outline/preflight/draft/revision/review/memory_update/ingest/simulation/release）")
     p_tc.add_argument("--assignee", default="", help="责任 Agent")
     p_tc.add_argument("--mode", default="staging", help="read_only / staging / draft / proposal")
@@ -97,12 +131,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_tc.add_argument("--note", default="")
     p_tc.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
 
-    p_ti = task_sub.add_parser("inspect", help="查看任务详情", parents=[common])
+    p_ti = task_sub.add_parser("inspect", help="查看任务详情", parents=[sub_common])
     p_ti.add_argument("task_id", help="形如 TASK-000001")
     p_ti.add_argument("--json", action="store_true", help="附带 JSON 输出")
 
     # ---- stage ----
-    p_stage = sub.add_parser("stage", help="把 Agent 产出写入 staging（唯一允许的提案落点）", parents=[common])
+    p_stage = sub.add_parser("stage", help="把 Agent 产出写入 staging（唯一允许的提案落点）", parents=[sub_common])
     p_stage.add_argument("--task", required=True, help="任务 ID")
     p_stage.add_argument("--from", dest="source", required=True, help="源文件；`-` 表示从 stdin 读")
     p_stage.add_argument("--to", dest="target", required=True, help="目标正式文件的项目内相对路径")
@@ -111,13 +145,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_stage.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
 
     # ---- diff ----
-    p_diff = sub.add_parser("diff", help="查看 staging 与正式文件的差异", parents=[common])
+    p_diff = sub.add_parser("diff", help="查看 staging 与正式文件的差异", parents=[sub_common])
     p_diff.add_argument("--task", required=True, help="任务 ID")
     p_diff.add_argument("--path", default=None, help="只看某个目标文件")
     p_diff.add_argument("--full", action="store_true", help="不截断差异行")
 
     # ---- approve ----
-    p_approve = sub.add_parser("approve", help="作者批准 staging 内容（绑定内容指纹）", parents=[common])
+    p_approve = sub.add_parser("approve", help="作者批准 staging 内容（绑定内容指纹）", parents=[sub_common])
     p_approve.add_argument("--task", required=True, help="任务 ID")
     p_approve.add_argument("--note", default="")
     p_approve.add_argument("--reject", action="store_true", help="驳回而不是批准")
@@ -125,13 +159,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve.add_argument("--as", dest="actor", default=None, help="只接受 author")
 
     # ---- adopt ----
-    p_adopt = sub.add_parser("adopt", help="登记作者直接编辑后的文件状态", parents=[common])
+    p_adopt = sub.add_parser("adopt", help="登记作者直接编辑后的文件状态", parents=[sub_common])
     p_adopt.add_argument("--note", default="")
     p_adopt.add_argument("--dry-run", action="store_true", help="只报告变化，不推进基线")
     p_adopt.add_argument("--as", dest="actor", default=None, help="只接受 author")
 
     # ---- publish ----
-    p_pub = sub.add_parser("publish", help="把已批准内容转为正式状态", parents=[common])
+    p_pub = sub.add_parser("publish", help="把已批准内容转为正式状态", parents=[sub_common])
     p_pub.add_argument("--task", required=True, help="任务 ID")
     p_pub.add_argument("--note", default="")
     p_pub.add_argument("--confirm", action="store_true", help="确认发布")
@@ -139,14 +173,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_pub.add_argument("--as", dest="actor", default=None, help="只接受 author")
 
     # ---- backup / restore ----
-    p_backup = sub.add_parser("backup", help="创建本地备份（含清单与回读校验）", parents=[common])
+    p_backup = sub.add_parser("backup", help="创建本地备份（含清单与回读校验）", parents=[sub_common])
     p_backup.add_argument("--out", default=None, help="备份目录，默认 <runtime>/backups")
     p_backup.add_argument("--label", default="", help="备注标签")
     p_backup.add_argument("--no-git", action="store_true", help="不备份 .git")
     p_backup.add_argument("--list", action="store_true", help="只列出现有备份")
     p_backup.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
 
-    p_restore = sub.add_parser("restore", help="从备份恢复（默认预演，不覆盖现存文件）", parents=[common])
+    p_restore = sub.add_parser("restore", help="从备份恢复（默认预演，不覆盖现存文件）", parents=[sub_common])
     p_restore.add_argument("--backup-id", required=True, help="形如 BK-20261120-101500")
     p_restore.add_argument("--dry-run", action="store_true", help="只预演，不写盘")
     p_restore.add_argument("--confirm", action="store_true", help="执行恢复")
@@ -155,39 +189,39 @@ def build_parser() -> argparse.ArgumentParser:
     p_restore.add_argument("--as", dest="actor", default=None, help="只接受 author")
 
     # ---- maps ----
-    p_maps = sub.add_parser("maps", help="从 Canon 数据重画地图页与 canvas（默认预演）", parents=[common])
+    p_maps = sub.add_parser("maps", help="从 Canon 数据重画地图页与 canvas（默认预演）", parents=[sub_common])
     maps_sub = p_maps.add_subparsers(dest="maps_command", required=True)
 
-    p_mpaths = maps_sub.add_parser("paths", help="打印地图生成用到的全部路径", parents=[common])
+    p_mpaths = maps_sub.add_parser("paths", help="打印地图生成用到的全部路径", parents=[sub_common])
     p_mpaths.add_argument("--world-subdir", default=None)
 
     p_madm = maps_sub.add_parser(
-        "import-admin", help="把资产库「地图库」重排为 WORLD-0040 行政区划表", parents=[common]
+        "import-admin", help="把资产库「地图库」重排为 WORLD-0040 行政区划表", parents=[sub_common]
     )
     p_madm.add_argument("--world-subdir", default=None)
     p_madm.add_argument("--xlsx", default=None, help="资产表路径，默认项目内 90_Archive 下那份")
     p_madm.add_argument("--confirm", action="store_true", help="执行写入")
 
-    p_mbuild = maps_sub.add_parser("build", help="重画地图页与两张 canvas", parents=[common])
+    p_mbuild = maps_sub.add_parser("build", help="重画地图页与两张 canvas", parents=[sub_common])
     p_mbuild.add_argument("--world-subdir", default=None)
     p_mbuild.add_argument("--xlsx", default=None, help="资产表路径（build 不读，仅为参数一致）")
     p_mbuild.add_argument("--maps-only", action="store_true", help="只重画图，不碰州域／府／城邑档案")
     p_mbuild.add_argument("--confirm", action="store_true", help="执行写入")
 
     # ---- schema（T02 契约）----
-    p_schema = sub.add_parser("schema", help="查看与校验数据契约（JSON Schema）", parents=[common])
+    p_schema = sub.add_parser("schema", help="查看与校验数据契约（JSON Schema）", parents=[sub_common])
     schema_sub = p_schema.add_subparsers(dest="schema_command", required=True)
 
-    p_slist = schema_sub.add_parser("list", help="列出可校验类型", parents=[common])
+    p_slist = schema_sub.add_parser("list", help="列出可校验类型", parents=[sub_common])
     p_slist.add_argument("--schema-dir", default=None, help="schema 目录，默认自动定位")
 
-    p_scheck = schema_sub.add_parser("check", help="按类型校验 JSON 文件（- 读 stdin）", parents=[common])
+    p_scheck = schema_sub.add_parser("check", help="按类型校验 JSON 文件（- 读 stdin）", parents=[sub_common])
     p_scheck.add_argument("type", help="类型名，如 entity／assertion／approval")
     p_scheck.add_argument("files", nargs="*", help="JSON 文件；`-` 表示 stdin")
     p_scheck.add_argument("--schema-dir", default=None)
 
     # ---- allocate-id ----
-    p_alloc = sub.add_parser("allocate-id", help="分配稳定 ID（默认预演，--confirm 落盘）", parents=[common])
+    p_alloc = sub.add_parser("allocate-id", help="分配稳定 ID（默认预演，--confirm 落盘）", parents=[sub_common])
     p_alloc.add_argument("--type", required=True, help="CHARACTER／LOCATION／EVENT……或直接给前缀 CHAR")
     p_alloc.add_argument("--count", type=int, default=1, help="一次分配几个（默认 1）")
     p_alloc.add_argument("--reason", default="", help="分配原因，写进审计")
@@ -197,7 +231,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_alloc.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
 
     # ---- package-hash ----
-    p_ph = sub.add_parser("package-hash", help="算规范化 JSON 的 sha256（审批与发布绑这个值）", parents=[common])
+    p_ph = sub.add_parser("package-hash", help="算规范化 JSON 的 sha256（审批与发布绑这个值）", parents=[sub_common])
     p_ph.add_argument("path", help="JSON 文件；`-` 读 stdin")
     p_ph.add_argument("--check", default=None, help="比对期望哈希，不一致退出 1")
     p_ph.add_argument("--canonical", action="store_true", help="同时打印规范化 JSON 原文")

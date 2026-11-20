@@ -2,6 +2,157 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.6.0 — 2026-11-20
+
+T03「00_Canon 解析与索引」。六项交付：Markdown/YAML 解析、块 ID、SQLite、
+中文检索、revision 绑定、rebuild。
+
+**兼容性影响**：`index/index.json` 不再是索引本体。`status` 会自动认旧的
+`index/index.json` 与 `index/index.sqlite` 并提示重跑，但新索引写在
+`index/builds/<build_id>.sqlite` + `index/active.json` 指针下。
+**需要跑一次 `rebuild-index`**，否则 `search` 会直接告诉你还没有索引。
+
+### 新增命令
+
+- `rebuild-index [--canon-revision <rev>]`——重建索引。给 revision 时从
+  `git archive` 读该 commit 的 Markdown，不落临时目录、不切工作树；
+- `search <查询> [--limit N] [--json] [--show-index]`——中文/ID/别名检索。
+
+命令行 18 → **19 条**。
+
+### 一、解析与块 ID
+
+`markdown.py`：frontmatter（PyYAML，缺库时遇嵌套**直接报错**而不是猜）+ 正文分块。
+块 ID 形如 `p0001`，4 位宽，同一产物内唯一。块按空行切；围栏代码块整段一块；
+连续列表/引用/表格各自一块。每块记 `line_start`/`line_end`，**指原文行号**，
+可直接回跳。
+
+坏文件（非 UTF-8、非法 YAML、嵌套结构无 PyYAML）**记入 `failed` 后继续**，
+不让一份坏档案中断整次重建。
+
+### 二、17 张表，8 填 9 空
+
+表清单一字不差照 PRD §16.1 建。本轮填 `index_metadata` `artifacts` `entities`
+`aliases` `source_refs` `narrative_order` `blocks` `fts_blocks`；
+`events` `event_edges` `assertions` `state_changes` `knowledge` `revelations`
+`foreshadowing` `dependencies` `issues` 建空表留给 T04/T05/T07。
+
+**这不是「已支持」**。`index_metadata.populated`/`empty` 把这件事写进库里，
+`rebuild-index` 输出里也分两行打——「建了但本版不填」与「本版会填但这次没数据」
+是两件事，混在一起会误导人。
+
+### 三、中文检索按长度分派
+
+| 查询 | 路径 |
+|---|---|
+| ID / 别名精确 | `identifiers` 精确查 |
+| ≥ 3 字 | FTS5 `trigram` |
+| < 3 字 | 参数化 `LIKE ... ESCAPE '\'` |
+
+**两字中文词（`林砚`、`周决`）是这次最容易漏的一格**：`trigram` 的窗口是三字符，
+两字切不出 token，硬走 FTS 会静默返回 0 条。`test_index_schema.py` 里有一条用例
+专门钉住「两字在 FTS 下命中为 0」，防止有人把它当 bug「修」成走 FTS。
+
+另有一层：`name`/`aliases` 只在 frontmatter、**不在正文块里**。所以正文搜不到时
+还要再走一次名称路径（`mode=name`，并在结果里注明「正文里没有这个词；命中的是实体名」）。
+没有这一层，两字人名永远检不出来。
+
+FTS5 `trigram` 不可用时**不用 `unicode61` 顶上**——那会让中文按整段切词、
+`doctor` 却报「FTS 可用」。退化路径是整库不建虚表、`fts_mode=none`、全走 LIKE，
+慢但结果对，原因写进 `fts_blocks_unavailable` 表。
+
+每条命中带 `path` / `block_id` / `line_start`。块 ID（`p0007`）与行号是两套坐标：
+前者用于跨命令引用，后者能直接跳到原文那一行——只给块 ID 还得自己数段落。
+
+### 四、不原地重建
+
+每次重建写 `index/builds/<build_id>.sqlite`，写完才切 `index/active.json` 指针。
+**全程不覆盖任何已存在的文件**，读者要么拿到旧指针、要么拿到新指针。
+
+比「临时文件 + `os.replace`」更彻底：崩溃留下的半成品永远只是多一个没人指向的
+`.sqlite`，删不删都不影响正确性。代价是旧 build 不自动清（R-18）。
+
+### 五、revision 绑定
+
+`--canon-revision` 走 `git archive` 直读该 commit，索引里记的 `canon_revision`
+就是实际读的那棵树。修了一个会让索引**谎报 revision** 的坑：`git -C` 会向上找
+外层仓库，Vault 不是仓库根时会把公仓 HEAD 当成自己的。现在先校验
+`rev-parse --show-toplevel` 等于 Vault 本身，否则明确报错。
+
+### 六、其他
+
+- `doctor` 新增 SQLite 段：报版本 + trigram 可用性，不可用时直接说「会退化为 LIKE」；
+- `status` 打印库文件名（`builds/<id>.sqlite`）、产物/块数、`fts=`、依据的 revision、历史 build 数；
+- 索引布局收敛到 `indexing/locate.py`，CLI 不再各处重复定义路径常量。
+
+### 七、在真实 Vault 上跑出来的三个缺陷
+
+代码写完时单测全绿、`rebuild-index` 也「成功」，但拿真实库（1073 份 Markdown）一跑，
+三处都是**不报错**的那种错，全部已修并补了回归：
+
+1. **归档一份没跳过**。排除名单硬编码成 `90_Archive`，而 V4.0 的 Vault 顶层归档叫
+   `99_Archive`。于是旧 PRD（2611 行）、旧实体索引（75KB）整个被索引进库：
+   产物多 6 份、块多 928 块。注释写着「跳过运行态/归档」，实际只跳了项目内的 `90_Archive`。
+   **修法**：目录名改从配置取（`skip_dirs_from_layout`），`rebuild-index` 一行打印
+   「跳过运行态/归档 N 份（07_Staging、08_Reviews、90_Archive、99_Archive）」——
+   跳过什么必须看得见，否则下一个人只会再被骗一次。
+2. **模板占位符被当成重号**。`id: {{id}}` 的模板文件被计入 `duplicate_ids`，
+   真实库上多报一个 `{{id}}`。`validate` 早就排除这种（`if not eid or "{{" in eid: continue`），
+   builder 没跟上——同一个库在两处给出不同结论。**修法**：判据统一，占位符退化成文件名。
+3. **生成的看板压过真正的档案**。`LIKE` 结果按插入顺序（即路径字典序）返回，
+   `00_System/Dashboards/` 因为 `00_` < `10_` 永远排最前。真实库上搜「陈默」，
+   前三条全是 `工作台.md` 的摘录，`CHAR-0001_陈默.md` 被挤到看不见。
+   这不只是难看：看板是从档案**派生**的，让人先引用派生页等于在索引里绕了个循环。
+   **修法**：结果分层（作品内容 0 > 共享资产 1 > 系统文档与生成看板 2），层内再按 rank / id。
+
+第 1、2 条都是「单测覆盖不到」的：夹具里的 Vault 只建了 `90_Archive`，
+恰好跟错误常量同名；模板文件也只有真实库才有。**这类缺陷只有拿真库跑才暴露。**
+
+### 测试
+
+新增 5 个文件共 **75 条**：`test_markdown`（13）、`test_index_schema`（17）、
+`test_index_build`（15，含 3 条跳过）、`test_index_search`（18）、
+`test_t03_cli`（12，含 4 条跳过）。全量 **386 passed / 8 skipped**。
+
+跳过的都是环境限制（沙箱不能 `git init` 写 `.git`），不是代码缺陷。
+
+两条关键回归做了「退回修复必须失败」的验证：把 `order by` 改回原样，
+`test_project_content_ranks_before_generated_dashboard` 精确报出
+「第一条是 00_System/Dashboards/工作台.md」，改回来即通过。
+
+## 0.5.1 — 2026-11-20
+
+修一个**静默错库**的缺陷：全局参数 `--vault` / `--runtime` / `--project` /
+`--log-level` 只有写在子命令**之后**才生效，写在之前会被无声丢弃。
+
+验收 T02 时实际撞上：`novel --vault <库> validate` 报「未配置作者 Vault」，
+而 `novel validate --vault <库>` 正常。危险之处不在报错——报错还算好的；
+真正糟的是同时给了 `--vault` 和别的来源时，命令会**安安静静作用在另一个库上**。
+
+**兼容性影响**：无。只是让本来就声称成立的前置写法真的成立。
+
+### 根因
+
+argparse 解析子命令时会新开一个 namespace，解析完把它**全部属性**搬回主
+namespace。于是子命令那份 `--vault` 的默认值 `None` 覆盖了主命令刚解析出的值。
+这跟「先解析后合并」的直觉相反，所以看代码不容易看出来。
+
+### 修法
+
+拆成两份参数组：主命令用真实默认值，子命令用 `argparse.SUPPRESS`——
+「没写就不产生属性」，主命令那份才留得住。嵌套子命令（`task create`、
+`maps paths`、`schema list|check`）共用同一份，一并修好。
+
+### 测试
+
+新增 `tests/unit/test_cli_arg_order.py`（7 条）：前后两种位置、嵌套子命令、
+不写时的默认值、两处都写时后者生效、以及一条端到端比对两种写法输出一致。
+
+**已实测该测试能抓到缺陷**：把修复退回原版后，正好是 3 条「前置」用例失败、
+4 条「后置与默认值」用例通过——与根因判断完全吻合，不是碰巧全绿。
+
+---
+
 ## 0.5.0 — 2026-11-20
 
 完成 PRD §23 **T02：Schema、ID 与哈希**。六项交付（第 8 章模型 / JSON Schema /

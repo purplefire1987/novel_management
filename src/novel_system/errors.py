@@ -43,3 +43,10 @@ class SchemaError(NovelError):
     """数据不满足契约：缺字段、非法枚举、未知字段。"""
 
     code = 1
+
+
+class ParseError(NovelError):
+    """无法解析输入：不是 UTF-8、YAML 不合法、frontmatter 顶层不是映射。"""
+
+    code = 1
+

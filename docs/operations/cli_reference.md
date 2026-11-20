@@ -1,11 +1,20 @@
 # CLI 参考
 
-对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§8），共 19 条。全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
+对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§8）与 T03 的 `rebuild-index`/`search`，
+顶层命令共 **19** 条（`task` / `maps` / `schema` 是命令组，各自还有子命令）。
+全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
 novel --vault ~/vault status       # 等价
 novel status --vault ~/vault
 ```
+
+两处都写时**后者生效**（与普通命令行参数一致）。嵌套子命令（`task create`、`maps paths`、`schema list|check`）同样两种位置都收。
+
+> 前置写法在 0.5.0 及更早版本**实际无效**：argparse 解析子命令时会新开一个 namespace，
+> 解析完把它的属性整体搬回主 namespace，子命令的默认值 `None` 就把前面给的路径盖掉了。
+> 表现为「未配置作者 Vault」，或者更糟——同时有 `~/.config/novel-system/config.yaml`
+> 时静默作用在配置里那个库上。已在 0.5.1 修复。
 
 未给 `--project` 时：配置里有 `active_project.project_id` 就用它；没有则报错并列出候选，**绝不按「只有一个项目」去推断**。
 `novel init-project` 建第一个项目时会自动写入 `active_project`，所以日常不必每次带 `--project`。
@@ -30,7 +39,11 @@ novel status --vault ~/vault
 
 ### `novel doctor`
 
-检查项：Python 版本、PyYAML、Vault 与 Runtime 是否存在、Runtime 是否被放进 Vault、公仓与 Vault 是否互相包含、四个隐私开关是否为 false。
+检查项：Python 版本、PyYAML、**SQLite 版本与 FTS5 `trigram` 可用性**、Vault 与 Runtime 是否存在、Runtime 是否被放进 Vault、公仓与 Vault 是否互相包含、四个隐私开关是否为 false。
+
+SQLite 那段会明说 trigram 能不能用：不能用时索引退化为 `LIKE` 子串扫描，
+结果仍然正确、但大库上慢——**不会**偷偷换成对中文无效的 `unicode61`。
+PyYAML 未安装时同样明说：遇到嵌套 frontmatter（`source_refs`、`aliases`）会直接报错并跳过该文件。
 
 Runtime 存在时顺带补建 `index/logs/tasks/approvals/backups` 五个子目录。
 
@@ -38,7 +51,7 @@ Runtime 存在时顺带补建 `index/logs/tasks/approvals/backups` 五个子目�
 
 ### `novel status`
 
-Vault 路径、项目列表（含 Markdown 计数）、索引大小、任务总数与未结数、等待作者批准的任务、备份数量与最近一次是否 verified、最近 5 条操作。
+Vault 路径、项目列表（含 Markdown 计数）、索引（库文件名 `builds/<id>.sqlite`、产物数/块数、`fts=` 模式、依据的 revision、历史 build 份数）、任务总数与未结数、等待作者批准的任务、备份数量与最近一次是否 verified、最近 5 条操作。
 
 ### `novel validate [--strict]`
 
@@ -88,15 +101,60 @@ Vault 路径、项目列表（含 Markdown 计数）、索引大小、任务总�
 
 ---
 
-## 3. 索引
+## 3. 索引与检索
 
-### `novel rebuild-index`
+### `novel rebuild-index [--canon-revision <commit>]`
 
-扫 Vault 内全部 Markdown（跳过隐藏目录、`07_Staging`、`08_Reviews`、`90_Archive`），写 `<runtime>/index/index.json`。
+扫 Vault 内全部 Markdown，写 `<runtime>/index/builds/<build_id>.sqlite`，
+然后把 `index/active.json` 指针切过去。
 
-记录 `schema_version`、`built_at`、条目数、带 id 数、重复 id 列表。模板里的 `id: {{id}}` 视为无 id，不参与重复统计。
+**排除的目录**：项目内 `07_Staging` / `08_Reviews` / `90_Archive`，以及 Vault 根归档
+（名字从 `Vault_Config.yaml` 的 `layouts.archive` 取，当前是 `99_Archive`）。
+输出里会打「跳过运行态/归档 N 份（目录清单）」——跳过什么必须看得见。
+
+- **不原地重建**：每次写一个新文件，全程不覆盖已存在的库。读者要么拿到旧指针、
+  要么拿到新指针，没有中间态。崩溃留下的半成品只是多一个没人指向的 `.sqlite`。
+- **旧 build 不会自动清**（R-18）。要腾空间就手动删 `index/builds/` 下不要的，
+  或者整个删掉 `index/` 重跑——索引是派生物，删了永远安全。
+- `--canon-revision <commit>` 从 `git archive` 直读该 commit 的 Markdown，
+  **不落临时目录、不切工作树**，也不碰 `00_Canon` 里的任何文件。
+  不给时读工作树，并把当前 HEAD（如果 Vault 自己是 git 仓库）记进索引。
+
+17 张表照 PRD §16.1 建，**本轮只有 8 张会填**：`index_metadata` `artifacts` `entities`
+`aliases` `source_refs` `narrative_order` `blocks` `fts_blocks`。其余 9 张是空表，
+留给 T04/T05/T07。输出里这两类**分两行打**，不合并成「已支持」。
+
+坏文件（非 UTF-8、非法 YAML、没装 PyYAML 而 frontmatter 有嵌套）逐份记入 `失败` 计数后继续，
+不会中断整次重建。
 
 索引可随时删除重建，不反向修改任何事实源。
+
+### `novel search <查询> [--limit N] [--json] [--show-index]`
+
+按查询形态分三条路：
+
+| 查询 | 路径 | 说明 |
+|---|---|---|
+| 完整 ID（`CHAR-0001`）或别名 | 精确查 | 命中档案没有正文块时也会返回一条「ID 命中」，不是空结果 |
+| ≥ 3 字 | FTS5 `trigram` | `握住了刀柄` 这类长词走这里 |
+| < 3 字 | `LIKE` 子串 | `林砚` `周决` 这类两字词走这里——trigram 的窗口是三字符，两字切不出 token |
+
+正文块搜不到时还会再走一次**名称路径**（frontmatter 的 `name`/`aliases`），
+此时 `mode=name` 并注明「正文里没有这个词；命中的是实体名或别名」。
+没有这一层，两字人名永远检不出来。
+
+- `--limit N` 默认 20；
+- `--json` 输出 `{query, mode, hits[]}`，每条带 `path` / `block_id` / `line_start` / `text`；
+- `--show-index` 顺带打印用的是哪一份 build；
+- **结果分层**：`10_Projects/` 的作品内容排最前，其次 `90_Shared_Assets/`，
+  最后是 `00_System/` 下的系统文档与生成看板。生成看板是从档案派生的，
+  让派生页排在事实源前面，等于让人引用摘要去改原文（真实库上搜「陈默」曾出现前三名
+  全是 `工作台.md` 摘录、`CHAR-0001_陈默.md` 看不见的情况）；
+- 没命中退出码 **1**，还没建索引退出码 **2**（`2` 是「你得先 rebuild-index」，
+  不是「搜不到」，脚本里别混用）。
+
+FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`，结果对但慢，
+`doctor` 和 `rebuild-index` 都会明说。`unicode61` 那种「看起来能用、实际检不出中文」的路子被明确排除。
 
 ---
 
@@ -300,7 +358,8 @@ novel package-hash tmp/release_plan.json --canonical   # 同时看规范化后�
 | 任务记录 | `<runtime>/tasks/TASK-*.yaml` | 否（但可重开任务） |
 | 批准记录 | `<runtime>/approvals/APR-*.json` | 否 |
 | 操作日志 | `<runtime>/logs/ops.jsonl` | 否 |
-| 索引 | `<runtime>/index/index.json` | 是 |
+| 索引库 | `<runtime>/index/builds/<build_id>.sqlite` | 是 |
+| 索引指针 | `<runtime>/index/active.json` | 是（指向哪一份 build） |
 | 作者基线 | `<runtime>/authorship/<project_id>.json` | 是（重新 adopt） |
 | 备份 | `<runtime>/backups/<BK-ID>/` | 否 |
 | staging 产物 | `<vault>/10_Projects/<PROJECT>/07_Staging/<TASK-ID>/` | 否（发布后仍保留作证据） |
