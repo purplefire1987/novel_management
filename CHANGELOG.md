@@ -2,6 +2,118 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.12.0 — 2026-11-21
+
+T09「创作与审核」与 T10「记忆与完整发布闭环」。九项交付：规划契约、`write`、
+`review`（风险路由 + 返修预算）、正文批准、记忆提案、源哈希校验、提案审核、
+正文/记忆共同发布、依赖失效。ADR-018 记了取舍。
+
+**兼容性影响**：四条。
+
+1. **`release prepare` 多了一道共同发布闸**。批次里含 `03_Manuscripts/` 且没有任何
+   记忆提案、也没有「本章不产记忆」声明时，准备阶段直接拒绝。要单独发正文，
+   必须显式 `--skip-closure`。
+2. **`ApprovalStore.latest_for()` / `status_for()` 只看内容批准**（绑了文件的、
+   `target_type` 为 `artifact` 或空）。发布计划、变更、记忆提案这三类对象批准
+   不再被当成「任务已批准」——否则一次 `proposal approve` 会顶掉正文批准。
+3. **索引 `dependencies` 表从第 4 版起会填**，`SCHEMA_VERSION` 3 → 4，
+   `BUILDER_VERSION` 0.12.0。新加 `content_hash`、`validation_status` 两列。
+4. **发布计划多了一个可选字段 `closure_skipped`**（`schemas/release_plan.schema.json`）。
+   只在 `true` 时输出，所以 0.11.0 及更早写下的计划重新序列化后哈希不变——
+   **已批准、待执行的旧计划不会因为这升级变成「批准的是另一份计划」**。
+   用 `--skip-closure` 的那些批次会把豁免写进计划，因此它也在作者批准的哈希里。
+
+**升级后要做的事**：**跑一次 `rebuild-index`**。不跑的话 `dependencies` 表仍是空的、
+伏笔表也还是旧列（0.11.0 的提示仍然适用）。
+
+### 一、T09：草稿在结构上碰不到 Canon
+
+`workflows/draft.py` 的目标路径由代码生成（`03_Manuscripts/Drafts/<CH>.md`），
+生成后再校验一次不在 `01_Canon` 下；落盘只走 `StagingArea.stage()`。
+验收「草稿不写正式 00_Canon」不是靠提醒，是靠写不出来。
+
+写之有两道前置：`plan.check()` 说规划够格，`preflight` 说资料包 PASS。
+缺一道就不写——不知道边界、没查资料就动笔，写出来的东西没法判对错。
+
+正文与元数据分离：模型返回结构化信封，`chapter_text` 是正文，
+新事实候选 / 偏离 / 未决问题走元数据。正文里不掺系统注释（PRD §14.1）。
+
+### 二、规划契约：只派生确定性可读的两处
+
+真库章卡是散文式的：「必须发生的剧情事实」是张时间表，「禁止发生的内容」是一串列表。
+`novel plan derive` 只读这两处：
+
+- 表格第二列 → `must_happen`；
+- 以「不得／禁止／不许／不能」开头的条目 → `must_not_happen` 与 `creative_scope.forbidden`。
+
+**`allowed` 与 `approval_required` 一律不派生**：散文里没有来源，编一个就是替作者扩权。
+写回只插入缺失键，写完校验正文逐字节未变。真库实测 CH-0001 派生 10 条必须发生、
+5 条禁止，每条带 `文件#L行号`。
+
+### 三、审核：风险只能升，返修有硬预算
+
+- 死亡／复活／核心规则变更／身份揭露／RETCON 命中即至少 HIGH，命中位置一并报出。
+  单字「死」会误伤「死路／死寂／死守」，命中后过一遍搭配过滤；
+- 人工与模型只能往上抬；降级请求被忽略并留说明；
+- 审核角色 = 草稿角色时 `APPROVE` 直接 `SecurityError`，没有 `--force`；
+- 每份 `REVISE` 算一轮，用完就不再接受审核。顺序是「先判预算、再判资格、最后写记录」。
+
+规则检查只看形状：空正文、系统注释、正文里混进第二份文档、禁令条目里的专名。
+**语义问题（人物用了还没获得的信息）机器判不了**——每次都写进 findings，不假装查过。
+
+### 四、正文批准：不是确认弹窗
+
+`novel approve text --task --chapter --as author` 要求：审核结论 APPROVE、
+按风险该过的角色都过过、没有 OPEN BLOCKER。绑整份文件字节的 sha256。
+改一个字节，批准即失效（PRD §14.5）。
+
+### 五、T10：未发布也能提取，改了就失效
+
+- 提取的输入是**已批准候选**，不要求正文 ACTIVE（PRD §15.1）——
+  这样正文与记忆才能同批发布；
+- 提案存 `source.sha256` 与 `source.staged`。正文改一个字节，`verify()` 判 `STALE`，
+  `approve` 与发布都拒绝；
+- 没给模型时退回确定性骨架：只有章节字数与已登记实体清单，并写明「语义条目未提取」。
+  模型路径失败也一样退回，不「尽力而为地提取」出一堆看着像事实的东西。
+
+### 六、共同发布：不许半边生效
+
+`novel deps closure` 与 `release prepare` 对每一条正文问一句：有已批准且未失效的
+记忆提案，或作者显式写的「本章不产记忆 + 理由」？都没有就阻断。
+
+**「没有提案」与「声明不产记忆」是两件事**：前者是漏做，后者是决定。
+混为一谈，闸门就退化成「没做也能过」。
+
+### 七、依赖失效：只波及相关产物
+
+`novel deps check` 直接读 frontmatter 的 `depends_on`：
+
+| 情形 | 结果 |
+|---|---|
+| 哈希一致 | VALID |
+| 哈希不一致（HARD／SOFT） | STALE／NEEDS_REVIEW |
+| 没记 content_hash、目标不存在 | NEEDS_REVIEW |
+
+传递只走一级：A 依赖 B、B 自己 STALE 时 A 记 NEEDS_REVIEW 而不是 STALE。
+一次局部改动不该沿着引用链炸开——那样 STALE 会多到没人看。
+
+### 八、修掉的真缺陷
+
+- **规则检查把整份文件当正文**：frontmatter 的 `---` 被当成「正文里混了两份文档」，
+  每一份草稿都会被判 BLOCKER。现在哈希绑整份字节、检查只看 `body`；
+- **`latest_for` 把对象批准当内容批准**：`proposal approve` 排在正文批准之后，
+  `release prepare` 拿到「批准覆盖 0 个文件」的记录去核对 staging。现在按
+  `target_type` 与「有没有绑文件」过滤；
+- **提案的源路径解析错**：`source_target` 是项目内相对路径，却拿 `vault / target` 去拼，
+  `verify` 永远报「源文件已不存在」。现在优先用 `source.staged`，其次 `pp.at(target)`。
+
+### 九、数字
+
+- 命令行 30 → **35 条**（`plan` / `write` / `review` / `proposal` / `deps`）；
+  `approve` 多了 `text` 这一种对象；
+- pytest 635 → **655 passed / 1 skipped**；`scripts/selfcheck.py` 39 → **50 项**；
+- 契约仍 24 类（新增的是模块而不是新 schema）；索引表 17 张，填充 16 张。
+
 ## 0.11.0 — 2026-11-21
 
 T08「Agent 适配器与写前资料包」。九角色接入流程、提示词统一装配、检索预算两条不变量、

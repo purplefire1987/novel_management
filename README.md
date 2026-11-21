@@ -62,7 +62,7 @@ active_project:
 ## 4. 命令
 
 V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务补入地图、契约、索引、
-时间线、审批与变更、发布、导入、Agent 几组命令，命令行**现为 30 条**：
+时间线、审批与变更、发布、导入、Agent、创作与记忆几组命令，命令行**现为 35 条**：
 三条地图命令（`maps paths` / `import-admin` / `build`）、四条契约命令
 （`schema list` / `schema check` / `allocate-id` / `package-hash`，T02）、
 两条索引命令（`rebuild-index` / `search`，T03）、三条时间线与认知命令
@@ -70,7 +70,9 @@ V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务�
 （`inspect` / `issue` / `change` / `impact`，T05）、一条发布命令
 （`release`，含 10 个子命令，T06）、一条导入命令
 （`import`，含 5 个子命令，T07）、两条 Agent 命令
-（`preflight`、`agent` 含 3 个子命令，T08）。
+（`preflight`、`agent` 含 3 个子命令，T08）、五条创作与记忆命令
+（`plan` 含 3 个子命令、`write`、`review` 含 2 个子命令、`proposal` 含 7 个子命令、
+`deps` 含 3 个子命令，T09–T10）。
 
 | 命令 | 用途 | 写入 |
 |---|---|---|
@@ -120,6 +122,14 @@ V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务�
 | `novel agent list` | 九角色权限矩阵、可用工具、角色卡是否在位 | 否 |
 | `novel agent prompt --role` | 渲染某角色提示词；默认只看结构，`--show` 打全文 | 否 |
 | `novel agent usage` | 当天调用计量台账（只记元数据，不记正文） | 否 |
+| `novel plan show` \| `check` | 章卡是否够格开写：逐项列出 §10.2 字段的有无与出处 | 否 |
+| `novel plan derive` | 从「必须／禁止」派生结构化字段；只派生确定性可读的两处 | 是（章卡，需 `--write`） |
+| `novel write` | 主笔写草稿：前置规划与资料包，产物只进 staging | 是（仅 staging） |
+| `novel review submit` \| `status` | 审核：风险路由、返修预算、高风险不许自审 | 是（仅 Runtime） |
+| `novel approve text` | 正文批准：要求先过审核，绑字节哈希 | 是（仅 Runtime） |
+| `novel proposal extract` \| `approve` | 记忆提案：从已批准正文提取，源哈希一变即失效 | 是（仅 Runtime） |
+| `novel proposal declare-none` | 声明本章不产记忆（必须写理由） | 是（仅 Runtime） |
+| `novel deps check` \| `show` \| `closure` | 依赖失效（只有相关变化才失效）与共同发布检查 | 否 |
 | `novel maps paths` | 打印地图生成用到的全部路径 | 否 |
 | `novel maps import-admin` | 从资产表重排行政区划表；默认预演 | 是（Canon） |
 | `novel maps build` | 重画地图页与两张 canvas；默认预演 | 是（Canon） |
@@ -128,12 +138,19 @@ V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务�
 
 ```bash
 novel task create --type draft --assignee writer            # 拿到 TASK-000001
-novel stage  --task TASK-000001 --from 草稿.md \
-             --to 03_Manuscripts/Drafts/CH-0001.md --as writer
+novel plan  check CH-0001                                   # 规划够格吗（八项必需字段）
+novel preflight CH-0001                                     # 资料包，判 PASS 才能开写
+novel write --task TASK-000001 --chapter CH-0001 \
+            --mock-response 模型输出.json --as writer        # 草稿只落 staging
 novel diff   --task TASK-000001                             # 作者审阅
+novel review submit --task TASK-000001 --chapter CH-0001 \
+             --verdict approve --as editor                  # 审核（风险路由）
 novel inspect TASK-000001                                   # 七项：哈希、drift、BLOCKER、风险…
 novel approve artifact TASK-000001 --hash <sha256> --as author   # 绑定当前字节
-novel release prepare --task TASK-000001 --as author        # 生成发布计划
+novel approve text --task TASK-000001 --chapter CH-0001 --as author   # 批正文本身
+novel proposal extract --task TASK-000001 --chapter CH-0001  # 从已批准正文提记忆
+novel proposal approve PROP-000001 --as author
+novel release prepare --task TASK-000001 --as author        # 生成发布计划（过共同发布闸）
 novel approve release REL-000001 --hash <计划哈希> --as author   # 批准这份计划
 novel publish --task TASK-000001 --as author --confirm      # 执行发布（22 步）
 novel release status                                        # 判词应为 OK
@@ -143,6 +160,10 @@ novel release status                                        # 判词应为 OK
   只接受 `--as author`，Agent 无法代办。
 - 批准绑定每个文件**此刻**的 sha256。批准后 staging 被改动（哪怕一个字节）→ 发布直接拒绝，需重新批准。
 - 发布前还会拦两道：目标上有 OPEN 的 `BLOCKER`、有未批准的 `RETCON` 覆盖。
+- **多了两道 T09/T10 的闸**：`approve text` 要求先有 `APPROVE` 的审核结论（按风险该过的
+  角色齐、无 BLOCKER），它不是确认弹窗也没有 `--force`；`release prepare` 要求每条正文的
+  记忆都说清楚（提案已批准，或 `proposal declare-none --reason` 明确声明不产记忆）。
+  真要单独发正文，用 `--skip-closure`，豁免会记进计划的 `closure_skipped` 并进批准哈希。
 - 同一条任务不能发布两次；内容有更新请新建任务。
 - 写入 `01_Canon/` 时 `publish` 额外要求 `--confirm-canon`。
 - **发布不是覆盖写**：1–13 步全在隔离快照里做，第 18 步才切换正式指针。
@@ -154,8 +175,9 @@ novel release status                                        # 判词应为 OK
 开工前先让系统把「这一章要守的东西」摆出来，而不是靠记性：
 
 ```bash
-novel rebuild-index                                  # 索引 3 版起才会填伏笔表
-novel preflight CH-000102                            # 出资料包，最后一行是判词
+novel plan check CH-0001                             # 规划够格吗（八项必需字段）
+novel rebuild-index                                  # 索引 3 版起填伏笔表，4 版起填依赖表
+novel preflight CH-0001                              # 出资料包，最后一行是判词
 novel agent list                                     # 九角色谁能做什么
 novel agent prompt --role writer --task TASK-000001   # 主笔这次拿到的提示词结构
 ```
@@ -219,7 +241,7 @@ novel agent prompt --role writer --task TASK-000001   # 主笔这次拿到的提
 
 ```text
 src/novel_system/
-  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / import_cmd / backup_cmd / maps_cmd / schema_cmd / id_cmd）
+  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / import_cmd / backup_cmd / maps_cmd / schema_cmd / agent_cmd / work_cmd / id_cmd）
   config/         五级配置解析（含 V4.0 Vault_Config 写法兼容）
   paths.py        项目内目录解析与边界校验
   version.py      版本号唯一出处（发布清单与 `--version` 都读它）
@@ -241,7 +263,9 @@ src/novel_system/
   timeline/       事件 DAG、状态区间、认知查询
   importing/      原稿导入：定位符 / 保全 / 切章 / 提取 / 抽样 / 分批入 staging（T07）
   agents/         九角色注册与权限矩阵、预算、类型化工具、提示词装配、计量、Preflight（T08）
-  validation/ workflows/ adapters/ core/   预留扩展位（T09）
+  workflows/      创作与审核：规划契约 / 写稿（只落 staging）/ 审核与风险路由 / 正文批准（T09）
+  validation/     写后闭环：记忆提案 / 依赖失效 / 共同发布（T10）
+  adapters/ core/  模型适配层（当前只有 Mock）／预留
 config/             默认配置与配置 Schema
 schemas/            24 类数据契约（JSON Schema，additionalProperties 一律 false）
 templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）
@@ -260,8 +284,8 @@ tests/              unit / integration / security / acceptance / fixtures
 ## 7. 测试与检查
 
 ```bash
-pytest                                    # 635 passed / 1 skipped
-python3 scripts/selfcheck.py              # 39 项端到端冒烟，不依赖 pytest
+pytest                                    # 655 passed / 1 skipped
+python3 scripts/selfcheck.py              # 50 项端到端冒烟，不依赖 pytest
 python3 scripts/privacy_scan.py --repo .  # 公仓隐私扫描
 ```
 

@@ -63,6 +63,8 @@ def _write_t08_fixtures(project: Path) -> None:
         "timeline: 兴元十二年七月初八\n"
         "pov: 抄书人\n"
         "participants:\n- CHAR-0001\n"
+        "entities:\n- CHAR-0001\n"
+        "core_conflict: 自检用冲突：书匣必须在雨停前离岸\n"
         "creative_scope:\n"
         "  allowed:\n  - 符合人物动机的对话\n"
         "  forbidden:\n  - 人物复活\n"
@@ -132,13 +134,17 @@ def main_cli() -> int:
     # T06 之后 publish 只执行「已准备且已批准」的计划：两道门都要先关上才算验过
     run(
         "release prepare 未批准必须拒绝",
-        ["release", "prepare", *common, "--task", "TASK-000001", "--as", "author"],
+        ["release", "prepare", *common, "--task", "TASK-000001", "--skip-closure", "--as", "author"],
         expect=4,
     )
     run("approve 非作者必须拒绝", ["approve", *common, "--task", "TASK-000001", "--as", "writer"], expect=3)
     run("approve", ["approve", *common, "--task", "TASK-000001", "--as", "author"])
     run("publish 无计划必须拒绝", ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"], expect=2)
-    run("release prepare", ["release", "prepare", *common, "--task", "TASK-000001", "--as", "author"])
+    # 这一段测发布协议本身；共同发布闸在后面 T09/T10 段单独验。
+    run(
+        "release prepare",
+        ["release", "prepare", *common, "--task", "TASK-000001", "--skip-closure", "--as", "author"],
+    )
 
     release_dir = runtime / "releases" / "REL-000001"
     plan_hash = sha256_file(release_dir / "plan.json")
@@ -288,6 +294,97 @@ def main_cli() -> int:
             ('"tool_calls": 0' not in out, "台账里没有工具调用，计量没落盘"),
         ),
     )
+    # ---- T09 创作与审核 / T10 记忆闭环 ----
+    mock = work / "mock-writer.json"
+    mock.write_text(
+        json.dumps(
+            {
+                "task_id": "TASK-000001",
+                "role": "writer",
+                "result": {
+                    "chapter_id": "CH-0001",
+                    "title": "自检章",
+                    "chapter_text": "雨落在灰石渡的石阶上，抄书人把最后一页纸压进书匣。\n\n"
+                    "船家接过匣子，没有问里面是什么。\n",
+                    "new_fact_candidates": [],
+                    "plan_deviations": [],
+                    "open_questions": [],
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    # 用上一个任务号：selfcheck 前面已经建过若干任务
+    tasks = sorted((runtime / "tasks").glob("TASK-*.yaml"))
+    run("task create（写作任务）", ["task", "create", *common, "--type", "draft", "--assignee", "writer", "--as", "writer"])
+    write_task = sorted((runtime / "tasks").glob("TASK-*.yaml"))[-1].stem
+
+    run(
+        "plan check 规划够格",
+        ["plan", "check", *common, "CH-0001"],
+        check=lambda out: ("够格开写" in out, "规划缺必需字段"),
+    )
+    canon_before = sorted(
+        str(p.relative_to(project)) for p in (project / "01_Canon").rglob("*.md")
+    )
+    run(
+        "write 草稿只进 staging",
+        ["write", *common, "--task", write_task, "--chapter", "CH-0001", "--mock-response", str(mock), "--as", "writer"],
+        check=lambda out: _all(
+            ("草稿已进 staging" in out, "没有落到 staging"),
+            ("03_Manuscripts" in out, "目标不是正文路径"),
+        ),
+    )
+    canon_after = sorted(str(p.relative_to(project)) for p in (project / "01_Canon").rglob("*.md"))
+    RESULTS.append(
+        (
+            "草稿没写进 01_Canon",
+            canon_before == canon_after and not (project / "01_Canon" / "Chapters" / "CH-0001.md").exists(),
+            "草稿流程动了正式区",
+        )
+    )
+
+    run(
+        "review 高风险不许自审",
+        ["review", "submit", *common, "--task", write_task, "--chapter", "CH-0001",
+         "--role", "writer", "--verdict", "approve", "--as", "writer"],
+        expect=3,   # SecurityError：自审是安全拦截，不是普通用法错误
+        check=lambda out: ("不能给自己写的稿" in out, "自审没被拦住"),
+    )
+    run(
+        "review 编辑通过",
+        ["review", "submit", *common, "--task", write_task, "--chapter", "CH-0001",
+         "--role", "editor", "--verdict", "approve", "--as", "editor"],
+    )
+    run(
+        "approve text 正文批准",
+        ["approve", "text", *common, "--task", write_task, "--chapter", "CH-0001", "--as", "author"],
+        check=lambda out: ("CHAPTER_TEXT" in out, "批准范围不对"),
+    )
+    run(
+        "proposal extract 未发布也能提取",
+        ["proposal", "extract", *common, "--task", write_task, "--chapter", "CH-0001"],
+        check=lambda out: ("提取出" in out, "没产出提案"),
+    )
+    proposals = sorted((runtime / "proposals").glob("PROP-*.yaml"))
+    if proposals:
+        prop_id = proposals[-1].stem
+        run("proposal approve", ["proposal", "approve", *common, prop_id, "--as", "author"])
+        run(
+            "deps closure 记忆说清楚了",
+            ["deps", "closure", *common, "--task", write_task],
+            check=lambda out: ("可以同批发布" in out, "共同发布检查没过"),
+        )
+        run(
+            "release prepare 带上记忆同批",
+            ["release", "prepare", *common, "--task", write_task, "--as", "author"],
+            check=lambda out: ("已生成发布计划" in out, "计划没生成"),
+        )
+    else:
+        RESULTS.append(("proposal approve", False, "没有生成提案文件"))
+
     run("status", ["status", *common])
 
     width = max(len(label) for label, _, _ in RESULTS)

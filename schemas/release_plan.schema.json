@@ -46,6 +46,10 @@
       "description": "计划放行的非阻断问题；BLOCKER 不得出现在这里"
     },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "closure_skipped": {
+      "type": "boolean",
+      "description": "本批含正文但显式跳过共同发布闸（--skip-closure）；true 表示记忆可能落后于正文"
+    },
     "index_config_version": {
       "type": "string",
       "description": "索引构建配置版本；换了分词或字段映射就必须变"
