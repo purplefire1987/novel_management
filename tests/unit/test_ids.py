@@ -231,12 +231,12 @@ def test_unknown_area_name_rejected(tmp_path: Path) -> None:
 
 def test_allocate_continues_sequence(vault: Path, runtime: Path) -> None:
     alloc = IdAllocator(vault, runtime, actor="test")
-    assert alloc.allocate("CHAR") == ["CHAR-0003"]
+    assert alloc.allocate("CHAR") == ["CHAR-000003"]
 
 
 def test_allocate_count(vault: Path, runtime: Path) -> None:
     alloc = IdAllocator(vault, runtime, actor="test")
-    assert alloc.allocate("CHAR", count=3) == ["CHAR-0003", "CHAR-0004", "CHAR-0005"]
+    assert alloc.allocate("CHAR", count=3) == ["CHAR-000003", "CHAR-000004", "CHAR-000005"]
 
 
 def test_freed_numbers_are_not_reused(vault: Path, runtime: Path) -> None:
@@ -246,9 +246,9 @@ def test_freed_numbers_are_not_reused(vault: Path, runtime: Path) -> None:
     指向另一个对象。所以取号要同时看审计记录。
     """
     alloc = IdAllocator(vault, runtime, actor="test", lock_timeout=0.2)
-    assert alloc.allocate("CHAR") == ["CHAR-0003"]
+    assert alloc.allocate("CHAR") == ["CHAR-000003"]
     (vault / "10_Projects" / "p1" / "01_Canon" / "Characters" / "CHAR-0002_乙.md").unlink()
-    assert alloc.allocate("CHAR") == ["CHAR-0004"]
+    assert alloc.allocate("CHAR") == ["CHAR-000004"]
 
 
 def test_history_survives_file_deletion(vault: Path, runtime: Path) -> None:
@@ -257,7 +257,7 @@ def test_history_survives_file_deletion(vault: Path, runtime: Path) -> None:
     alloc.allocate("CHAR", count=2)  # 0003, 0004
     for name in ("CHAR-0001_甲.md", "CHAR-0002_乙.md"):
         (vault / "10_Projects" / "p1" / "01_Canon" / "Characters" / name).unlink()
-    assert alloc.allocate("CHAR") == ["CHAR-0005"]
+    assert alloc.allocate("CHAR") == ["CHAR-000005"]
 
 
 def test_allocate_records_audit_line(vault: Path, runtime: Path) -> None:
@@ -266,7 +266,7 @@ def test_allocate_records_audit_line(vault: Path, runtime: Path) -> None:
     lines = (runtime / "id-allocations.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     row = json.loads(lines[0])
-    assert row["ids"] == ["CHAR-0003", "CHAR-0004"]
+    assert row["ids"] == ["CHAR-000003", "CHAR-000004"]
     assert row["actor"] == "writer"
     assert row["reason"] == "新建人物"
     assert row["previous_max"] == 2
@@ -274,7 +274,7 @@ def test_allocate_records_audit_line(vault: Path, runtime: Path) -> None:
 
 def test_dry_run_does_not_write(vault: Path, runtime: Path) -> None:
     alloc = IdAllocator(vault, runtime, actor="test")
-    assert alloc.allocate("CHAR", dry_run=True) == ["CHAR-0003"]
+    assert alloc.allocate("CHAR", dry_run=True) == ["CHAR-000003"]
     assert not (runtime / "id-allocations.jsonl").exists()
 
 
@@ -301,7 +301,7 @@ def test_dirty_other_prefix_does_not_block(tmp_path: Path, runtime: Path) -> Non
     _write(root / "B" / "ASSET-0001_y.md", _card("ASSET-0001"))
     _write(root / "C" / "CHAR-0001_甲.md", _card("CHAR-0001"))
     alloc = IdAllocator(root, runtime, actor="test")
-    assert alloc.allocate("CHAR") == ["CHAR-0002"]
+    assert alloc.allocate("CHAR") == ["CHAR-000002"]
 
 
 def test_allow_dirty_flag(vault: Path, runtime: Path, tmp_path: Path) -> None:
@@ -309,7 +309,7 @@ def test_allow_dirty_flag(vault: Path, runtime: Path, tmp_path: Path) -> None:
     _write(root / "A" / "ASSET-0001_x.md", _card("ASSET-0001"))
     _write(root / "B" / "ASSET-0001_y.md", _card("ASSET-0001"))
     alloc = IdAllocator(root, runtime, actor="test")
-    assert alloc.allocate("ASSET", allow_dirty=True) == ["ASSET-0002"]
+    assert alloc.allocate("ASSET", allow_dirty=True) == ["ASSET-000002"]
 
 
 def test_allocate_survives_pending_copy(tmp_path: Path, runtime: Path) -> None:
@@ -318,7 +318,7 @@ def test_allocate_survives_pending_copy(tmp_path: Path, runtime: Path) -> None:
     _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
     _write(root / "07_Staging" / "TASK-1" / "CH-0001.md", _card("CH-0001"))
     alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
-    assert alloc.allocate("chapter", count=2) == ["CH-0002", "CH-0003"]
+    assert alloc.allocate("chapter", count=2) == ["CH-000002", "CH-000003"]
 
 
 def test_allocate_still_refuses_two_formal_copies(tmp_path: Path, runtime: Path) -> None:

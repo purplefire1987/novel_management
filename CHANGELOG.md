@@ -2,6 +2,78 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.14.0 — 2026-11-22
+
+ID 体系重构：全库重排号段、统一六位、遗留前缀按 PRD 收敛。
+
+**这不是一次代码版本升级，是一次数据迁移。** 代码侧只改了 `ids.py` 的位数常量与
+前缀表（约 20 行），但库里 1046 份档案的文件名、frontmatter、5818 处引用全变了。
+所以它的兼容性影响比其他版本大：
+
+> **迁移提示**：任何缓存了旧 ID 的外部脚本、书签、Obsidian canvas、Dataview 查询
+> 都需要跟着改。对照表在 `~/WorkBuddy/novel-runtime/reports/id_remap_mapping.json`
+> （`id_map` 是 old→new，`path_map` 是旧路径→新路径）。
+> 备份在 `~/WorkBuddy/novel-runtime/backups/vault-pre-remap-20261122-013855.tar.gz`。
+
+### 一、位数：四位 → 六位
+
+`ids.MIN_WIDTH` 4 → 6。`CHAR-0001` → `CHAR-000001`。关闭 R-14。
+
+schema pattern 仍是 `[0-9]{4,6}`：不是要「两种写法并存」，而是历史归档
+（`99_Archive/legacy_v1`）与 `{{id}}` 模板里还是四位，收紧会让它们校验失败。
+**新号一律六位。**
+
+### 二、前缀收敛：六类遗留前缀按 PRD 迁移
+
+| 旧 | 份数 | 新 | 依据 |
+|---|---|---|---|
+| `SKL` | 171 | `ITEM` | PRD 无「技能」类型 |
+| `CREATURE` | 76 | `CHAR` | PRD：生物是角色的标签 |
+| `WORLD` | 43 | `RULE` | 全是体系／总表／规则，无地理条目 |
+| `FATE` | 42 | `CHAR` | PRD 无「命途」类型 |
+| `ASSET` | 22 | `ITEM` | PRD：素材归 ITEM |
+| `VOL` | 2 | `PLAN-VOL` | PRD 明确 |
+
+代价说清楚：`ITEM` 从 336 涨到 **529**（物品＋技能＋素材同号段），
+`CHAR` 从 86 涨到 **204**（人物＋生物＋命途同号段）。
+语义靠 `type` 字段区分，不靠号段推断——**以后不要再从号段猜类型**。
+
+### 三、号段重排
+
+每个前缀从 `000001` 连续编号，组内保持原有相对顺序。
+新号段：`ITEM` 529 / `CHAR` 204 / `LOC` 110 / `FAC` 102 / `RULE` 43 /
+`CH` 30 / `SCENE` 11 / `EVT` 7 / `FORESHADOW` 4 / `PLAN-VOL` 4 / `PLAN-CH` 2。
+
+**`CH` 的号段语义变了**：旧稿 28 份原在 `CH-1001`…`CH-1028`（`id_rules.yaml` 的
+`reserved_bands: CH 1000`），重排后变成 `CH-000003`…`CH-000030`，与新正文
+`CH-000001`/`CH-000002` 同段。旧稿与新正文现在只能靠物理路径
+`90_Archive/Original_Draft/` 区分。**这是「全库连续编号」的必然代价**，
+如果将来要恢复「旧稿独立号段」，得单独再排一次。
+
+### 四、12 份审阅记录删掉 id
+
+`review_note` 契约的 `required` 里没有 `id`，`novel note` 写的报告也不带 id——
+这 12 份是 note 通道之前的遗留批次号（`REVIEW-CH-*`、`PREFLIGHT-CH-*`、
+`MEMORY-CH-*`、`RB-*`、`AUDIT-*`、`MIGRATE-*`，以及一份中文前缀的）。
+按最新设计它们不该是「产物」，删 id 并去掉文件名里的 ID 前缀。
+
+### 五、`ids.py` 前缀表
+
+- `LEGACY_PREFIXES` 移走六类已迁移前缀，只留 PRD 未定义且确实存在历史号的类别
+  （`RELSHIP`/`REVIEW`/`PREFLIGHT`/`MEMORY`/`RB`/`INGEST`/`OUTLINE`/`LORE`/`GRAPH`）。
+- `TYPE_TO_PREFIX`：`volume` → `PLAN-VOL`，`skill`→`ITEM`、`creature`→`CHAR`、
+  `world`→`RULE`、`fate`→`CHAR`、`asset`→`ITEM`。
+- `allocate-id --type SKL` 现在报「未知 ID 类型」——这是**期望行为**：
+  它提示调用方前缀已迁移，而不是悄悄发出一个非 PRD 前缀。
+
+### 六、验证
+
+`validate`：1046 份带 id、**重复 0**、双链 4945 条**零断链**、通过。
+两个 canvas 共 217 个文件节点**零断**。索引重建后旧 ID 检索 0 命中、新 ID 20 命中。
+
+**未做**：`adopt --as author` 需作者执行（`AUDIT_ONLY` 设计上 Agent 不得代办）；
+`release prepare` 仍未跑过，T06 安全里程碑仍未过。
+
 ## 0.13.0 — 2026-11-22
 
 三件事：给 `08_Reviews` 一条写通道、给发布闸补上契约校验、给日志加脱敏。

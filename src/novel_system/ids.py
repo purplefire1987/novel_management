@@ -8,15 +8,18 @@
 - 失败产生的空号可以保留。
 - 事件不因章节重排改 ID。本模块只发号，不承担「改号」职责。
 
-**位数按现状取 4 位**（`CHAR-0001`）。PRD §8.1 示例写的是 6 位
-（`CHAR-000001`），而库内 986 份档案全是 4 位。改六位要动全库文件名与所有
-引用，收益为零、风险极大，所以这里跟随现状，并在 `schema` 的 pattern 上
-放宽到 4–6 位以兼容两种写法。**这是与 PRD 的一处已知偏离，已记入
-docs/operations/known_risks.md。**
+**位数取 6 位**（`CHAR-000001`），与 PRD §8.1 示例一致。2026-11-22 之前
+库内档案是 4 位，理由是「改六位要动全库文件名与所有引用」；作者当日裁定
+重编号，全库 1046 份已统一到 6 位，这条偏离随之关闭（原 R-14）。
+`schema` 的 pattern 仍放宽到 4–6 位——历史归档与 `{{id}}` 模板里还有 4 位，
+收紧会让它们校验失败。
 
-前缀表分两类：PRD 规范的 24 个，和 v1.0 已在用、PRD 未列的前缀。后者不是
-「合法扩展」，是待迁移的包袱——保留它们是为了让分配器能认出现有号段，
-不至于把 `SKL-0001` 当成未知前缀而重新从 1 开始发号。
+前缀表分两类：PRD 规范的 24 个，和 PRD 未定义的审阅／批次类前缀。后者不是
+「合法扩展」，是历史包袱：审阅记录按最新设计**不该带 id**
+（`review_note` 契约的 `required` 里没有 `id`），保留它们只是为了让分配器
+认得出历史号，不至于把 `REVIEW-0001` 当成未知前缀重新发号。
+2026-11-22 已把 `SKL`／`CREATURE`／`WORLD`／`FATE`／`ASSET`／`VOL` 六类
+迁到 PRD 前缀，它们不再可发号。
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ from . import frontmatter as fm
 from .errors import ConflictError, UsageError
 from .storage import iter_files
 
-MIN_WIDTH = 4
+MIN_WIDTH = 6
 MAX_WIDTH = 6
 
 # PRD §8.1 的正式前缀。
@@ -63,22 +66,19 @@ PRD_PREFIXES: dict[str, str] = {
     "IMP": "导入",
 }
 
-# v1.0 在用、PRD 未列。发号时认得出，但不鼓励新增。
+# PRD 未定义、但库里可能有历史号的类别。**只用于认出旧号，不鼓励新增。**
+# 2026-11-22 已迁走的（SKL/CREATURE/WORLD/FATE/ASSET/VOL）不再列在这里——
+# 留着它们会让 `allocate-id --type SKL` 又发出一个非 PRD 前缀。
 LEGACY_PREFIXES: dict[str, str] = {
-    "SKL": "技能（v1.0 遗留，PRD 无此前缀）",
-    "CREATURE": "生物（PRD 视为人物／势力／生物角色的标签，非独立实体）",
-    "WORLD": "世界条目（PRD 归入 RULE／LOC，待迁移）",
-    "FATE": "命途（v1.0 遗留）",
-    "ASSET": "素材（PRD 归入 ITEM 或资产库，待迁移）",
-    "VOL": "卷（PRD 用 PLAN-VOL）",
-    "RELSHIP": "关系档案（v1.0 遗留）",
-    "REVIEW": "审阅记录（PRD 未定义 ID 类型）",
+    "RELSHIP": "关系档案（PRD 无此前缀；REL 已让给发布）",
+    "REVIEW": "审阅记录（PRD 未定义；最新设计改为不带 id）",
     "PREFLIGHT": "写前资料包（PRD 用任务承载）",
     "MEMORY": "记忆条目（PRD 用 KNOW／摘要）",
+    "RB": "回滚点（PRD 用 REL）",
+    "INGEST": "导入批次（PRD 用 IMP）",
     "OUTLINE": "大纲（PRD 用 PLAN-*）",
     "LORE": "设定条目（v1.0 遗留）",
-    "INGEST": "导入批次（PRD 用 IMP）",
-    "RB": "回滚点（PRD 用 REL）",
+    "GRAPH": "图谱分析（历史）",
 }
 
 PREFIXES: dict[str, str] = {**PRD_PREFIXES, **LEGACY_PREFIXES}
@@ -98,7 +98,7 @@ TYPE_TO_PREFIX: dict[str, str] = {
     "RULE": "RULE",
     "CHAPTER": "CH",
     "TEXT": "CH",
-    "VOLUME": "VOL",
+    "VOLUME": "PLAN-VOL",
     "SCENE": "SCENE",
     "EVENT": "EVT",
     "ASSERTION": "AST",
@@ -116,11 +116,12 @@ TYPE_TO_PREFIX: dict[str, str] = {
     "RELEASE": "REL",
     "INDEX": "IDX",
     "IMPORT": "IMP",
-    "SKILL": "SKL",
-    "CREATURE": "CREATURE",
-    "WORLD": "WORLD",
-    "FATE": "FATE",
-    "ASSET": "ASSET",
+    # 下面五个是 2026-11-22 的迁移去向：PRD 没有对家，按作者裁定压到最接近的 PRD 前缀。
+    "SKILL": "ITEM",       # 技能 → 物品
+    "CREATURE": "CHAR",    # 生物 → 角色（PRD：生物是角色标签）
+    "WORLD": "RULE",       # 世界条目／体系总表 → 世界规则
+    "FATE": "CHAR",        # 命途 → 角色
+    "ASSET": "ITEM",       # 素材 → 物品
     "RELATIONSHIP": "RELSHIP",
 }
 
