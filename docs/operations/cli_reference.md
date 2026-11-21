@@ -1,7 +1,8 @@
 # CLI 参考
 
-对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§8）与 T03 的 `rebuild-index`/`search`，
-顶层命令共 **19** 条（`task` / `maps` / `schema` 是命令组，各自还有子命令）。
+对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§10）、T03 的 `rebuild-index`/`search`、
+T06 的 `release` 与 T07 的 `import`。顶层命令共 **28** 条
+（`task` / `maps` / `schema` / `release` / `import` 是命令组，各自还有子命令）。
 全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
@@ -124,7 +125,7 @@ Vault 路径、项目列表（含 Markdown 计数）、索引（库文件名 `bu
 `aliases` `source_refs` `narrative_order` `blocks` `fts_blocks`，加 T04 的 `events`
 `event_edges` `assertions` `state_changes` `knowledge` `revelations`。
 
-剩下 3 张是空表：`foreshadowing`（伏笔契约待 T07/T09）、`dependencies`（T07 之后）、
+剩下 3 张是空表：`foreshadowing`（伏笔契约待 T09）、`dependencies`（T09 之后）、
 `issues`（**问题的权威副本在 runtime，不进索引**——见第 7 节）。
 
 「建了空表」不等于「已支持」，也**不等于「表里有数据」**：真库六个语义表里
@@ -457,6 +458,64 @@ novel change list [--status IMPACTED]
 - 首次运行建立基线，不产生「改动」记录。
 - 历史保留最近 100 条，存 `<runtime>/authorship/<project_id>.json`。
 - 只接受作者身份。
+
+---
+
+## 8.5 原稿导入（`novel import`）
+
+把旧稿搬进系统。四步，**每一步都不写正式区**：
+
+```bash
+novel import scan ~/旧稿/ --batch-size 20 --as ingestor   # 保全 + 解析 + 提取 + 抽样
+novel import report IMP-000001 --chapters                 # 看账
+novel import stage IMP-000001 --batch 1 --as writer       # 进 staging
+# 之后仍走 approve artifact → release prepare → approve release → release execute
+```
+
+### `novel import scan <路径…> [--level N] [--seed S] [--sample N] [--batch-size N] [--json]`
+
+`路径` 可以是文件也可以是目录（目录会展开，同名不同内容直接拒绝）。收 `.md` / `.markdown` / `.txt`。
+
+- **原始字节原样保全**到 `90_Archive/Imports/<IMP>/raw/`，写后逐份回读 sha256 比对，
+  不符即中止整次导入。不转码、不归一化换行；
+- 非 UTF-8 文件（GBK 等）**拒绝并说明**——本系统不猜编码。docx/epub/pdf 属 P1，同样明确拒绝；
+- `--level N` 按第 N 级 Markdown 标题切章，`0`（默认）取最浅一级；
+- `--seed` 抽样种子，同种子同结果；`--sample` 抽样条数，默认 100；
+- 逐维度给结论，**任何一维不达标退出码就是 1**，不写「导入成功」这种总括。
+
+### `novel import report <IMP> [--chapters] [--mentions] [--json]`
+
+十一个维度逐条列出，另可看章表与候选提及。候选提及**全部是候选**（`approved: false`），
+是否成为事实由作者判断。
+
+### `novel import stage <IMP> --batch N [--batch-size N] --as writer`
+
+把某一批写进 staging，返回任务号。`--batch-size 0` 表示整批一次放完。
+
+- **只有标题没有正文的空章不发号**，会在输出里点名「跳过」，不占 CH 号；
+- 台账 `05_Ledgers/Imports/<IMP>.md` 覆盖**整个导入**：已发号的写 CH 号，
+  未发的写「尚未发号」，空章写「不进正文」；
+- 重跑同一批**复用原号**（不多吃一个号）；换切分方式则拒绝，因为已发的号会与章对不上。
+
+### `novel import where <IMP> <定位符>`
+
+按 `文件名#L起-L止` 回读原文。定位符只用文件名与行号——不带章号（章号是解析结果，
+换切分规则就变）、不带块 ID（派生数据）。读不到就报错，不返回空串。
+
+```bash
+novel import where IMP-000001 "旧稿.md#L3-L9"
+```
+
+### `novel import list [--json]`
+
+历次导入与各自的可发布状态。
+
+### 两个不要混淆的口径
+
+- **未映射段落不阻断发布**（PRD §12.4 允许映射到「显式未映射区」），
+  但它让「非空段落全部有归属」这一维度不达标；
+- **抽样准确率只衡量来源定位**（定位符能否反查回原文），不衡量语义提取对不对。
+  后者要人看，系统不代劳。
 
 ---
 

@@ -167,7 +167,8 @@ Agent 唯一能碰正式区的路径是 `publish`，而 `publish` 需要你的�
 | 时机 | 动作 |
 |---|---|
 | 每章开写前 | `task create --type preflight` 拿资料包 |
-| 每章写完 | `stage` → `diff` → `approve` → `publish` |
+| 每章写完 | `stage` → `diff` → `approve artifact` → `release prepare` → `approve release` → `publish` |
 | 每章入库后 | 让记忆管理员提记忆更新，你批准后 `publish` |
+| 搬旧稿进来 | `import scan` → `import report` → `import stage --batch N`，之后同上 |
 | 每周 | `novel backup --label "周备份"`，并复制到外部硬盘 |
 | 任何时候手改了文件 | `novel adopt --dry-run` 看一眼，再 `adopt` |

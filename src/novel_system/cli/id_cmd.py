@@ -10,8 +10,9 @@ from __future__ import annotations
 import argparse
 
 from .. import config as cfg_mod
-from ..errors import ConflictError
+from ..errors import ConflictError, SecurityError, UsageError
 from ..ids import IdAllocator, IdRegistry, resolve_prefix
+from ..paths import ProjectPaths
 from ._common import fail, heading, info, ok, warn
 
 
@@ -19,23 +20,42 @@ def cmd_allocate_id(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     vault = cfg.require_vault()
     runtime = cfg.require_runtime()
 
-    prefix = resolve_prefix(args.type)
-    alloc = IdAllocator(vault, runtime, actor=getattr(args, "actor", None) or "author-local")
+    # 区划从项目布局取，不写死目录名：正式区 / 待发布区 / 归档区。
+    # 没指定项目时**不做「只有一个项目就用它」的推断**（本系统一贯如此），
+    # 退回「全库按正式区」的从严口径，并在输出里说明——两种口径数出来的重号数
+    # 可以不一样，不说明就会让人以为库里的重号比实际多。
+    try:
+        pp = ProjectPaths.resolve(cfg, getattr(args, "project", None))
+        areas = pp.area_roots()
+        scope_note = ""
+    except (UsageError, SecurityError, cfg_mod.ConfigError):
+        areas = None
+        scope_note = "未指定 --project，按「全库皆正式区」的从严口径判重（数可能偏多）"
 
-    registry = IdRegistry(vault)
+    prefix = resolve_prefix(args.type)
+    alloc = IdAllocator(
+        vault, runtime, actor=getattr(args, "actor", None) or "author-local", areas=areas
+    )
+
+    registry = IdRegistry(vault, areas=areas)
     current_max = registry.max_number(prefix)
     stray = registry.stray_compound(prefix)
 
     heading(f"分配 {prefix}（当前最大号 {current_max:04d}）")
+    if scope_note:
+        info(scope_note)
     if stray:
         warn(f"另有 {len(stray)} 个复合型 ID 以 {prefix}- 开头，不计入号段：")
         for raw, source in stray[:5]:
             info(f"{raw} ← {source}")
         info("PRD §8.1 禁止复合型；迁移前它们不参与取号")
 
-    others = [k for k in registry.collisions() if not k.startswith(prefix + "-")]
+    others = [k for k in registry.conflicts() if not k.startswith(prefix + "-")]
     if others:
-        warn(f"库内另有 {len(others)} 个其它前缀的重复 ID（与本前缀无关，validate 会报）")
+        warn(f"正式区另有 {len(others)} 个其它前缀的重复 ID（与本前缀无关，validate 会报）")
+    in_flight = registry.pending_copies()
+    if in_flight:
+        info(f"另有 {len(in_flight)} 个 ID 在待发布区有副本（同一对象在途，不算撞号）")
 
     try:
         issued = alloc.allocate(

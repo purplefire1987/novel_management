@@ -140,13 +140,34 @@ novel release status                                      # 判词 OK 才算落�
 
 ## 六、把现有稿子搬进来
 
-新系统不提供「一键导入」——旧稿的目录口径各不相同，自动搬迁必然出错。建议：
+两条路，按原稿的规整程度选。
+
+**A. 有 `.md` / `.txt` 原稿，想让它自动切章**（0.10.0 起）：
+
+```bash
+novel backup --label "搬迁前"                              # 先备份，别跳
+novel import scan ~/旧稿/ --batch-size 20 --as ingestor     # 保全原文 + 切章 + 抽取 + 抽样
+novel import report IMP-000001 --chapters                   # 看它切成了什么
+novel import stage IMP-000001 --batch 1 --as writer         # 第一批进 staging
+# 之后就是第五节那套：approve → release prepare → approve release → publish
+```
+
+它**不替你决定**：切不出章就整篇一章并说明；没提到人名就报「待提取」（覆盖不完整
+不阻断发布）；GBK 文件直接拒绝而不是猜编码。原稿原样存在
+`90_Archive/Imports/<IMP>/raw/`，`import where IMP-000001 "旧稿.md#L3-L9"` 随时回读。
+
+docx / epub / pdf 属 P1，本版明确不支持——先另存为 UTF-8 的 Markdown 或 TXT。
+
+**B. 稿子是散的、结构要人来定**（照下面五步手工搬）：
 
 1. 先 `novel backup --label "搬迁前"`；
 2. 正文原样放进 `03_Manuscripts/Drafts/`，**不要改写、不要手工转录**（手抄会漏字）；
 3. 设定逐类放进 `01_Canon/` 对应子目录；
 4. 跑 `novel validate`，把断链与重复 ID 列出来，一条条处理；
 5. 处理完 `novel adopt --as author` 登记基线，之后系统才知道哪些是你手改的。
+
+两条路都不改你的字。区别只在「谁来决定章怎么切」：A 让系统切完给你看，
+B 你自己摆好。
 
 ## 七、出问题怎么办
 
@@ -157,6 +178,9 @@ novel release status                                      # 判词 OK 才算落�
 | 发布被拒「缺批准」 | `novel task inspect TASK-xxx` 看批准状态 |
 | 发布被拒「内容指纹不符」 | staging 在批准后被改过，重新 `approve` |
 | 想撤销刚做的事 | `novel backup --list` 找最近备份，`restore --dry-run` 预演 |
+| `import scan` 退出码 1 | 正常：有维度没达标（常见是某份文件非 UTF-8 被拒）。逐行看它标了哪一项 |
+| 导入切出的章不对 | 整篇一章多半是没有章节标记，用 `--level N` 指定层级，或手工搬（上面 B 路） |
+| `import stage` 说「换切分方式」 | 同一导入不能改 `--batch-size`。要改就 `import scan` 起一个新导入号 |
 
 任何情况下都**不要**手工删除 `00_System/` 或 `01_Canon/` 里的文件来「修问题」。
 先备份，再看报告。

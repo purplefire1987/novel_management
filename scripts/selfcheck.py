@@ -129,6 +129,57 @@ def main_cli() -> int:
 
     run("publish 重复必须拒绝", ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"], expect=1)
     run("adopt", ["adopt", *common, "--as", "author"])
+
+    # ---- T07 原稿导入：scan（不写正式区）→ stage（只写 staging） ----
+    old_src = work / "old"
+    old_src.mkdir(parents=True, exist_ok=True)
+    (old_src / "旧稿.md").write_text(
+        "# 第一章 渡口\n\n雨落在石阶上。CHAR-0001 撑着伞。\n\n# 第二章 夜航\n\n船停了一夜。\n",
+        encoding="utf-8",
+    )
+    # 非 UTF-8 必须被拒绝：不猜编码是硬约定，报告里要写明
+    (old_src / "乱码.txt").write_bytes("第一章 乱码\n\n正文\n".encode("gbk"))
+
+    def scan_said_no(out: str):
+        if "IMP-000001" not in out:
+            return False, "报告里没有导入号"
+        if "不猜" not in out:
+            return False, "GBK 文件未被拒绝，或拒绝理由没写清"
+        return True, ""
+
+    # 有维度未达标（GBK 被拒）时 scan 返回 1：部分失败不许报成全量成功
+    run(
+        "import scan 部分失败返回 1",
+        ["import", "scan", *common, str(old_src), "--as", "ingestor", "--batch-size", "1"],
+        expect=1,
+        check=scan_said_no,
+    )
+    run("import list", ["import", "list", *common])
+    run("import report", ["import", "report", *common, "IMP-000001", "--chapters"])
+    run(
+        "import where 反查原文",
+        ["import", "where", *common, "IMP-000001", "旧稿.md#L3"],
+        check=lambda out: ("石阶" in out, "定位符没取回正文"),
+    )
+    run(
+        "import stage 第一批",
+        ["import", "stage", *common, "IMP-000001", "--batch", "1", "--batch-size", "1", "--as", "writer"],
+    )
+    # 第二批发号曾经被 staging 里的副本判成撞号而卡死，这里钉住它
+    run(
+        "import stage 第二批（发号不被 staging 副本卡住）",
+        ["import", "stage", *common, "IMP-000001", "--batch", "2", "--batch-size", "1", "--as", "writer"],
+    )
+
+    ledger = project / "05_Ledgers" / "Imports" / "IMP-000001.md"
+    staging_ledger = sorted((project / "07_Staging").glob("*/ingest/05_Ledgers/Imports/IMP-000001.md"))
+    if not staging_ledger:
+        RESULTS.append(("台账覆盖全计划", False, "staging 里没有台账"))
+    else:
+        text = staging_ledger[-1].read_text(encoding="utf-8")
+        ok = "第一章 渡口" in text and "第二章 夜航" in text and "staged_batches: [1, 2]" in text
+        RESULTS.append(("台账覆盖全计划", ok, "台账丢了已发批次或没有批次记录"))
+
     run("backup", ["backup", *common, "--as", "author", "--label", "smoke"])
 
     backups = sorted(p.name for p in (runtime / "backups").glob("BK-*"))

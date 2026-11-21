@@ -26,6 +26,7 @@
 | [ADR-013](ADR-013-event-dag-and-state-intervals.md) | 时间线用事件 DAG；状态按区间；认知与事实分表 | 已接受 |
 | [ADR-014](ADR-014-approval-binds-bytes.md) | 批准绑定对象与当前字节；BLOCKER 不可豁免；RETCON 独立审批 | 已接受（细化 006） |
 | [ADR-015](ADR-015-release-protocol-and-recovery.md) | 发布先建完再切指针；恢复靠四点交叉验证；锁由内核判定 | 已接受（细化 009） |
+| [ADR-016](ADR-016-manuscript-import.md) | 原稿导入保原始字节；定位符只用文件名与行号；分维度记账 | 已接受（细化 006） |
 
 ## 这些 ADR 里最重要的三句话
 

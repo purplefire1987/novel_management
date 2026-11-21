@@ -53,10 +53,12 @@ from .workspace import (
     apply_changes,
     build_snapshot,
     copy_tree,
+    project_rel,
     release_change_loader,
     scan_snapshot,
     skip_parts,
     source_change_loader,
+    vault_rel,
     write_change_bytes,
 )
 
@@ -224,12 +226,15 @@ def prepare_rollback(
 
     changes: list[Change] = []
     removals: list[str] = []
+    # 清单是 Vault 相对（快照的坐标系），计划是项目相对——换算，不混用。
     for path in sorted(target_files):
         if current_files.get(path) != target_files[path]:
             op = "modify" if path in current_files else "add"
-            changes.append(Change(path=path, op=op, content_hash=target_files[path]))
+            changes.append(
+                Change(path=project_rel(pp, path), op=op, content_hash=target_files[path])
+            )
     for path in sorted(set(current_files) - set(target_files)):
-        removals.append(path)
+        removals.append(project_rel(pp, path))
     if not changes and not removals:
         raise ConflictError(f"{target_release} 的内容与当前正式版完全相同，无需回退")
 
@@ -341,25 +346,26 @@ def _validate_candidate(pp: ProjectPaths, snapshot: Path, plan: ReleasePlan, fil
         pp.at(rel)
 
 
-def _check_file_set(snapshot: Path, plan: ReleasePlan) -> list[ManifestFile]:
-    """第 7 步：最终文件集与计划一致。"""
+def _check_file_set(pp: ProjectPaths, snapshot: Path, plan: ReleasePlan) -> list[ManifestFile]:
+    """第 7 步：最终文件集与计划一致。路径比的是 Vault 相对（快照的坐标系）。"""
     files = scan_snapshot(snapshot)
     present = {item.path: item for item in files}
     for change in plan.changes:
+        rel = vault_rel(pp, change.path)
         if change.op == "delete":
-            if change.path in present:
+            if rel in present:
                 raise ConflictError(f"{change.path} 应删除但仍在候选区")
             continue
-        item = present.get(change.path)
+        item = present.get(rel)
         if item is None:
-            raise ConflictError(f"候选区缺少 {change.path}")
+            raise ConflictError(f"候选区缺少 {change.path}（应在 {rel}）")
         if item.sha256 != change.content_hash:
             raise ConflictError(
                 f"{change.path} 在候选区里的哈希与计划不符"
                 f"（{item.sha256[:12]}… ≠ {change.content_hash[:12]}…）"
             )
     for rel in plan.removals:
-        if rel in present:
+        if vault_rel(pp, rel) in present:
             raise ConflictError(f"{rel} 应删除但仍在候选区")
     return files
 
@@ -634,7 +640,7 @@ def execute(
         _maybe_fault("before:4")
         files_dir.mkdir(parents=True, exist_ok=True)
         if meta.bytes_from:
-            loader = release_change_loader(store.snapshot_dir(meta.bytes_from))
+            loader = release_change_loader(pp, store.snapshot_dir(meta.bytes_from))
         else:
             # staging 路径来自计划自身（meta），不依赖任务记录还在不在。
             loader = source_change_loader(pp, dict(meta.staged_paths or {}))
@@ -646,7 +652,7 @@ def execute(
     # ---- 5 应用精确字节 ----
     if 5 not in done:
         _maybe_fault("before:5")
-        written = apply_changes(snapshot, plan, files_dir)
+        written = apply_changes(pp, snapshot, plan, files_dir)
         _mark(store, journal, 5, "done", f"写入 {len(written)} 个文件")
 
     # ---- 6 校验 ----
@@ -658,7 +664,7 @@ def execute(
     # ---- 7 文件集一致 ----
     if 7 not in done:
         _maybe_fault("before:7")
-        files = _check_file_set(snapshot, plan)
+        files = _check_file_set(pp, snapshot, plan)
         _mark(store, journal, 7, "done", f"{len(files)} 个文件")
     else:
         files = scan_snapshot(snapshot)

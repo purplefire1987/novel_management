@@ -155,6 +155,78 @@ def test_same_prefixed_filenames_are_not_collisions(tmp_path: Path) -> None:
     assert {c[0] for c in registry.compounds} == {"VOL-0001-S1-DETAIL", "VOL-0001-PLAN", "VOL-0001-DESIGN"}
 
 
+# ---- 分级查重（T07 发现：发布过一次就发不出号） ----------------------------
+
+def _areas(root: Path) -> dict[str, list[Path]]:
+    return {
+        "formal": [root / "03_Manuscripts"],
+        "pending": [root / "07_Staging"],
+        "archive": [root / "90_Archive"],
+    }
+
+
+def test_pending_copy_is_not_a_conflict(tmp_path: Path) -> None:
+    """正式区一份 + staging 一份 = 同一对象在途，不算撞号。
+
+    这是 T07 的真实现场：第一批发布后，正式区与 staging 各有一份 CH-0001，
+    旧实现把它判成重号，第二批连号都发不出来。
+    """
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "07_Staging" / "TASK-1" / "CH-0001.md", _card("CH-0001"))
+
+    registry = IdRegistry(root, areas=_areas(root))
+    assert registry.collisions(), "物理上确实是两处，得看得见"
+    assert registry.conflicts() == {}, "但正式区只有一份，不是撞号"
+    assert set(registry.pending_copies()) == {"CH-0001"}
+    assert [r.area for r in registry.records if r.id == "CH-0001"] == ["formal", "pending"]
+
+
+def test_two_formal_copies_are_a_conflict(tmp_path: Path) -> None:
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "03_Manuscripts" / "CH-0001_copy.md", _card("CH-0001"))
+    registry = IdRegistry(root, areas=_areas(root))
+    assert set(registry.conflicts()) == {"CH-0001"}
+
+
+def test_out_of_area_copy_is_tainted_not_conflict(tmp_path: Path) -> None:
+    """区划外那份（Vault 根的旧归档、`99_Archive/legacy_v1` 之类）不算撞号。
+
+    算成撞号的结果是「整库快照里有过的号，今天一个都发不出来」。
+    但它也不能隐身：进 tainted，报告里看得见。
+    """
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "99_Archive" / "legacy" / "CH-0001.md", _card("CH-0001"))
+    registry = IdRegistry(root, areas=_areas(root))
+    assert registry.conflicts() == {}
+    assert set(registry.tainted()) == {"CH-0001"}
+    assert {r.area for r in registry.collisions()["CH-0001"]} == {"formal", "other"}
+
+
+def test_archive_copy_is_tainted_not_conflict(tmp_path: Path) -> None:
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "90_Archive" / "CH-0001.md", _card("CH-0001"))
+    registry = IdRegistry(root, areas=_areas(root))
+    assert registry.conflicts() == {}
+    assert set(registry.tainted()) == {"CH-0001"}
+
+
+def test_without_areas_everything_is_formal(tmp_path: Path) -> None:
+    """忘了传区划时按「全库皆正式区」处理：宁可从严，不能悄悄放松。"""
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "07_Staging" / "CH-0001.md", _card("CH-0001"))
+    assert set(IdRegistry(root).conflicts()) == {"CH-0001"}
+
+
+def test_unknown_area_name_rejected(tmp_path: Path) -> None:
+    with pytest.raises(UsageError, match="未知 ID 区划"):
+        IdRegistry(tmp_path, areas={"formal": [], "trash": [tmp_path]})
+
+
 # ---- 分配 ----------------------------------------------------------------
 
 def test_allocate_continues_sequence(vault: Path, runtime: Path) -> None:
@@ -238,6 +310,25 @@ def test_allow_dirty_flag(vault: Path, runtime: Path, tmp_path: Path) -> None:
     _write(root / "B" / "ASSET-0001_y.md", _card("ASSET-0001"))
     alloc = IdAllocator(root, runtime, actor="test")
     assert alloc.allocate("ASSET", allow_dirty=True) == ["ASSET-0002"]
+
+
+def test_allocate_survives_pending_copy(tmp_path: Path, runtime: Path) -> None:
+    """发布过一次之后，staging 里那份副本不该把后续发号卡死（T07 回归）。"""
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "07_Staging" / "TASK-1" / "CH-0001.md", _card("CH-0001"))
+    alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
+    assert alloc.allocate("chapter", count=2) == ["CH-0002", "CH-0003"]
+
+
+def test_allocate_still_refuses_two_formal_copies(tmp_path: Path, runtime: Path) -> None:
+    """区划不能把「真撞号」也一起放过去。"""
+    root = tmp_path / "v"
+    _write(root / "03_Manuscripts" / "CH-0001.md", _card("CH-0001"))
+    _write(root / "03_Manuscripts" / "CH-0001_copy.md", _card("CH-0001"))
+    alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
+    with pytest.raises(ConflictError, match="正式区"):
+        alloc.allocate("chapter")
 
 
 def test_lock_is_honored(vault: Path, runtime: Path) -> None:

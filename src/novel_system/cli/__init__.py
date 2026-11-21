@@ -24,6 +24,7 @@ from . import (
     change_cmd,
     flow,
     id_cmd,
+    import_cmd,
     index_cmd,
     init,
     maps_cmd,
@@ -58,6 +59,7 @@ HANDLERS = {
     "adopt": flow.cmd_adopt,
     "publish": flow.cmd_publish,
     "release": release_cmd.cmd_release,
+    "import": import_cmd.cmd_import,
     "backup": backup_cmd.cmd_backup,
     "restore": backup_cmd.cmd_restore,
     "maps": maps_cmd.cmd_maps,
@@ -372,6 +374,44 @@ def build_parser() -> argparse.ArgumentParser:
     p_runlock = release_sub.add_parser("unlock", help="检查发布锁是否被持有（不按年龄猜）", parents=[sub_common])
     p_runlock.add_argument("--confirm", action="store_true", help="执行检查（获取并立即释放）")
     p_runlock.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    # ---- import（T07 原稿导入）----
+    p_import = sub.add_parser("import", help="原稿导入：扫描、报告、分批入 staging", parents=[sub_common])
+    import_sub = p_import.add_subparsers(dest="import_command", required=True)
+
+    p_iscan = import_sub.add_parser(
+        "scan", help="扫描原稿：保全原始字节、解析章节、提取候选、抽样（不写正式区）", parents=[sub_common]
+    )
+    p_iscan.add_argument("paths", nargs="+", help="一个或多个 .md/.markdown/.txt（也可以是目录）")
+    p_iscan.add_argument("--level", type=int, default=0, help="按第几级 Markdown 标题切章（0=自动取最浅）")
+    p_iscan.add_argument("--seed", default="", help="抽样种子；同种子同结果")
+    p_iscan.add_argument("--sample", type=int, default=0, help="抽样条数，默认 100")
+    p_iscan.add_argument("--batch-size", type=int, default=0, help="每批章数（只用于提示，不切分）")
+    p_iscan.add_argument("--json", action="store_true")
+    p_iscan.add_argument("--as", dest="actor", default=None, help="操作者")
+
+    p_irep = import_sub.add_parser("report", help="查看某次导入的全部维度", parents=[sub_common])
+    p_irep.add_argument("import_id")
+    p_irep.add_argument("--chapters", action="store_true", help="列出每章的行区间")
+    p_irep.add_argument("--mentions", action="store_true", help="列出候选提及")
+    p_irep.add_argument("--json", action="store_true")
+
+    p_istage = import_sub.add_parser(
+        "stage", help="把某一批章节写进 staging（不写正式区）", parents=[sub_common]
+    )
+    p_istage.add_argument("import_id")
+    p_istage.add_argument("--batch", type=int, default=1, help="第几批（1 起）")
+    p_istage.add_argument("--batch-size", type=int, default=0, help="每批章数；0 表示全放一批")
+    p_istage.add_argument("--as", dest="actor", default=None, help="操作者")
+
+    p_iwhere = import_sub.add_parser(
+        "where", help="按来源定位符回读原文（验证来源是否可解析）", parents=[sub_common]
+    )
+    p_iwhere.add_argument("import_id")
+    p_iwhere.add_argument("locator", help="形如 文件名#L12-L18")
+
+    p_ilist = import_sub.add_parser("list", help="列出历次导入", parents=[sub_common])
+    p_ilist.add_argument("--json", action="store_true")
 
     # ---- backup / restore ----
     p_backup = sub.add_parser("backup", help="创建本地备份（含清单与回读校验）", parents=[sub_common])

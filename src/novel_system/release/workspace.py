@@ -72,6 +72,43 @@ def _should_skip(rel_parts: tuple[str, ...], skip: frozenset[str]) -> bool:
     return any(part in skip for part in rel_parts)
 
 
+def vault_rel(pp: ProjectPaths, project_rel: str) -> str:
+    """**项目相对**（`03_Manuscripts/...`）→ **Vault 相对**（快照的坐标系）。
+
+    计划里的路径是项目相对（`_scope_of` 靠这个前缀分类，canon 闸也靠它），
+    快照与清单的路径是 Vault 相对（索引、git 提交都用这套）。两套看着像，
+    混用不报错、只会把文件落到错的地方，所以两个方向各给一个函数，
+    并且**互相拒绝对方的输入**。
+    """
+    if _already_vault_rel(pp, project_rel):
+        raise UsageError(
+            f"{project_rel} 已经是 Vault 相对路径；计划里的路径必须是项目相对"
+            f"（应写成 {project_rel[len(pp.rel(pp.root)) + 1 :]}）"
+        )
+    return pp.rel(pp.at(project_rel))
+
+
+def project_rel(pp: ProjectPaths, vault_path: str) -> str:
+    """**Vault 相对**（清单、索引的坐标系）→ **项目相对**（计划的坐标系）。
+
+    回退计划的路径来自旧清单，天生是 Vault 相对的；不换算就会把
+    `10_Projects/<项目>/03_Manuscripts/...` 当成项目相对再拼一次项目根。
+    """
+    root_rel = pp.rel(pp.root)
+    prefix = root_rel + "/"
+    if not vault_path.startswith(prefix):
+        raise ConflictError(
+            f"{vault_path} 不在项目 {pp.project_id} 之内（项目根 {root_rel}），"
+            "发布只处理项目内的文件"
+        )
+    return vault_path[len(prefix) :]
+
+
+def _already_vault_rel(pp: ProjectPaths, path: str) -> bool:
+    root_rel = pp.rel(pp.root)
+    return path == root_rel or path.startswith(root_rel + "/")
+
+
 def copy_tree(src: Path, dest: Path, skip: tuple[str, ...]) -> None:
     """复制 src 到 dest，跳过指定目录名。不保留软链接（跟进去会逃出快照）。"""
     skip_set = frozenset(skip)
@@ -120,25 +157,28 @@ def write_change_bytes(
     return out
 
 
-def apply_changes(snapshot: Path, plan: ReleasePlan, files_dir: Path) -> list[str]:
-    """把 `files/` 里的字节落进快照，并处理删除项。返回实际写入的路径。"""
+def apply_changes(pp: ProjectPaths, snapshot: Path, plan: ReleasePlan, files_dir: Path) -> list[str]:
+    """把 `files/` 里的字节落进快照，并处理删除项。返回实际写入的路径。
+
+    `files/` 按项目相对路径存（与 staging 对齐），快照按 Vault 相对路径落
+    （与重建索引的产物一致）——两者不是同一个根，必须换算。
+    """
     written: list[str] = []
     for change in plan.changes:
+        target = snapshot / vault_rel(pp, change.path)
         if change.op == "delete":
-            target = snapshot / change.path
             if target.exists():
                 target.unlink()
             continue
         source = files_dir / change.path
         if not source.exists():
             raise ConflictError(f"隔离工作区缺少 {change.path} 的字节，拒绝继续")
-        target = snapshot / change.path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
         written.append(change.path)
 
     for rel in plan.removals:
-        target = snapshot / rel
+        target = snapshot / vault_rel(pp, rel)
         if target.exists():
             target.unlink()
     return written
@@ -243,18 +283,22 @@ def build_snapshot(
         # 不复用会留下两份内容，谁也不敢删。
         shutil.rmtree(dest)
     copy_tree(pp.vault, dest, skip)
-    written = apply_changes(dest, plan, files_dir)
+    written = apply_changes(pp, dest, plan, files_dir)
     revision, kind, warnings = commit_snapshot(dest, release_id, plan_hash)
     files = scan_snapshot(dest)
 
     # 计划里的每一条都必须真的落在快照里：这是「文件集与计划一致」的第一次核对。
+    # 比较的是**换算后**的 Vault 相对路径——拿项目相对路径去比，会把上面说的
+    # 幽灵文件当成「已落位」，检查看着通过而实际发错了地方。
     present = {item.path for item in files}
-    missing = [c.path for c in plan.changes if c.op != "delete" and c.path not in present]
+    missing = [
+        c.path for c in plan.changes if c.op != "delete" and vault_rel(pp, c.path) not in present
+    ]
     if missing:
         raise ConflictError(f"隔离工作区缺少计划中的文件：{missing}")
-    for rel in plan.removals:
-        if rel in present:
-            raise ConflictError(f"隔离工作区里 {rel} 应已删除但仍在")
+    absent = [rel for rel in plan.removals if vault_rel(pp, rel) in present]
+    if absent:
+        raise ConflictError(f"隔离工作区里 {absent} 应已删除但仍在")
 
     return SnapshotResult(
         path=dest,
@@ -282,11 +326,11 @@ def source_change_loader(pp: ProjectPaths, staging_paths: dict[str, str]):
     return load
 
 
-def release_change_loader(snapshot: Path):
-    """从旧发布的快照读字节（回退用）。"""
+def release_change_loader(pp: ProjectPaths, snapshot: Path):
+    """从旧发布的快照读字节（回退用）。路径同样要换成 Vault 相对。"""
 
     def load(change: Change) -> bytes:
-        path = snapshot / change.path
+        path = snapshot / vault_rel(pp, change.path)
         if not path.exists():
             raise ConflictError(f"旧发布快照里没有 {change.path}，无法回退到它")
         return path.read_bytes()

@@ -155,6 +155,10 @@ class IdRecord:
     number: int
     source: str  # 项目内相对路径
     origin: str  # frontmatter / filename
+    area: str = "formal"  # formal / pending / archive
+
+    def __str__(self) -> str:
+        return f"{self.id}@{self.source}[{self.area}]"
 
 
 def split_id(raw: str) -> tuple[str, int] | None:
@@ -180,14 +184,55 @@ def is_compound_id(raw: str) -> bool:
 
 
 class IdRegistry:
-    """扫全 Vault 收集 ID。只读，不缓存跨调用结果。"""
+    """扫全 Vault 收集 ID。只读，不缓存跨调用结果。
 
-    def __init__(self, vault: Path, include_hidden: bool = False):
+    **查重是分级的**，因为「同一个 ID 出现在两处」有三种完全不同的来由：
+
+    - 正式区里出现两次：真撞号。按 ID 取对象永远有歧义，必须拦住（FAIL）。
+    - 正式区一份 + 待发布区（staging/审阅）一份：**同一个对象在途**。
+      拷贝是发布流程的正常中间态，判成撞号等于「发布一次就再也发不出号」。
+    - 正式区一份 + 归档区一份：多半是历史归档没删干净，只告警（WARN）。
+
+    区划由 `areas` 传入（`ProjectPaths.area_roots()`），不在这里写死目录名。
+    **不传 areas 时全库一律按正式区处理**——宁可从严，也不能因为调用方忘了
+    传参就悄悄放松查重。
+    """
+
+    def __init__(self, vault: Path, include_hidden: bool = False, areas: dict | None = None):
         self.vault = vault
         self.include_hidden = include_hidden
         self._records: list[IdRecord] | None = None
         self._compounds: list[tuple[str, str]] | None = None
         self._mismatched: list[tuple[str, str, str]] | None = None
+        self._areas = self._normalise_areas(areas)
+
+    def _normalise_areas(self, areas: dict | None) -> dict[str, list[Path]]:
+        out: dict[str, list[Path]] = {"formal": [], "pending": [], "archive": []}
+        for name, roots in (areas or {}).items():
+            if name not in out:
+                raise UsageError(f"未知 ID 区划：{name}（可用 formal / pending / archive）")
+            out[name] = [Path(r).resolve() for r in roots]
+        self._has_areas = any(out.values())
+        if not self._has_areas:
+            out["formal"] = [self.vault.resolve()]
+        return out
+
+    def area_of(self, path: Path) -> str:
+        """formal / pending / archive / other。
+
+        没给区划时全库都是 formal（从严）。给了区划时，落在三区之外的路径记 `other`
+        ——它们不是正式区，不能算撞号；通常是 Vault 根的旧归档（如 `99_Archive/legacy_v1`），
+        把那里的历史副本算成「正式区有两份」会让今天一个号都发不出去。
+        """
+        try:
+            target = path.resolve()
+        except OSError:
+            return "formal"
+        for name in ("formal", "pending", "archive"):
+            for root in self._areas[name]:
+                if target == root or root in target.parents:
+                    return name
+        return "other" if self._has_areas else "formal"
 
     def _collect(self) -> list[IdRecord]:
         records: list[IdRecord] = []
@@ -200,6 +245,7 @@ class IdRegistry:
                 rel = path.relative_to(self.vault).as_posix()
             except ValueError:
                 rel = str(path)
+            area = self.area_of(path)
             head = path.stem.split("_")[0].strip()
             from_name = split_id(head)
 
@@ -214,7 +260,9 @@ class IdRegistry:
                 # VOL-0001-S1-DETAIL，同一卷的五份文档各是不同对象，却被文件名判成同一个。
                 from_meta = split_id(raw_id)
                 if from_meta:
-                    records.append(IdRecord(raw_id, from_meta[0], from_meta[1], rel, "frontmatter"))
+                    records.append(
+                        IdRecord(raw_id, from_meta[0], from_meta[1], rel, "frontmatter", area)
+                    )
                 elif is_compound_id(raw_id):
                     compounds.append((raw_id, rel))
                 if from_name and head != raw_id:
@@ -223,7 +271,7 @@ class IdRegistry:
 
             # 没有 frontmatter id 才退回文件名。
             if from_name:
-                records.append(IdRecord(head, from_name[0], from_name[1], rel, "filename"))
+                records.append(IdRecord(head, from_name[0], from_name[1], rel, "filename", area))
             elif is_compound_id(head):
                 compounds.append((head, rel))
         self._compounds = compounds
@@ -258,11 +306,41 @@ class IdRegistry:
         return max(numbers) if numbers else 0
 
     def collisions(self) -> dict[str, list[IdRecord]]:
-        """同一 ID 出现在多处。键是 ID，值是所有出处。"""
+        """同一 ID 出现在多处（不分区域）。键是 ID，值是所有出处。"""
         buckets: dict[str, list[IdRecord]] = {}
         for record in self.records:
             buckets.setdefault(record.id, []).append(record)
         return {k: v for k, v in buckets.items() if len({r.source for r in v}) > 1}
+
+    def conflicts(self) -> dict[str, list[IdRecord]]:
+        """**正式区内**同一 ID 的两份以上。这是真撞号，发号必须停。"""
+        return {
+            eid: recs
+            for eid, recs in self.collisions().items()
+            if len({r.source for r in recs if r.area == "formal"}) > 1
+        }
+
+    def tainted(self) -> dict[str, list[IdRecord]]:
+        """正式区一份 + 非正式区也有一份（归档或区划外）。只告警，不拦发号。
+
+        归档区里躺着 `legacy_v1` 这种整库快照时，这里会一次报出很多条，
+        所以它是「报告用」的口径，**不参与发号拦截**。
+        """
+        out: dict[str, list[IdRecord]] = {}
+        for eid, recs in self.collisions().items():
+            areas = {r.area for r in recs}
+            if "formal" in areas and ("archive" in areas or "other" in areas):
+                out[eid] = recs
+        return out
+
+    def pending_copies(self) -> dict[str, list[IdRecord]]:
+        """正式区一份 + 待发布区也有一份：同一对象在途。按设计如此，不是问题。"""
+        out: dict[str, list[IdRecord]] = {}
+        for eid, recs in self.collisions().items():
+            areas = {r.area for r in recs}
+            if "formal" in areas and "pending" in areas and not ({"archive", "other"} & areas):
+                out[eid] = recs
+        return out
 
     def stray_compound(self, prefix: str) -> list[tuple[str, str]]:
         """`EVT-CH-0001-001` 这类复合型，按「首段前缀」归到 EVT 名下。
@@ -276,11 +354,19 @@ class IdRegistry:
 class IdAllocator:
     """分配入口。所有正式 ID 都应经这里发出。"""
 
-    def __init__(self, vault: Path, runtime: Path | None, actor: str = "", lock_timeout: float = 5.0):
+    def __init__(
+        self,
+        vault: Path,
+        runtime: Path | None,
+        actor: str = "",
+        lock_timeout: float = 5.0,
+        areas: dict | None = None,
+    ):
         self.vault = vault
         self.runtime = runtime
         self.actor = actor or "unknown"
         self.lock_timeout = lock_timeout
+        self.areas = areas
 
     # ---- 锁 ----------------------------------------------------------
     def _lock_path(self) -> Path:
@@ -333,22 +419,22 @@ class IdAllocator:
         if count < 1:
             raise UsageError("--count 至少为 1")
         prefix = resolve_prefix(kind)
-        registry = IdRegistry(self.vault)
+        registry = IdRegistry(self.vault, areas=self.areas)
 
-        # 只拦本前缀的重号。ASSET 撞号不该让 CHAR 也发不出号——那是两件事，
-        # 全库重号由 validate 负责报。带病发号只在**本前缀**有歧义时才危险。
+        # 只拦本前缀的**正式区内**重号。理由分两层：
+        # 1. 只拦本前缀：ASSET 撞号不该让 CHAR 也发不出号，全库重号由 validate 报。
+        # 2. 只看正式区：staging 里那一份是同一对象的在途副本（T07 导入就是
+        #    「先入 staging 再发布」），把它算成撞号等于发布一次就断掉后续发号。
         dirty = {
-            eid: recs
-            for eid, recs in registry.collisions().items()
-            if (split_id(eid) or (None,))[0] == prefix
+            eid: recs for eid, recs in registry.conflicts().items() if (split_id(eid) or (None,))[0] == prefix
         }
         if dirty and not allow_dirty:
             detail = "；".join(
-                f"{eid}（{'、'.join(sorted({r.source for r in recs}))}）"
+                f"{eid}（{'、'.join(sorted({r.source for r in recs if r.area == 'formal'}))}）"
                 for eid, recs in sorted(dirty.items())[:5]
             )
             raise ConflictError(
-                f"{prefix} 前缀已有 {len(dirty)} 个重复 ID，先修完再发号：{detail}\n"
+                f"{prefix} 前缀在正式区已有 {len(dirty)} 个重复 ID，先修完再发号：{detail}\n"
                 "重复存在时继续发号，会让「按 ID 取对象」永远有歧义。"
                 "确认要带病发号请加 --allow-dirty。"
             )
@@ -359,8 +445,9 @@ class IdAllocator:
             # 只看前者会在删档后从洞里补号——那等于让旧引用指到另一个对象上。
             base = max(registry.max_number(prefix), self._historical_max(prefix))
             issued = [f"{prefix}-{n:0{MIN_WIDTH}d}" for n in range(base + 1, base + count + 1)]
-            # 锁内复查：别的进程可能刚发过号。
-            taken = {r.id for r in IdRegistry(self.vault).records}
+            # 锁内复查：别的进程可能刚发过号。这里查**全部记录**（含 staging/归档）——
+            # 取号取最大号本来就要看全库，否则会把号发到别人盘里的对象上。
+            taken = {r.id for r in IdRegistry(self.vault, areas=self.areas).records}
             clash = [i for i in issued if i in taken]
             if clash:
                 raise ConflictError(f"分配结果与现有 ID 冲突：{clash}")

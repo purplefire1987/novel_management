@@ -23,10 +23,14 @@
 |---|---|
 | 设定、人物、地点、组织 | Vault 内 Markdown/YAML |
 | 规划与正文 | Vault 内文件，状态由 frontmatter 标明 |
+| 原稿（导入的旧稿） | Vault 归档区 `90_Archive/Imports/<IMP>/raw/`，逐份 sha256 记在清单里 |
 | 索引 | Runtime 内，可删除重建 |
 | Agent 任务状态 | Runtime / 任务记录，不等于 Canon |
 
 冲突时以作者确认过的 Markdown/YAML 为准。索引不得反向覆盖事实源。
+
+**原稿不是 Canon**。它进的是归档区（不在正式区六个根目录里），
+引用它的是「定位符 `文件名#L起-L止`」而不是章号——章号是解析结果，会随切分规则变。
 
 ## 路径解析
 
@@ -73,6 +77,25 @@ Agent 产出            →  07_Staging/<TASK-ID>/<分栏>/...   （stage）
 关键设计：**批准绑定内容而不是绑定任务**。批准记录里存每个文件当时的 sha256，发布时逐个重算比对——
 「批的是 A，发的是 B」在哈希这一层就不成立。同时 `stage` 会记下目标正式文件当时的 `base_sha256`，
 所以「提案生成之后作者又改过正式文件」能被识别为冲突，而不是被静默覆盖。
+
+## 导入链路：原稿怎么进这套关口
+
+旧稿导入不是捷径，只是把「生成提案」换成了「从原稿切出来」：
+
+```
+原稿文件            →  90_Archive/Imports/<IMP>/raw/     （import scan，写后回读 sha256）
+解析与提取          →  <runtime>/imports/<IMP>/           （manifest.json + detail.json）
+某批章节            →  07_Staging/<TASK-ID>/<分栏>/...    （import stage）
+之后                →  与 staged 内容完全相同：approve → release prepare → approve release → execute
+```
+
+- **scan 一行正式区都不碰**；`stage` 只写 staging；发布仍是 T06 的 22 步。
+- 台账 `<project>/05_Ledgers/Imports/<IMP>.md` 覆盖**整个导入计划**：
+  已发号的写 CH 号，未发的写「尚未发号」。分批发布时读它才知道还差哪几章。
+- 各批已发的号记在 `<runtime>/imports/<IMP>/assignments.json`，
+  重跑同一批复用原号；换切分方式直接拒绝（已发的号会与章对不上）。
+- **ID 查重按区域分级**：正式区两份才算撞号，staging 那份是同一对象在途。
+  不分级的后果是发布过一次就再也发不出号。
 
 ## 未采纳的方案
 

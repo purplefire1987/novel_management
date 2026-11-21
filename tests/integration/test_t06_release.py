@@ -167,6 +167,31 @@ def test_manifest_pins_index_used_by_queries(env, tmp_path, capsys):
     assert (runtime / "index" / "builds" / f"{build_id}.sqlite").exists()
 
 
+def test_snapshot_has_no_phantom_files(env, tmp_path, capsys):
+    """快照里每个文件都必须落在 Vault 里真实存在的相对路径上。
+
+    计划里的路径是项目相对，快照的根是 Vault。不做换算就会把
+    `03_Manuscripts/...` 直接写到快照根，于是发布索引同时收录正式文件与
+    一份「Vault 里不存在」的幽灵，搜索会命中一个打不开的路径。
+    """
+    vault, runtime, root = env
+    _, release_id = _stage_release(vault, runtime, tmp_path, capsys, text="第一章 正文\n")
+    capsys.readouterr()
+    assert _run(vault, runtime, "release", "execute", release_id, "--as", "author", "--confirm") == 0
+    capsys.readouterr()
+
+    root_rel = root.relative_to(vault).as_posix()
+    snapshot = runtime / "releases" / release_id / "snapshot"
+    started = {p.relative_to(snapshot).as_posix() for p in snapshot.rglob("*.md")}
+    assert f"{root_rel}/{CHAPTER}" in started, "正式文件必须在项目根之下"
+    assert CHAPTER not in started, f"快照根不该出现 {CHAPTER} 这样的项目内路径"
+
+    # 清单与快照逐一对得上，且清单里没有幻觉路径
+    manifest = _status(vault, runtime, capsys)["manifest"]
+    for item in manifest["files"]:
+        assert (snapshot / item["path"]).exists(), item["path"]
+
+
 # --------------------------------------------------------------------------
 # 断点：切换前
 # --------------------------------------------------------------------------

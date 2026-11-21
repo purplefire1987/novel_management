@@ -20,7 +20,18 @@
         "properties": {
           "path": { "type": "string", "minLength": 1 },
           "sha256": { "$ref": "_common.schema.json#/$defs/sha256" },
-          "bytes": { "type": "integer", "minimum": 0 }
+          "bytes": { "type": "integer", "minimum": 0 },
+          "format": {
+            "type": "string",
+            "enum": ["markdown", "text", ""],
+            "description": "识别出的格式；被拒绝的文件可能为空"
+          },
+          "encoding": { "type": "string" },
+          "lines": { "type": "integer", "minimum": 0 },
+          "rejected": {
+            "type": "string",
+            "description": "非空表示未接收，内容必须写明原因。「没进来」和「进来了但写坏了」是两件事，不能合并"
+          }
         }
       }
     },

@@ -29,6 +29,15 @@ DEFAULT_DIRS = {
 
 MANUSCRIPT_STAGES = ("Drafts", "Revisions", "Final")
 
+# ID 查重的三级别。**不是三种目录**——是「同一 ID 出现在两处时该怎么判」：
+# formal 里撞两次 = 真撞号；pending（待发布/审阅）里的副本是同一对象在途，
+# 不算撞号；牵连 archive 只告警，因为历史包袱不该让今天发不出号。
+ID_AREA_KEYS = {
+    "formal": None,  # PUBLISH_TARGETS，见 area_roots()
+    "pending": ("staging_root", "review_root"),
+    "archive": ("archive_root",),
+}
+
 # publish 允许写入的正式区。staging / planning 草稿不在其列。
 PUBLISH_TARGETS = (
     "canon_root",
@@ -175,6 +184,19 @@ class ProjectPaths:
     def control_roots(self) -> list[Path]:
         """受控区根目录：Canon、定稿、账本、记忆、规划、素材。"""
         return [self.in_dir(key) for key in PUBLISH_TARGETS]
+
+    def area_roots(self) -> dict[str, list[Path]]:
+        """按 ID 查重的三级别返回根目录。目录名一律从布局配置取，不写死。
+
+        顺序有意义：同一路径若被两处声明（例如有人把 staging 指到 canon），
+        先声明者胜，所以 formal 排第一。
+        """
+        roots: dict[str, list[Path]] = {"formal": self.control_roots()}
+        for area, keys in ID_AREA_KEYS.items():
+            if keys is None:
+                continue
+            roots[area] = [self.in_dir(key) for key in keys]
+        return roots
 
     def is_control_path(self, target: Path) -> bool:
         """目标是否落在允许 publish 的正式区。"""

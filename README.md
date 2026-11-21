@@ -62,13 +62,14 @@ active_project:
 ## 4. 命令
 
 V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务补入地图、契约、索引、
-时间线、审批与变更、发布几组命令，命令行**现为 27 条**：
+时间线、审批与变更、发布、导入几组命令，命令行**现为 28 条**：
 三条地图命令（`maps paths` / `import-admin` / `build`）、四条契约命令
 （`schema list` / `schema check` / `allocate-id` / `package-hash`，T02）、
 两条索引命令（`rebuild-index` / `search`，T03）、三条时间线与认知命令
 （`state` / `knowledge` / `reveal`，T04）、四条审批与变更命令
 （`inspect` / `issue` / `change` / `impact`，T05）、一条发布命令
-（`release`，含 10 个子命令，T06）。
+（`release`，含 10 个子命令，T06）、一条导入命令
+（`import`，含 5 个子命令，T07）。
 
 | 命令 | 用途 | 写入 |
 |---|---|---|
@@ -109,6 +110,11 @@ V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务�
 | `novel backup` | 本地备份，含清单与回读校验；`--list` 列备份 | 是（Runtime） |
 | `novel restore --dry-run` | 预演恢复，列出新增/冲突/损坏 | 否 |
 | `novel restore` | 执行恢复；默认不覆盖现存文件 | 是 |
+| `novel import scan` | 扫原稿：保全原始字节、解析章节、提取候选、抽样；不写正式区 | 是（归档区 + Runtime） |
+| `novel import report` | 逐维度看账（接收/保全/映射/覆盖/抽样/冲突） | 否 |
+| `novel import stage` | 把某一批章节写进 staging | 是（仅 staging） |
+| `novel import where` | 按 `文件名#L起-L止` 回读原文 | 否 |
+| `novel import list` | 历次导入与可发布状态 | 否 |
 | `novel maps paths` | 打印地图生成用到的全部路径 | 否 |
 | `novel maps import-admin` | 从资产表重排行政区划表；默认预演 | 是（Canon） |
 | `novel maps build` | 重画地图页与两张 canvas；默认预演 | 是（Canon） |
@@ -186,7 +192,7 @@ novel release status                                        # 判词应为 OK
 
 ```text
 src/novel_system/
-  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / backup_cmd / maps_cmd / schema_cmd / id_cmd）
+  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / import_cmd / backup_cmd / maps_cmd / schema_cmd / id_cmd）
   config/         五级配置解析（含 V4.0 Vault_Config 写法兼容）
   paths.py        项目内目录解析与边界校验
   version.py      版本号唯一出处（发布清单与 `--version` 都读它）
@@ -206,7 +212,8 @@ src/novel_system/
   backup/         备份、校验、恢复
   indexing/       SQLite 索引（17 表；schema/source/builder/search/locate）
   timeline/       事件 DAG、状态区间、认知查询
-  validation/ workflows/ agents/ adapters/ core/   预留扩展位（T07–T09）
+  importing/      原稿导入：定位符 / 保全 / 切章 / 提取 / 抽样 / 分批入 staging（T07）
+  validation/ workflows/ agents/ adapters/ core/   预留扩展位（T08–T09）
 config/             默认配置与配置 Schema
 schemas/            22 类数据契约（JSON Schema，additionalProperties 一律 false）
 templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）
@@ -225,8 +232,8 @@ tests/              unit / integration / security / acceptance / fixtures
 ## 7. 测试与检查
 
 ```bash
-pytest                                    # 505 条
-python3 scripts/selfcheck.py              # 26 项端到端冒烟，不依赖 pytest
+pytest                                    # 568 条
+python3 scripts/selfcheck.py              # 33 项端到端冒烟，不依赖 pytest
 python3 scripts/privacy_scan.py --repo .  # 公仓隐私扫描
 ```
 

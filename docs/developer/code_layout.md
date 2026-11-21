@@ -16,6 +16,7 @@ cli/          只做参数解析与输出格式化，不写业务判断
   ├── backup_cmd.py backup / restore
   ├── maps_cmd.py   maps paths / import-admin / build
   ├── schema_cmd.py schema list / check、package-hash
+  ├── import_cmd.py import scan / report / stage / where / list
   └── id_cmd.py     allocate-id
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
@@ -25,7 +26,7 @@ frontmatter.py frontmatter 的唯一解析实现（只顶层 key: value）
 markdown.py    Markdown 解析与块 ID：frontmatter（走 PyYAML）+ 按空行切块 + 行号回指
 canonical.py  字节规范化（去 BOM、LF）与规范化 JSON 包哈希
 schema.py     JSON Schema 校验器（draft 2020-12 实用子集，零依赖）
-ids.py        稳定 ID 分配：前缀表、查重、加锁、审计
+ids.py        稳定 ID 分配：前缀表、分级查重（正式区/待发布/归档）、加锁、审计
 storage/      哈希、原子写、不覆盖写、可验证复制
 audit/        操作日志（ops.jsonl）与操作者校验
 tasks/        任务记录与状态流转
@@ -39,18 +40,26 @@ release/      发布协议（ADR-015）
   ├── workspace.py 隔离快照：复制树 / 落精确字节 / 扫描 / 提交
   ├── gates.py     六道闸（产物批准、BLOCKER、RETCON、正式区、Canon 二次确认）
   └── lock.py      flock 发布锁；不按年龄或 PID 猜死锁
+importing/    原稿导入（ADR-016）
+  ├── model.py     定位符、Chapter/Paragraph/ImportFile、ImportManifest（十一维度）
+  ├── scanner.py   格式/编码/哈希识别；非 UTF-8 与 P1 格式明确拒绝
+  ├── preserve.py  原始字节保全：写后逐份回读 sha256
+  ├── parser.py    切章与段落归属：标题层级、段落总数核对
+  ├── extract.py   候选提及（词典来自 Canon 的 name/aliases），一律 approved=false
+  ├── sampling.py  固定种子抽样；只量定位准确率
+  └── report.py    清单/明细落盘、分批入 staging、台账、已发号持久化
 baseline/     作者编辑基线（adopt）
 backup/       备份、校验、恢复
 adapters/     模型适配层；当前只有 MockLLM（确定性、不联网、不需密钥）
 indexing/     SQLite 索引：schema 建表 / source 取文件 / builder 建库 / search 查询 / locate 定位
 timeline/     事件 DAG（graph）/ 状态区间与认知查询（query）/ 前言提取（model）
-validation/ workflows/ agents/ core/   预留扩展位（T07 之后）
+validation/ workflows/ agents/ core/   预留扩展位（T08 之后）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
 
 ```
-cli → release / backup / staging / tasks / approvals / changes / baseline
+cli → release / importing / backup / staging / tasks / approvals / changes / baseline
     → timeline / indexing
     → paths / storage / audit / config
     → errors
