@@ -2,12 +2,41 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/novel-system/foreshadowing.schema.json",
   "title": "伏笔（埋设、提示与回收）",
-  "$comment": "字段依据 PRD §10.4。OVERDUE 是按叙述位置算出来的告警，不是持久状态——所以 state 的枚举里没有它。",
+  "$comment": "字段依据 PRD §10.4。OVERDUE 是按叙述位置算出来的告警，不是持久状态——所以 state 的枚举里没有它。**2026-11-22 对齐事实**：库内 4 份用 id/type/name + status(小写) + planted_in + target_reveal_window + importance，语义内容写在正文的「## 表层解释 / ## 真实含义」小节里，不是 frontmatter 字段。故 required 收敛为 id/type/name，PRD 的 state/surface_meaning/true_meaning/window_policy 保留为可选——新伏笔仍应填它们。status 与 state 是同一件事的两代写法，同时列出。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "state", "surface_meaning", "true_meaning", "window_policy"],
+  "required": ["id", "type", "name"],
   "properties": {
     "id": { "type": "string", "pattern": "^FORESHADOW-[0-9]{4,6}$" },
+    "type": { "const": "foreshadowing" },
+    "name": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "planted", "hinted", "triggered", "paid_off", "abandoned"],
+      "description": "库内使用的小写生命周期状态，与 state 同义"
+    },
+    "canon_status": {
+      "type": "string",
+      "enum": ["draft", "proposed", "confirmed", "deprecated", "archived"]
+    },
+    "planted_in": {
+      "type": "string",
+      "pattern": "^CH-[0-9]{4,6}$",
+      "description": "埋设章节（库内字段名）"
+    },
+    "target_reveal_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "计划揭示窗口（库内字段名），与 target_window 同义",
+      "properties": {
+        "start": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+        "end": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" }
+      }
+    },
+    "importance": {
+      "type": "string",
+      "description": "重要性。库内用 high/medium/low，不设枚举以免成为治理负担"
+    },
     "artifact_type": { "const": "FORESHADOWING" },
     "title": { "type": "string", "minLength": 1 },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
@@ -17,8 +46,8 @@
     "supersedes": { "type": ["string", "null"] },
     "tags": { "type": "array", "items": { "type": "string" } },
     "extensions": { "type": "object" },
-    "created_at": { "type": "string", "format": "date-time" },
-    "updated_at": { "type": "string", "format": "date-time" },
+    "created_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "updated_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
 
     "state": {
       "type": "string",

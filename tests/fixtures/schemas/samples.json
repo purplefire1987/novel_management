@@ -27,17 +27,22 @@
   },
   "event": {
     "valid": {
-      "event_id": "EVT-0001",
-      "summary": "示例事件",
-      "source_chapter": "CH-0001",
+      "id": "EVT-0001",
+      "type": "event",
+      "name": "示例事件",
+      "chapter_id": "CH-0001",
+      "sequence": 1,
+      "canon_status": "confirmed",
       "participants": [
         "CHAR-0001"
       ],
+      "location_id": "LOC-0001",
       "created_at": "2026-11-20T10:00:00Z"
     },
     "invalid": {
-      "event_id": "EVT-CH-0001-001",
-      "summary": "复合型 ID 不合法"
+      "id": "EVT-CH-0001-001",
+      "type": "event",
+      "name": "复合型 ID 不合法"
     }
   },
   "artifact": {
@@ -156,6 +161,8 @@
   "foreshadowing": {
     "valid": {
       "id": "FORESHADOW-0001",
+      "type": "foreshadowing",
+      "name": "示例伏笔",
       "state": "PLANNED",
       "surface_meaning": "表层解释",
       "true_meaning": "真实含义",
@@ -643,6 +650,27 @@
       "task_id": "TASK-000001",
       "role": "plot_planner",
       "result": {}
+    }
+  },
+  "review_note": {
+    "valid": {
+      "type": "review_report",
+      "name": "示例审阅记录",
+      "status": "active",
+      "created_at": "2026-11-22",
+      "author": "editor",
+      "scope": "第一章场景卡",
+      "chapter_id": "CH-0001",
+      "verdict": "revise"
+    },
+    "invalid": {
+      "type": "review_report",
+      "name": "示例审阅记录",
+      "status": "active",
+      "created_at": "2026-11-22",
+      "author": "editor",
+      "scope": "第一章场景卡",
+      "verdict": "lgtm"
     }
   }
 }

@@ -1003,6 +1003,58 @@ CH-0001  STALE
 
 ---
 
+## 8.13 审阅记录（`novel note`）
+
+把审阅、审计、变更记录写进 `08_Reviews/`。**这是唯一不经过 `publish` 的写入通道**。
+
+它存在的理由：`08_Reviews` 不在 `PUBLISH_TARGETS` 六根里，`publish` 会拒绝它（这是对的，
+审阅意见不是作品内容，进正式区会被算进签字基线）。但「不能发布」被当成了「可以手写文件」，
+于是它成了全库唯一一处没有契约的写入点。
+
+```
+novel note add --title <标题> [--kind review|audit|change-log]
+               [--body <正文> | --body-file <文件> | 管道]
+               [--scope <范围>] [--task-id TASK-xxxx] [--chapter-id CH-xxxx]
+               [--verdict pass|revise|reject|partial]
+               [--source-sha256 <64 位十六进制>]
+               [--dry-run] [--as <角色>]
+novel note list [--kind <类>] [--json]
+```
+
+### 三种 `kind` 落到哪
+
+| kind | 子目录 | frontmatter `type` |
+|---|---|---|
+| `review`（默认） | `Audit_Reports/Chapter_Review/` | `review_report` |
+| `audit` | `Audit_Reports/` | `audit_report` |
+| `change-log` | `Change_Log/` | `change_log` |
+
+目录根从 layout 的 `review_root` 取，不写死 `08_Reviews`。
+
+### 三条不变量
+
+1. **同名即拒，绝不覆盖。** 审阅记录不该被静默改写——要修正就换标题，
+   或把旧的标成 `superseded`。文件名是 `<标题>_<YYYYMMDD>.md`。
+2. **先过 schema 再落盘。** frontmatter 按 `schemas/review_note.schema.json` 校验，
+   不合契约直接拒。落盘后才发现字段错，就只能在最不该脏的地方留一份坏文件。
+3. **`verdict` 只是意见，不是批准。** 审阅说 `pass`，正文照样要 `approve` + `publish`
+   才能成为正式事实。这条不写清楚，很容易演变成「总编说行就行」。
+
+### 为什么默认直写而不是先预演
+
+这条通道存在的意义是「轻」——如果写一条意见也要先预演再确认，编辑就会绕回去手写文件，
+而手写才是真风险。保护落在别处：同名拒绝、schema 校验、每次写入进 oplog。
+`--dry-run` 仍保留，用于先看标题会变成什么文件名。
+
+```console
+$ novel note add --kind review --title "CH-0001 场景卡一致性" \
+    --chapter-id CH-0001 --verdict revise --as editor --body-file review.md
+  [OK]   已写入 10_Projects/novel-001_jiuzhou/08_Reviews/Audit_Reports/Chapter_Review/CH-0001-场景卡一致性_20261122.md
+  08_Reviews 不进正式区，不需要 approve/publish，也不算签字基线
+  审阅结论「revise」只是意见；正文要成为正式事实仍须 approve + publish
+  op: OP-20261122-011158-F612
+```
+
 ## 9. 备份与恢复
 
 ### `novel backup [--out <目录>] [--label <标签>] [--no-git] [--list]`

@@ -228,6 +228,19 @@ def cmd_status(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
 WIKILINK = re.compile(r"\[\[([^\]\|]+?)(?:\\?\|[^\]]*)?\]\]")
 
+# 代码里的 `[[...]]` 不是链接：Obsidian 只对正文渲染双链。
+# 写作时举例说明「裸 ID 双链长什么样」必然会写出 `[[CH-0001]]`，
+# 不排除掉就会给每份讲解文档制造一条假断链——假断链比漏报更误导，
+# 因为它会训练人忽略这项检查。
+_FENCED = re.compile(r"```.*?```", re.S)
+_INLINE_CODE = re.compile(r"`[^`\n]*`")
+
+
+def _link_text(text: str) -> str:
+    """把代码区替换成等长空白，保留位置关系，避免误判代码里的双链字面量。"""
+    text = _FENCED.sub(lambda m: " " * len(m.group(0)), text)
+    return _INLINE_CODE.sub(lambda m: " " * len(m.group(0)), text)
+
 
 def _resolve_link(target: str, pp: ProjectPaths, stems: dict[str, list[Path]]) -> bool:
     raw = target.strip()
@@ -408,7 +421,7 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
                 text = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            for match in WIKILINK.finditer(text):
+            for match in WIKILINK.finditer(_link_text(text)):
                 total_links += 1
                 target = match.group(1).strip()
                 if target.startswith("10_Projects/"):

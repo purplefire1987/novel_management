@@ -10,17 +10,89 @@
    一律降级为「只记内存」，不许把 `novel validate` 变成因为日志挂了而失败。
 3. **重复调用不重复挂 handler**。同一进程里跑多次 `main()`（测试就是这样），
    每调一次加一个 FileHandler，日志会出现 N 份重复行。
+
+## 脱敏（AC-47）
+
+密钥进日志有两条路：调用点手写 `logger.info(f"...{key}")`，或者异常堆栈里带出
+一个含 key 的请求体。**只堵第一条没用**——第二条发生在框架内部，调用点根本看不到。
+所以脱敏挂在 `Formatter` 上：无论消息从哪来、是不是异常堆栈，只要经过 formatter
+就过一遍替换。这样新增日志自动受保护，不需要每个调用点记得脱敏。
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 ROOT_NAME = "novel"
 LOG_FILE = "novel.log"
 DEFAULT_FORMAT = "%(asctime)s %(levelname)-5s %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+PLACEHOLDER = "<REDACTED>"
+
+# 只认「键 + 分隔符 + 值」的形状，不对裸单词动手：
+# 把「token 用量 1200」改成「<REDACTED> 用量」是误伤，比漏脱敏更让人不敢信日志。
+_SECRET_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    # Bearer 必须排在「键值对」规则之前：否则 `Authorization: Bearer eyJ...`
+    # 会先被键值对规则把 `Bearer` 这个词当值换掉，JWT 本体反而留在日志里。
+    # 那是脱敏最坏的失败方式——看起来脱过了。
+    # PEM 私钥整段放最前：若让键值对规则先跑，它会把 `-----BEGIN` 换成占位符，
+    # 这条就再也匹配不到 `-----END`，密钥体留在后几行。
+    (
+        re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
+        f"{PLACEHOLDER}:PRIVATE_KEY",
+    ),
+    (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9\-._~+/]{8,}=*"), f"Bearer {PLACEHOLDER}"),
+    # Basic / Digest / Negotiate / NTLM：凭据紧跟在方案词后面，方案不能当值。
+    (
+        re.compile(r"(?i)\b(basic|digest|negotiate|ntlm)\s+[A-Za-z0-9+/=._~\-]{8,}"),
+        rf"\1 {PLACEHOLDER}",
+    ),
+    # key=value / key: value / "key": "value"。authorization 排除已知方案前缀，
+    # 否则 `Authorization: Basic xxx` 会被这条先把 `Basic` 换成占位符、凭据留在原地。
+    (
+        re.compile(
+            r"(?i)\b(api[_-]?key|apikey|access[_-]?key|secret[_-]?key|secret|"
+            r"token|access[_-]?token|refresh[_-]?token|password|passwd|pwd|"
+            r"authorization|client[_-]?secret|"
+            r"response|nonce|opaque|signature|x-api-key|private[_-]?key)\b"
+            r"(\s*[:=]\s*)(?!bearer|basic|digest|negotiate|ntlm)([\"']?)([^\s,;\"'\)}\]]{4,})"
+        ),
+        r"\1\2\3" + PLACEHOLDER,
+    ),
+    # 常见云厂商密钥形状
+    (re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}\b"), PLACEHOLDER),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), PLACEHOLDER),
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), PLACEHOLDER),
+    # URL 里的 user:pass@host
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^/\s:@]+:[^/\s@]+@"), rf"\1{PLACEHOLDER}@"),
+    # query string 里的 token
+    (re.compile(r"(?i)([?&](?:api[_-]?key|token|secret|access_token)=)([^&\s]{4,})"), rf"\1{PLACEHOLDER}"),
+)
+
+
+def redact(text: str) -> str:
+    """把疑似密钥替换成占位符。纯函数，便于直接测。"""
+    if not text:
+        return text
+    for pattern, repl in _SECRET_RULES:
+        text = pattern.sub(repl, text)
+    return text
+
+
+class RedactingFormatter(logging.Formatter):
+    """在 formatter 层脱敏：消息、参数、异常堆栈一视同仁。
+
+    为什么不放在 `Filter` 里：`Filter` 拿到的是 `record.msg` 与 `record.args`，
+    异常堆栈还没渲染出来；而堆栈恰恰是最容易带出请求体与密钥的地方。
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        return redact(super().format(record))
+
+
 
 _configured = False
 
@@ -66,7 +138,7 @@ def setup_logging(
         _configured = True
         return None
 
-    formatter = logging.Formatter(DEFAULT_FORMAT, DATE_FORMAT)
+    formatter = RedactingFormatter(DEFAULT_FORMAT, DATE_FORMAT)
 
     if runtime is not None:
         candidate = log_path(runtime)
@@ -97,7 +169,6 @@ def setup_logging(
 
 def is_configured() -> bool:
     return _configured
-
 
 def _level_of(level: str | int | None) -> int | None:
     """`OFF` / `NONE` 返回 None，表示只留 NullHandler。"""

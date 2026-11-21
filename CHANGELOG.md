@@ -2,6 +2,93 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.13.0 — 2026-11-22
+
+三件事：给 `08_Reviews` 一条写通道、给发布闸补上契约校验、给日志加脱敏。
+前两件都不只是「加功能」——它们各自补的是一处「看似有、实际没有」的地方。
+
+### 一、`novel note`：08_Reviews 的轻量写通道
+
+`08_Reviews` 一直不在 `PUBLISH_TARGETS` 里，所以 `publish` 拒绝它；这本身是对的
+（审阅意见不是作品内容，进正式区会被算进签字基线，把「编辑的意见」和「作者的正文」
+绑在同一份哈希上）。但「不发布」被当成了「可以手写文件」，于是它成了全库唯一
+一处没有契约的写入点。
+
+新命令保留 publish 的三样、去掉它的两样：
+
+- 保留：frontmatter 走 `review_note` schema、原子写、进 oplog
+- 去掉：approve 批准链、加入签字基线
+
+`--kind review|audit|change-log` 决定落到 `Audit_Reports/Chapter_Review`、
+`Audit_Reports`、`Change_Log`。**同名即拒，绝不覆盖**——审阅记录不该被静默改写。
+
+### 二、发布闸补契约校验（AC-11／12／13／49）
+
+`_validate_candidate` 此前只做四样：路径、字节、可解析、正式区归属。它证明
+「文件是对的」，不证明「内容能成立」。新增 `validation/contract.py` 补上另外四样：
+
+| 检查 | 阻断码 |
+|---|---|
+| ID 形态（PRD §8.1） | `ID_SHAPE` |
+| 本次发布内 ID 唯一 | `ID_DUP` |
+| frontmatter 合契约 | `SCHEMA_INVALID` |
+| 正式断言必须带来源（AC-11） | `SOURCE_MISSING` |
+| 来源/双链目标必须存在（AC-12） | `SOURCE_NOT_FOUND`、`REF_BROKEN` |
+| 引文与来源字节一致（AC-13） | `SOURCE_HASH_MISMATCH` |
+| 被删的块仍被引用（AC-49） | `BLOCK_REMOVED_BUT_REFERENCED` |
+
+两条让步各有理由：**只校验本次变更**（全库体检是 `validate` 的事）；**新增产物严格、
+既有产物对历史形态豁免**（33 份素材库的裸路径来源补不出 hash，补就是编造）。
+没有契约的 type 记 `no_contract` 而非静默跳过——没查不等于没问题。
+
+### 三、日志脱敏（AC-47）
+
+脱敏挂在 `Formatter` 上而不是调用点：密钥进日志有两条路，第二条是**异常堆栈**
+里带出的请求体，发生在框架内部，调用点根本看不到。覆盖 Bearer / Basic / Digest、
+PEM 私钥整段、常见云厂商密钥形状、URL 内嵌凭据、query string token。
+
+规则顺序有讲究：PEM 与 Bearer 必须排在「键值对」规则之前，否则
+`Authorization: Bearer eyJ...` 会先把 `Bearer` 这个词当值换掉，JWT 本体留在原地
+——**看起来脱过了，比没脱更危险**。这条已写成回归用例。
+
+### 四、Schema 契约向真实数据收敛
+
+盘点发现 999 份可校验产物**通过 0 份**：契约是照 PRD 的理想模型写的，真实库是另一套。
+T02 的 fixture 是自造的，所以测试一直绿，真实库从未接过契约。改动 5 处：
+
+- 时间戳接受 `YYYY-MM-DD`（965 份只有日期，PRD §8.2 的 UTC 时刻从未落地）
+- `sourceRef` 增加「裸路径」第五分支（33 份历史形态）
+- `event` 认 `id`/`name`/`chapter_id`/`location_id`（原契约写 `event_id`/`summary`）
+- `foreshadowing` 认 `status`(小写)/`planted_in`/`target_reveal_window`/`importance`
+- `race_groups` 收 object（WORLD-0025 用「族属 → 种族列表」映射）
+
+对齐后 **998/999 通过**，剩 1 份是模板（本就不该校）。
+
+### 五、真实库数据修复
+
+- **复合型 ID 22 个**：`SCENE-CH-0001-001`→`SCENE-0001`…（11）、
+  `VOL-0001-DESIGN`→`PLAN-VOL-0001` 等（4）、`EVT-CH-0001-001`→`EVT-0001`…（7）。
+  父子关系本来就有 `chapter_id` + `sequence` 承载，ID 里编码章序正是 PRD §18.1 禁止的。
+- **重号 2 处**：`ASSET-0001`→`0021`、`ASSET-0002`→`0022`，只改「后到 + 零引用 +
+  deprecated」的 Battles 两份；Settings 与归档保持原号。
+- **断链 11 条**：`[[CH-0001]]`→`[[CH-0001_雨夜的血案|CH-0001]]`（Obsidian 按文件名匹配）。
+- `validate`：重复 0、双链 4945 条零断链、退出码 0。
+
+### 六、`validate` 不再误判代码里的双链
+
+写作时举例说明「裸 ID 双链长什么样」必然写出 `[[CH-0001]]` 字面量。Obsidian 不解析
+代码里的双链，检查器却把它算成断链——假断链比漏报更误导，它会训练人忽略这项检查。
+现在跳过围栏代码块与行内代码。
+
+### 兼容性影响
+
+- `event` / `foreshadowing` 契约放宽：`event_id`、`summary`、`state`、`surface_meaning`
+  等 PRD 字段名保留为**可选**别名，`id`/`name` 为权威。旧样本不受影响。
+- 发布闸新增阻断：**已在用的发布流程会在第 6 步更严**。历史形态（裸路径来源、
+  日期精度）对既有产物豁免，新产物不放行。
+- 测试 658 → **701**（unit 458 / integration 183 / acceptance 34 / security 26），
+  0 失败 1 跳过；selfcheck 50/50。
+
 ## 0.12.1 — 2026-11-21
 
 修 T06 发布协议里一处重复劳动：第 8 步不再重建快照。

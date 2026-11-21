@@ -2,15 +2,43 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/novel-system/event.schema.json",
   "title": "世界内事件（时间线事实）",
-  "$comment": "字段依据 PRD §9.3 与 §8.1。库内现存 7 份全为 EVT-CH-xxxx-yyy 复合形态，PRD 禁止；新事件一律纯序号，旧事件迁移见 known_risks。",
+  "$comment": "两次对齐的事实要写在这里，否则下一个人会以为字段名是随手起的。① ID：库内 7 份原为 EVT-CH-xxxx-yyy 复合形态，PRD §18.1 明令禁止，2026-11-22 已改为 EVT-0001..0007 纯序号。② 字段名：PRD §9.3 写的是 event_id/summary/source_chapter/location，库内实际用 id/name/chapter_id/location_id；全库 1058 份统一以 id 为权威，故 required 用 id/type/name，PRD 字段名保留为可选别名。事件与章节的归属由 chapter_id 承载，不编进 ID——章节重排时那种 ID 会自己说谎。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["event_id", "summary"],
+  "required": ["id", "type", "name"],
   "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^EVT-[0-9]{4,6}$",
+      "description": "权威 ID：纯序号，不得把章节号编进 ID"
+    },
+    "type": { "const": "event" },
+    "name": { "type": "string", "minLength": 1 },
     "event_id": {
       "type": "string",
       "pattern": "^EVT-[0-9]{4,6}$",
-      "description": "纯序号，不得把章节号编进 ID——章节会重排，事件不会"
+      "description": "PRD §9.3 的字段名，与 id 并存。id 为权威，此字段仅为符合 PRD 字面的可选别名"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "PRD §9.3 字段名，对应库内的 name/正文首段。可选"
+    },
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^CH-[0-9]{4,6}$",
+      "description": "事件所属章节。归属写在这里，不写进 ID"
+    },
+    "source_chapter": {
+      "type": "string",
+      "pattern": "^CH-[0-9]{4,6}$",
+      "description": "PRD §9.3 字段名，与 chapter_id 同义。二者择一即可"
+    },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "canon_status": {
+      "type": "string",
+      "enum": ["draft", "proposed", "confirmed", "deprecated", "archived"],
+      "description": "v1.0 遗留状态，与 entity 保持一致口径"
     },
     "artifact_type": { "const": "EVENT" },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
@@ -18,20 +46,27 @@
     "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "title": { "type": "string" },
-    "summary": { "type": "string", "minLength": 1 },
     "world_time": {
       "type": "string",
       "description": "世界内时间；允许模糊（如「第三年春」），但不得与已确认时间线矛盾"
     },
     "timeline_id": { "type": "string", "description": "所属时间线，如 TL-MAIN" },
-    "sequence": { "type": "integer", "minimum": 0 },
     "participants": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^(CHAR|FAC|ORG|CREATURE|LOC|ITEM)-[0-9]{4,6}$" }
+      "items": { "type": "string" },
+      "description": "参与者。建议填实体 ID，但允许写人名——库内多数事件尚未建立到实体的链接，强制 pattern 会把它们全判非法"
     },
-    "location": { "type": "string", "pattern": "^LOC-[0-9]{4,6}$" },
+    "location_id": {
+      "type": "string",
+      "pattern": "^LOC-[0-9]{4,6}$",
+      "description": "地点（库内字段名）"
+    },
+    "location": {
+      "type": "string",
+      "pattern": "^LOC-[0-9]{4,6}$",
+      "description": "PRD §9.3 字段名，与 location_id 同义"
+    },
     "consequences": { "type": "array", "items": { "type": "string" } },
-    "source_chapter": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
     "derived_from": {
       "type": "array",
       "description": "上游产物 ID。PRD §8.2 里这是数组，不是枚举",
@@ -45,8 +80,8 @@
     },
     "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" },
     "tags": { "type": "array", "items": { "type": "string" } },
-    "created_at": { "type": "string", "format": "date-time" },
-    "updated_at": { "type": "string", "format": "date-time" },
+    "created_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "updated_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
     "extensions": { "type": "object" }
   }
 }

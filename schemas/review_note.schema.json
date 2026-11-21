@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/review_note.schema.json",
+  "title": "审阅记录（08_Reviews 的轻量写入契约）",
+  "$comment": "08_Reviews 不在 PUBLISH_TARGETS 里，不参与 approve/publish，也不算签字基线。但「不发布」不等于「不校验」：这条通道仍走 frontmatter 契约、原子写与审计留痕。verdict 只表达审阅结论，不是作者批准——批准仍是 approve + publish 的事。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "name", "status", "created_at", "author", "scope"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["audit_report", "review_report", "change_log"]
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["active", "superseded", "withdrawn"]
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?)?",
+      "description": "日期或带时区的日期时间。历史文件多为 YYYY-MM-DD，不强制 date-time"
+    },
+    "author": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "minLength": 1, "description": "这份意见管到哪里：哪几章、哪个层面" },
+    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "chapter_id": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "revise", "reject", "partial"],
+      "description": "审阅结论，不是作者批准"
+    },
+    "source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "被审对象的内容指纹。正文一改，这份意见就该被判过期"
+    }
+  }
+}

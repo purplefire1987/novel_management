@@ -548,7 +548,9 @@ def test_canon_write_needs_second_confirmation(env, tmp_path, capsys):
     )
     task = sorted((runtime / "tasks").glob("TASK-*.yaml"))[-1].stem
     draft = tmp_path / "canon.md"
-    draft.write_text("---\nid: CHAR-0001\ntype: character\n---\n\n甲\n", encoding="utf-8")
+    # frontmatter 要完整：第 6 步的契约校验会按 entity 契约验（name 是必填）。
+    # 这里测的是发布协议本身，不该靠一个不合契约的样本去绕过闸门。
+    draft.write_text("---\nid: CHAR-0001\ntype: character\nname: 甲\n---\n\n甲\n", encoding="utf-8")
     assert _run(vault, runtime, "stage", "--task", task, "--from", str(draft), "--to", CANON, "--as", "writer") == 0
     digest = _json(vault, runtime, capsys, "inspect", task)["hash"]
     assert _run(vault, runtime, "approve", "artifact", task, "--hash", digest, "--as", "author") == 0

@@ -35,6 +35,8 @@ tasks/        任务记录与状态流转
 approvals/    批准记录（绑定对象类型 + 内容 sha256，按当前字节复核）
 changes/      问题单（ISSUE）、变更请求（CR）、影响分析；存 runtime，不进索引
 staging/      staging 落盘与 manifest
+reviews/      08_Reviews 的轻量写通道（`novel note`）：frontmatter 走 review_note 契约、
+              原子写、同名即拒；不进 PUBLISH_TARGETS、不走 approve、不算签字基线
 release/      发布协议（ADR-015）
   ├── model.py     ReleasePlan / ReleaseManifest / Journal / Receipt / ActivePointer 与 22 步名表
   ├── store.py     目录约定与读写：releases/<REL>/、receipts/、locks/；指针损坏即抛
@@ -66,7 +68,10 @@ agents/       Agent 适配器与写前资料包（ADR-017）
 validation/ 发布前的语义校验（ADR-018）
   ├── proposals.py     记忆提案：KINDS 十类、绑源哈希、模型失败退骨架、declare-none
   ├── dependencies.py  依赖四级判定（VALID/STALE/NEEDS_REVIEW）、传递只走一级
-  └── closure.py       共同发布闸：四种阻断码，供 deps closure 与 release prepare 共用
+  ├── closure.py       共同发布闸：四种阻断码，供 deps closure 与 release prepare 共用
+  └── contract.py      发布闸的契约校验（AC-11/12/13/49）：ID 形态与唯一、schema、
+                       来源与双链目标存在、引文字节一致、被删块仍被引用；
+                       只校验本次变更；新增产物严格、既有产物对历史形态豁免
 workflows/  创作链路（ADR-018）
   ├── plan.py           §10.2 十六字段认法、八项必需、只派生确定性可读的两处、写回只增不覆盖
   ├── draft.py          两道前置（plan.check + preflight PASS）、目标路径结构性固定、

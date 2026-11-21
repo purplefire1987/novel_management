@@ -13,19 +13,30 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
+    "looseDateTime": {
+      "type": "string",
+      "description": "日期级或完整时间戳。库内 965 份 created_at/updated_at 全是 YYYY-MM-DD——PRD §8.2 要求的「带时区的 ISO 8601 UTC」从未落地，当时的录入只有日期。按事实收敛：接受日期精度，不把 965 份全部判成非法。需要精确到时刻的新产物仍应写完整时间戳。",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?(\\.[0-9]+)?(Z|[+-][0-9]{2}:?[0-9]{2})?)?$"
+    },
     "blockId": {
       "type": "string",
       "pattern": "^[a-z][0-9]{3,5}$",
       "description": "块 ID，如 p0042。同一产物内唯一"
     },
     "sourceRef": {
-      "description": "判别联合（PRD §9.1）：来源不能只存自由文本路径，必须能定位到版本或哈希",
+      "description": "判别联合（PRD §9.1）：来源不能只存自由文本路径，必须能定位到版本或哈希。barePath 是为遗留数据保留的第五分支，见其说明",
       "oneOf": [
         { "$ref": "#/$defs/canonSource" },
         { "$ref": "#/$defs/candidateSource" },
         { "$ref": "#/$defs/rawSource" },
-        { "$ref": "#/$defs/authorDecisionSource" }
+        { "$ref": "#/$defs/authorDecisionSource" },
+        { "$ref": "#/$defs/barePath" }
       ]
+    },
+    "barePath": {
+      "type": "string",
+      "minLength": 1,
+      "description": "遗留形态：整条来源就是一个路径字符串（33 份 04_Story_Assets 如此）。当时的 import_id / file_sha256 / locator 没有随文件落下，事后补不出来——补出来就是编造。新产物不得再用这一形态：发布闸对新增产物要求判别联合，对既有产物只接受这一形态作为历史豁免。"
     },
     "canonSource": {
       "type": "object",

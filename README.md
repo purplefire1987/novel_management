@@ -62,7 +62,7 @@ active_project:
 ## 4. 命令
 
 V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务补入地图、契约、索引、
-时间线、审批与变更、发布、导入、Agent、创作与记忆几组命令，命令行**现为 35 条**：
+时间线、审批与变更、发布、导入、Agent、创作与记忆几组命令，命令行**现为 36 条**：
 三条地图命令（`maps paths` / `import-admin` / `build`）、四条契约命令
 （`schema list` / `schema check` / `allocate-id` / `package-hash`，T02）、
 两条索引命令（`rebuild-index` / `search`，T03）、三条时间线与认知命令
@@ -241,7 +241,7 @@ novel agent prompt --role writer --task TASK-000001   # 主笔这次拿到的提
 
 ```text
 src/novel_system/
-  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / import_cmd / backup_cmd / maps_cmd / schema_cmd / agent_cmd / work_cmd / id_cmd）
+  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / import_cmd / backup_cmd / maps_cmd / schema_cmd / agent_cmd / work_cmd / id_cmd / note_cmd）
   config/         五级配置解析（含 V4.0 Vault_Config 写法兼容）
   paths.py        项目内目录解析与边界校验
   version.py      版本号唯一出处（发布清单与 `--version` 都读它）
@@ -256,6 +256,7 @@ src/novel_system/
   approvals/      批准记录（绑定对象类型与每个文件的 sha256）
   changes/        问题单、变更请求、影响分析（存 Runtime，不进索引）
   staging/        staging 落盘与 manifest
+  reviews/        08_Reviews 轻量写通道：不使用 publish 的审阅记录（schema + 原子写 + 同名拒）
   release/        发布协议：22 步执行、断点恢复、正式指针、发布锁（ADR-015）
   baseline/       作者编辑基线（adopt）
   backup/         备份、校验、恢复
@@ -264,10 +265,10 @@ src/novel_system/
   importing/      原稿导入：定位符 / 保全 / 切章 / 提取 / 抽样 / 分批入 staging（T07）
   agents/         九角色注册与权限矩阵、预算、类型化工具、提示词装配、计量、Preflight（T08）
   workflows/      创作与审核：规划契约 / 写稿（只落 staging）/ 审核与风险路由 / 正文批准（T09）
-  validation/     写后闭环：记忆提案 / 依赖失效 / 共同发布（T10）
+  validation/     写后闭环：记忆提案 / 依赖失效 / 共同发布（T10）；发布闸的契约校验（ID/契约/来源/引用）
   adapters/ core/  模型适配层（当前只有 Mock）／预留
 config/             默认配置与配置 Schema
-schemas/            24 类数据契约（JSON Schema，additionalProperties 一律 false）
+schemas/            25 类数据契约（JSON Schema，additionalProperties 一律 false）
 templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）
 agents/             九 Agent 角色卡与权限矩阵（人读版 permissions.md 与代码逐格比对）
 workflows/          六个工作流定义
@@ -284,7 +285,7 @@ tests/              unit / integration / security / acceptance / fixtures
 ## 7. 测试与检查
 
 ```bash
-pytest                                    # 658 用例：657 passed / 1 skipped
+pytest                                    # 701 用例：700 passed / 1 skipped
 python3 scripts/selfcheck.py              # 50 项端到端冒烟，不依赖 pytest
 python3 scripts/privacy_scan.py --repo .  # 公仓隐私扫描
 ```

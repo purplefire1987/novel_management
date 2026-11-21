@@ -67,14 +67,23 @@
     "summary": { "type": "string" },
     "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" },
     "tags": { "type": "array", "items": { "type": "string" } },
-    "created_at": { "type": "string", "format": "date-time" },
-    "updated_at": { "type": "string", "format": "date-time" },
+    "created_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "updated_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
 
     "import_batch": { "type": "string", "description": "导入批次号（v1.0 遗留）" },
     "grade": { "type": ["string", "integer"], "description": "品阶（v1.0 遗留，仅武修／玄法一类使用）" },
     "school": { "type": "string", "description": "流派（v1.0 遗留）" },
     "race": { "type": "string", "description": "种族（v1.0 遗留）" },
-    "race_groups": { "type": "array", "items": { "type": "string" } },
+    "race_groups": {
+      "description": "种族分组。库内有两种实现：WORLD-0025 用「族属 → 种族列表」的映射，其余档案用扁平列表。两种都合法",
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        }
+      ]
+    },
     "generated_by": { "type": "string" },
     "volume_id": { "type": "string" },
     "extensions": {

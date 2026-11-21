@@ -34,6 +34,7 @@ from . import (
     index_cmd,
     init,
     maps_cmd,
+    note_cmd,
     read,
     release_cmd,
     schema_cmd,
@@ -72,6 +73,7 @@ HANDLERS = {
     "maps": maps_cmd.cmd_maps,
     "schema": schema_cmd.cmd_schema,
     "allocate-id": id_cmd.cmd_allocate_id,
+    "note": note_cmd.cmd_note,
     "package-hash": schema_cmd.cmd_package_hash,
     "preflight": agent_cmd.cmd_preflight,
     "agent": agent_cmd.cmd_agent,
@@ -672,6 +674,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_dl.add_argument("--task", default="", help="按任务的 staging 推出正文清单")
     p_dl.add_argument("--chapter", action="append", default=[], help="直接指定章节，可重复")
     p_dl.add_argument("--json", action="store_true")
+
+    # ---- note（08_Reviews 轻量写通道）----
+    p_note = sub.add_parser(
+        "note",
+        help="把审阅/审计意见写进 08_Reviews（不走 publish，不算签字基线）",
+        parents=[sub_common],
+    )
+    note_sub = p_note.add_subparsers(dest="note_command", required=True)
+
+    p_na = note_sub.add_parser("add", help="写入一份审阅记录（同名即拒，绝不覆盖）", parents=[sub_common])
+    p_na.add_argument("--kind", default="review", help="review / audit / change-log（默认 review）")
+    p_na.add_argument("--title", required=True, help="记录标题，同时决定文件名")
+    p_na.add_argument("--body", default="", help="正文；不给则读 --body-file 或 stdin")
+    p_na.add_argument("--body-file", default="", help="从文件读正文")
+    p_na.add_argument("--scope", default="", help="这份意见管到哪里；默认同标题")
+    p_na.add_argument("--task-id", default="", help="关联任务，如 TASK-0001")
+    p_na.add_argument("--chapter-id", default="", help="关联章节，如 CH-0001")
+    p_na.add_argument("--verdict", default="", help="pass / revise / reject / partial（只是意见，不是批准）")
+    p_na.add_argument("--source-sha256", default="", help="被审对象的内容指纹，正文一改即视为过期")
+    p_na.add_argument("--created-at", default="", help="日期，默认今天")
+    p_na.add_argument("--dry-run", action="store_true", help="只看目标路径与 frontmatter")
+    p_na.add_argument("--as", dest="actor", default=None, help="记录人（九角色之一或 author）")
+
+    p_nl = note_sub.add_parser("list", help="列出已有审阅记录", parents=[sub_common])
+    p_nl.add_argument("--kind", default="", help="只看某一类")
+    p_nl.add_argument("--json", action="store_true")
 
     return parser
 

@@ -29,12 +29,14 @@ from .. import markdown as md
 from ..canonical import utc_now
 from ..changes import ChangeStore, IssueStore  # noqa: F401 - 类型提示用
 from ..errors import ApprovalError, ConflictError, ParseError, SecurityError, UsageError
+from ..ids import IdRegistry
 from ..indexing import schema as index_schema
 from ..indexing.builder import build_index
 from ..indexing.source import WorktreeSource, skip_dirs_from_layout
 from ..paths import ProjectPaths
 from ..staging import StagingArea
 from ..storage import copy_verified, sha256_file, write_atomic
+from ..validation import contract as contract_mod
 from ..version import __version__
 from .gates import CANON_PREFIX, check_approval, check_gates
 from .lock import PublishLock
@@ -346,13 +348,26 @@ def _verify_approval(pp: ProjectPaths, plan: ReleasePlan, meta: PlanMeta, approv
     return approval.approval_id
 
 
-def _validate_candidate(pp: ProjectPaths, snapshot: Path, plan: ReleasePlan, files_dir: Path) -> None:
-    """第 6 步：路径、字节、解析、正式区归属。
+def _known_ids(pp: ProjectPaths) -> set[str]:
+    """全库现有 ID 集合，供「来源产物是否存在」（AC-12）判。
 
-    PRD 要求这里还校验 Schema、ID、引用、依赖。**这四样至今没做**：
-    依赖表从索引第 4 版（0.12.0）起会填，但发布闸仍不读它——依赖失效只由
-    `deps check` / `deps closure` 报出来，且不阻断发布。如实只做能做的四样，
-    并把「没做的」写在 known_risks（R-28）里，不假装做过。
+    读磁盘而不是读索引：索引可能是上一轮建的，而这里要回答的是
+    「这条来源现在还在不在」。复合型 ID 也算在内——它们形态不合规，
+    但仍有文件在，不能说「不存在」。
+    """
+    registry = IdRegistry(pp.vault, areas=pp.area_roots())
+    ids = {record.id for record in registry.records}
+    ids.update(raw for raw, _ in registry.compounds)
+    return ids
+
+
+def _validate_candidate(pp: ProjectPaths, snapshot: Path, plan: ReleasePlan, files_dir: Path) -> None:
+    """第 6 步前半：路径、字节、解析、正式区归属。
+
+    PRD 要求这里还校验 Schema、ID、引用、依赖。那四样在 0.13.0 起由
+    `validation/contract.py` 的 `check()` 补上，与这里同在第 6 步执行、失败同样拒绝发布。
+    分工是：**这里只管「文件本身对不对」**（路径在正式区、字节与计划一致、Markdown 能解析），
+    **那里管「内容能不能成立」**（形状合不合契约、身份唯不唯一、指向的东西在不在）。
     """
     for change in plan.changes:
         target = pp.at(change.path)
@@ -685,7 +700,18 @@ def execute(
     if 6 not in done:
         _maybe_fault("before:6")
         _validate_candidate(pp, snapshot, plan, files_dir)
-        _mark(store, journal, 6, "done", "路径/字节/解析/正式区")
+        # 路径/字节/解析只证明「文件是对的」，不证明「内容能成立」。
+        # 契约校验补的就是后半句：Schema / ID / 引用 / 来源 / 依赖（AC-11/12/13/49）。
+        contract_report = contract_mod.check(
+            pp, plan.changes, files_dir, known_ids=_known_ids(pp)
+        )
+        contract_report.raise_if_blocked()
+        detail = f"路径/字节/解析/正式区；契约 {contract_report.checked} 份"
+        if contract_report.warnings:
+            detail += f"，{len(contract_report.warnings)} 警告"
+        if contract_report.no_contract:
+            detail += f"，{len(contract_report.no_contract)} 份无契约"
+        _mark(store, journal, 6, "done", detail)
 
     # ---- 7 文件集一致 ----
     if 7 not in done:
