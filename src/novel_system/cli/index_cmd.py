@@ -67,10 +67,43 @@ def cmd_rebuild_index(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     if result.skipped:
         info(f"跳过运行态/归档 {result.skipped} 份（{'、'.join(skip_dirs)}）")
 
-    heading("建了但本版不填（不是「已支持」）")
+    heading("时间线与认知（T04）")
+    sem = result.semantic
+    ok(
+        f"事件 {sem.get('events', 0)}、边 {sem.get('edges', 0)}、"
+        f"客观断言 {sem.get('assertions', 0)}、状态变化 {sem.get('state_changes', 0)}、"
+        f"人物认知 {sem.get('knowledge', 0)}、读者揭示 {sem.get('revelations', 0)}"
+    )
+    if not any(sem.values()):
+        info("六张表全是空的。**这是真库当前的空态，不是「不支持」**——表已经会填了，")
+        info("只是还没有档案。记录从 frontmatter 读取，格式见 cli_reference「语义记录」一节。")
+    if result.planning_skipped:
+        warn(
+            f"规划隔离：{result.planning_skipped} 条语义记录来自规划件，未入事实表"
+            "（「打算这样写」不等于「已经这样发生」）"
+        )
+    if result.event_cycle:
+        warn("事件图有环，先后关系不成立，state 查询会拒绝排序：" + " → ".join(result.event_cycle))
+    if result.dangling_edges:
+        warn(
+            f"{len(result.dangling_edges)} 条事件边指向不存在的事件，已忽略："
+            f"{list(result.dangling_edges)[:3]}"
+        )
+    if result.semantic_warnings:
+        warn(f"{len(result.semantic_warnings)} 条语义记录没能入库（缺必填字段等）：")
+        for line in result.semantic_warnings[:5]:
+            info(line)
+
+    heading("建了但索引不填（不是「已支持」）")
     info("、".join(EMPTY_TABLES))
-    info("语义填充分别归 T04（时间线）、T05（认知）、T07 之后（伏笔/依赖/问题）")
-    thin = [f"{name}={count}" for name, count in result.tables.items() if count == 0]
+    info("问题与变更的权威副本在 <runtime>/issues、<runtime>/changes，不进索引：")
+    info("索引必须是「Vault + commit」的纯函数，掺进 runtime 状态就没法按 commit 复现")
+    info("伏笔档案要走 T07/T09 的契约，依赖要到 T07 之后才有")
+    thin = [
+        f"{name}={count}"
+        for name, count in result.tables.items()
+        if count == 0 and name not in EMPTY_TABLES
+    ]
     if thin:
         info(f"本版会填、但这次没数据：{'、'.join(thin)}")
 

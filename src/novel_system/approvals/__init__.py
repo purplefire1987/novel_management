@@ -36,6 +36,13 @@ class Approval:
     decision: str = "approved"
     note: str = ""
     files: list[ApprovalFile] = field(default_factory=list)
+    # T05：批准「精确对象」而不只是「某个任务」。
+    # target_type 取 artifact / proposal / release / change；target_hash 是批准时看到的那个哈希。
+    target_type: str = ""
+    target_id: str = ""
+    target_hash: str = ""
+    approved_scope: list[str] = field(default_factory=list)
+    change_id: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -47,6 +54,11 @@ class Approval:
             "decision": self.decision,
             "note": self.note,
             "files": [f.as_dict() for f in self.files],
+            "target_type": self.target_type,
+            "target_id": self.target_id,
+            "target_hash": self.target_hash,
+            "approved_scope": list(self.approved_scope),
+            "change_id": self.change_id,
         }
 
     @classmethod
@@ -71,6 +83,11 @@ class Approval:
             decision=str(data.get("decision") or "approved"),
             note=str(data.get("note") or ""),
             files=files,
+            target_type=str(data.get("target_type") or ""),
+            target_id=str(data.get("target_id") or ""),
+            target_hash=str(data.get("target_hash") or ""),
+            approved_scope=[str(x) for x in (data.get("approved_scope") or [])],
+            change_id=str(data.get("change_id") or ""),
         )
 
 
@@ -100,10 +117,17 @@ class ApprovalStore:
         note: str = "",
         approver: str = AUTHOR,
         decision: str = "approved",
+        target_type: str = "",
+        target_id: str = "",
+        target_hash: str = "",
+        approved_scope: list[str] | None = None,
+        change_id: str = "",
     ) -> Approval:
         if approver != AUTHOR:
             raise ApprovalError(f"批准主体只能是作者，收到：{approver}")
-        if not files and decision == "approved":
+        if not files and decision == "approved" and target_type not in ("release", "change"):
+            # 发布与变更批准绑的是「计划/影响报告的哈希」，不绑具体文件；
+            # 其余批准必须落在文件上，否则「批准了什么」无从核验。
             raise UsageError("批准记录必须至少绑定一个文件")
         approval = Approval(
             approval_id=self.next_id(),
@@ -114,6 +138,11 @@ class ApprovalStore:
             decision=decision,
             note=note,
             files=files,
+            target_type=target_type,
+            target_id=target_id,
+            target_hash=target_hash,
+            approved_scope=list(approved_scope or []),
+            change_id=change_id,
         )
         self.dir.mkdir(parents=True, exist_ok=True)
         write_atomic(
@@ -149,3 +178,31 @@ class ApprovalStore:
         if not approvals:
             return "pending_author"
         return approvals[-1].decision
+
+    # ---- T05：按对象查、按当前字节复核 ----
+    def for_target(self, target_type: str, target_id: str) -> list[Approval]:
+        """某个对象历次批准（按时间正序）；最后一笔有效即当前批准。"""
+        return [
+            a
+            for a in self.all()
+            if a.target_type == target_type and a.target_id == target_id and a.decision == "approved"
+        ]
+
+    @staticmethod
+    def verify(approval: Approval, current: dict[str, str]) -> tuple[str, list[str]]:
+        """按**当前字节**复核批准是否还有效。
+
+        `current` 是 {target: 现在的 sha256}。返回 (VALID|STALE, 失效的文件清单)。
+        **批准后改一个字节就失效**（PRD §14.5）——这里不做「非实质修改」的判断，
+        MVP 不实现含义识别，白名单留到 P1。
+        """
+        stale: list[str] = []
+        for record in approval.files:
+            now = current.get(record.target)
+            if now is None or now != record.sha256:
+                stale.append(record.target)
+        if approval.target_hash and approval.target_type in ("release", "change"):
+            now = current.get(approval.target_id)
+            if now is not None and now != approval.target_hash:
+                stale.append(approval.target_id)
+        return ("VALID" if not stale else "STALE"), stale

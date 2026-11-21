@@ -2,6 +2,113 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.8.0 — 2026-11-21
+
+T05「审批、变更请求、影响分析」。四个新命令、五类变更、一道发布闸门。
+
+**兼容性影响**：`approve` 拆成四个子命令
+（`artifact` / `proposal` / `release` / `change`），每个都要显式给 `--hash`。
+旧的 `approve --task X` **保留**（它已绑文件指纹，`publish` 也照着它校验），
+但新内容应当走新入口——旧入口说不出「批的是哪个对象」。`publish` 新增两条拒绝
+理由（OPEN BLOCKER、未批准的 RETCON 覆盖），以前能发的任务现在可能被拒，
+这是设计意图。
+
+**升级后要做的事**：无需迁移数据。旧批准记录没有 `target_type`，
+`inspect` 会按 `NONE` 处理，重批一次即可。
+
+### 新增命令
+
+命令行 22 → **26 条**。
+
+- `inspect <TASK|TASK:路径> [--json]`——批准前要看的七项：候选清单与各自哈希、
+  staging 与磁盘的 drift、批准状态、阻断问题、未批准 RETCON、变更范围、风险等级；
+- `approve artifact|proposal|release|change <ID> --hash <H>`——四类对象各自绑
+  不同的哈希，`--as` 只接受 `author`；
+- `issue new|list|resolve|waive`——问题单，三级（BLOCKER/NON_BLOCKING/SUGGESTION）
+  三态（OPEN/RESOLVED/WAIVED）；
+- `change create|list`——五类变更请求（PLAN_CHANGE/STATE_CHANGE/CORRECTION/
+  RETCON/EDITORIAL）；
+- `impact <CR-ID>`——生成影响报告：受影响的产物、正文、事件、断言、认知、伏笔、
+  依赖七类，报告哈希即变更批准的对象。
+
+### 一、批准绑当前字节，不读 manifest
+
+`inspect` 与 `approve` 都重新计算 staging 文件的 sha256。manifest 与磁盘不一致
+不算错误，作为 `drift` 报给作者。`verify()` 逐文件比对，**文件消失也算失效**
+（`current` 里取不到 ≠ 没改动）；另有包哈希比对兜「文件都没变但候选集合变了」。
+两道闸门各有独立用例，删任一道都会红。
+
+### 二、BLOCKER 不可豁免
+
+`issue waive` 对 BLOCKER 直接拒绝，报错里给两条合法路径：修掉后 `resolve`
+（必须写核验依据），或者先批准缩小范围的变更。`inspect` 同时扫任务 ID 与产物 ID
+上的 OPEN BLOCKER——同一个问题可能记在任务上也可能记在产物上。
+
+### 三、RETCON 独立审批
+
+`DRAFT → IMPACTED → APPROVED|REJECTED`。没跑 `impact` 不许批；`--hash` 必须与
+当前报告一致；报告列出的受影响正文既没 `--rewrite-chapters` 也没 `--narrow-scope`
+时拒绝——PRD §19.3 不允许「只改档案就宣称 RETCON 完成」。
+
+`blocking_scope()` 拦「先改档案、后补变更」：有未批准 RETCON 覆盖这批路径时，
+普通文件审批停下。
+
+### 四、问题与变更存 runtime
+
+`<runtime>/issues/` 与 `<runtime>/changes/`，不进正式区、不进索引。索引必须是
+「Vault + commit」的纯函数，塞进 runtime 状态就会让同一个 commit 建出两个不同
+的库。索引里的 `issues` / `dependencies` 两张表**建了但空着**，输出里写明
+「建了不等于已支持」。
+
+## 0.7.0 — 2026-11-21
+
+T04「时间线、事件、状态、认知」。三条验收：倒叙查询正确、排不出先后返回
+`UNORDERED`、角色误判不污染客观状态。
+
+**兼容性影响**：`rebuild-index` 开始填 `events` / `event_edges` / `assertions` /
+`state_changes` / `knowledge` / `revelations` 六张表（原先是空表）。
+
+真库实测：事件 **7** 个（`05_Ledgers/Events/`）、**边 0 条**，断言/状态变化/认知/揭示
+全为 **0**。所以查询只会得到 `UNORDERED` 或 `NOT_RECORDED`——
+**「表在」不等于「有数据」，「有事件」也不等于「有先后」**，输出里分别报，
+`UNORDERED` 时会提示「事件图里 0 条先后关系」。
+
+### 新增命令
+
+命令行 19 → **22 条**。
+
+- `state <实体ID> [--field F] [--after E|--before E] [--json]`——客观状态；
+- `knowledge <角色ID> [--about 命题] [--after E] [--json]`——人物认知；
+- `reveal <命题> [--json]`——某个真相是在哪一章、以什么方式揭开的。
+
+### 一、事件存成 DAG，比较靠可达性
+
+`EventGraph.compare()` 只给 `BEFORE` / `AFTER` / `SAME`，**没有路径就是
+`UNORDERED`**。不按 ID、不按章节号、不按插入顺序兜底。有环直接报错——
+环说明设定自相矛盾，此时任何拓扑序都是在错误答案里挑一个。
+
+`latest_among()` 返回**一批**极大元，不是一条。集合大于 1 时调用方必须返回
+`UNORDERED`，接口上就不给「取第一条」的机会。
+
+### 二、状态是区间 `[since, until)`
+
+`--after X` 命中左端点（开始事件算已生效），`--before X` 排除右端点（失效事件
+算已失效）。没有绑事件的记录视为恒成立。
+
+### 三、客观状态查询不读 `knowledge`
+
+`assertions` / `state_changes` 与 `knowledge` 物理分表，`state_answer()` 里
+不存在对 `knowledge` 的 select。不是过滤条件，是两张表隔开——过滤会被改掉，
+`select *` 会绕过。
+
+五个返回码 `RESOLVED` / `NOT_RECORDED` / `AMBIGUOUS` / `UNORDERED` / `DISPUTED`
+不合并：补救动作各不相同。
+
+### 四、规划记录不入事实表
+
+`02_Planning` 下的章卡、细纲是「计划发生」，不是「已经发生」。索引只把正文派生
+记录进事实表，规划目录下的同类文件单独计数（`skipped_planning`）。
+
 ## 0.6.0 — 2026-11-20
 
 T03「00_Canon 解析与索引」。六项交付：Markdown/YAML 解析、块 ID、SQLite、

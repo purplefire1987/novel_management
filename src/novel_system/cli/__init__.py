@@ -1,4 +1,4 @@
-"""CLI 入口。V4.0 §5.3 的 16 条命令，加 3 条地图生成命令。
+"""CLI 入口。V4.0 §5.3 的命令集，按 T01–T05 逐步落地。
 
 设计约束：
 - 不硬编码任何私人路径，一律走 config.load()。
@@ -18,9 +18,21 @@ from pathlib import Path
 from .. import config as cfg_mod
 from .. import logs
 from ..errors import NovelError
-from . import backup_cmd, flow, id_cmd, index_cmd, init, maps_cmd, read, schema_cmd
+from . import (
+    approval_cmd,
+    backup_cmd,
+    change_cmd,
+    flow,
+    id_cmd,
+    index_cmd,
+    init,
+    maps_cmd,
+    read,
+    schema_cmd,
+    timeline_cmd,
+)
 
-__version__ = "0.6.0"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
+__version__ = "0.8.0"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
 
 HANDLERS = {
     "doctor": read.cmd_doctor,
@@ -31,6 +43,13 @@ HANDLERS = {
     "init-project": init.cmd_init_project,
     "rebuild-index": index_cmd.cmd_rebuild_index,
     "search": index_cmd.cmd_search,
+    "state": timeline_cmd.cmd_state,
+    "knowledge": timeline_cmd.cmd_knowledge,
+    "reveal": timeline_cmd.cmd_reveal,
+    "inspect": approval_cmd.cmd_inspect,
+    "issue": change_cmd.cmd_issue,
+    "change": change_cmd.cmd_change,
+    "impact": change_cmd.cmd_impact,
     "task": flow.cmd_task,
     "stage": flow.cmd_stage,
     "approve": flow.cmd_approve,
@@ -118,6 +137,41 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--json", action="store_true", help="输出 JSON，便于脚本消费")
     p_search.add_argument("--show-index", action="store_true", help="附带索引的 revision 与 build id")
 
+    # ---- state / knowledge / reveal（T04 时间与认知）----
+    p_state = sub.add_parser(
+        "state",
+        help="查实体在某时点的客观字段值（只读断言与状态变化，不读人物认知）",
+        parents=[sub_common],
+    )
+    p_state.add_argument("entity", help="实体 ID，如 CHAR-000001")
+    p_state.add_argument("--field", default="", help="只看某个字段，如 life_status")
+    anchor_state = p_state.add_mutually_exclusive_group()
+    anchor_state.add_argument("--after", default=None, metavar="EVT", help="参照事件：查它发生之后")
+    anchor_state.add_argument("--before", default=None, metavar="EVT", help="参照事件：查它发生之前")
+    p_state.add_argument("--json", action="store_true", help="输出 JSON（含 status 与全部候选记录）")
+    p_state.add_argument("--show-index", action="store_true", help="附带索引 revision 与 build id")
+
+    p_kn = sub.add_parser(
+        "knowledge",
+        help="查角色对某命题的态度（查不到不等于「不知道」）",
+        parents=[sub_common],
+    )
+    p_kn.add_argument("holder", help="持有认知的角色 ID，如 CHAR-000001")
+    p_kn.add_argument("--subject", default="", help="命题主体 ID，如 CHAR-000002")
+    p_kn.add_argument("--predicate", default="", help="命题谓词，如 life_status")
+    anchor_kn = p_kn.add_mutually_exclusive_group()
+    anchor_kn.add_argument("--after", default=None, metavar="EVT", help="参照事件：查它发生之后")
+    anchor_kn.add_argument("--before", default=None, metavar="EVT", help="参照事件：查它发生之前")
+    p_kn.add_argument("--json", action="store_true", help="输出 JSON（含 status 与全部候选记录）")
+
+    p_rev = sub.add_parser(
+        "reveal",
+        help="查某命题在哪些叙述位置揭示给读者（不推断任何角色是否知道）",
+        parents=[sub_common],
+    )
+    p_rev.add_argument("proposition", help="命题 ID，如 AST-000001")
+    p_rev.add_argument("--json", action="store_true", help="输出 JSON")
+
     # ---- task ----
     p_task = sub.add_parser("task", help="创建或查看任务记录", parents=[sub_common])
     task_sub = p_task.add_subparsers(dest="task_command", required=True)
@@ -152,11 +206,101 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- approve ----
     p_approve = sub.add_parser("approve", help="作者批准 staging 内容（绑定内容指纹）", parents=[sub_common])
-    p_approve.add_argument("--task", required=True, help="任务 ID")
+    p_approve.add_argument(
+        "kind",
+        nargs="?",
+        choices=["artifact", "proposal"],
+        help="按对象批准：artifact（本版可用）／proposal（T07 才有）。省略则走 --task",
+    )
+    p_approve.add_argument("candidate", nargs="?", help="候选 ID：TASK-000001 或 TASK-000001:<目标路径>")
+    p_approve.add_argument("--hash", dest="hash", default="", help="当前内容哈希（非交互批准必填）")
+    p_approve.add_argument("--task", default=None, help="任务 ID（旧用法：一次批准该任务全部 staging）")
     p_approve.add_argument("--note", default="")
     p_approve.add_argument("--reject", action="store_true", help="驳回而不是批准")
     p_approve.add_argument("--force", action="store_true", help="有冲突仍批准（承担覆盖作者手改的风险）")
     p_approve.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    # ---- inspect（T05）----
+    p_inspect = sub.add_parser(
+        "inspect",
+        help="看清一个候选：内容哈希、与正式版差异、风险、阻断问题、批准范围",
+        parents=[sub_common],
+    )
+    p_inspect.add_argument("candidate", help="TASK-000001 或 TASK-000001:<目标相对路径>")
+    p_inspect.add_argument("--json", action="store_true", help="输出 JSON")
+
+    # ---- issue（T05 问题等级）----
+    p_issue = sub.add_parser("issue", help="登记与处理问题（BLOCKER 不能豁免）", parents=[sub_common])
+    issue_sub = p_issue.add_subparsers(dest="issue_command", required=True)
+
+    p_in = issue_sub.add_parser("new", help="登记一条问题", parents=[sub_common])
+    p_in.add_argument("--severity", required=True, help="BLOCKER / NON_BLOCKING / SUGGESTION")
+    p_in.add_argument("--category", required=True, help="KNOWLEDGE_BOUNDARY / CONTINUITY / TIMELINE / RULES / SCOPE / QUALITY / OTHER")
+    p_in.add_argument("--target", required=True, help="问题指向的对象 ID（任务或产物）")
+    p_in.add_argument("--block", default="", help="块 ID，如 p0031")
+    p_in.add_argument("--description", required=True, help="问题描述")
+    p_in.add_argument("--evidence", action="append", default=[], help="证据引用，可重复")
+    p_in.add_argument("--suggest", action="append", default=[], help="建议动作，可重复")
+    p_in.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
+
+    p_il = issue_sub.add_parser("list", help="列出问题", parents=[sub_common])
+    p_il.add_argument("--severity", default="", help="只看某个等级")
+    p_il.add_argument("--status", default="", help="只看某个状态")
+    p_il.add_argument("--json", action="store_true")
+
+    p_ir = issue_sub.add_parser("resolve", help="关闭问题（BLOCKER 必须写核验依据）", parents=[sub_common])
+    p_ir.add_argument("issue_id")
+    p_ir.add_argument("--note", default="")
+    p_ir.add_argument("--as", dest="actor", default=None)
+
+    p_iw = issue_sub.add_parser("waive", help="豁免问题（BLOCKER 一律拒绝）", parents=[sub_common])
+    p_iw.add_argument("issue_id")
+    p_iw.add_argument("--note", default="")
+    p_iw.add_argument("--as", dest="actor", default=None)
+
+    # ---- change（T05 变更请求）----
+    p_change = sub.add_parser("change", help="登记变更请求（RETCON 走独立审批）", parents=[sub_common])
+    change_sub = p_change.add_subparsers(dest="change_command", required=True)
+
+    p_cc = change_sub.add_parser("create", help="登记一笔变更", parents=[sub_common])
+    p_cc.add_argument("--type", required=True, help="PLAN_CHANGE / STATE_CHANGE / CORRECTION / RETCON / EDITORIAL")
+    p_cc.add_argument("--reason", required=True, help="为什么改（必填）")
+    p_cc.add_argument("--target", action="append", default=[], help="受影响对象 ID，可重复")
+    p_cc.add_argument("--scope", action="append", default=[], help="受影响路径前缀，可重复")
+    p_cc.add_argument("--old", default="", help="原记录摘要")
+    p_cc.add_argument("--new", dest="new", default="", help="新记录摘要")
+    p_cc.add_argument("--migration", default="", help="迁移计划")
+    p_cc.add_argument("--release-strategy", default="", help="发布策略")
+    p_cc.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_cl = change_sub.add_parser("list", help="列出变更", parents=[sub_common])
+    p_cl.add_argument("--json", action="store_true")
+
+    p_cs = change_sub.add_parser("show", help="查看一笔变更与它的影响报告", parents=[sub_common])
+    p_cs.add_argument("change_id")
+    p_cs.add_argument("--json", action="store_true")
+
+    p_ca = change_sub.add_parser(
+        "approve", help="独立审批（RETCON 必须：先 impact，再绑报告哈希批）", parents=[sub_common]
+    )
+    p_ca.add_argument("change_id")
+    p_ca.add_argument("--hash", required=True, help="影响报告的哈希")
+    p_ca.add_argument("--rewrite-chapters", action="store_true", help="承诺改写受影响正文")
+    p_ca.add_argument("--narrow-scope", action="store_true", help="明确缩小变更范围（不处理正文）")
+    p_ca.add_argument("--note", default="")
+    p_ca.add_argument("--force", action="store_true", help="非 RETCON 也走独立审批")
+    p_ca.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_cr = change_sub.add_parser("reject", help="驳回变更", parents=[sub_common])
+    p_cr.add_argument("change_id")
+    p_cr.add_argument("--note", default="")
+    p_cr.add_argument("--as", dest="actor", default=None)
+
+    # ---- impact（T05 影响分析）----
+    p_impact = sub.add_parser("impact", help="生成变更的影响报告（按索引反查）", parents=[sub_common])
+    p_impact.add_argument("change_id")
+    p_impact.add_argument("--dry-run", action="store_true", help="只算不写，不绑定哈希")
+    p_impact.add_argument("--json", action="store_true")
 
     # ---- adopt ----
     p_adopt = sub.add_parser("adopt", help="登记作者直接编辑后的文件状态", parents=[sub_common])

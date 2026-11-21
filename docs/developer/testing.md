@@ -119,6 +119,29 @@ def test_xxx(tmp_path, monkeypatch):
 `scripts/privacy_scan.py` 自身也要被测：故意造一个含 `/Users/` 绝对路径的文件，
 确认扫描能报出来；再造一个干净的，确认退出码 0。扫描器漏报比不扫更危险。
 
+## 闸门测试必须「退回就红」
+
+防绕过类的测试（BLOCKER 不可豁免、批准改一字节失效、RETCON 未表态不放行）
+光看「现在是绿的」不算数——测试可能在测另一条路径。做法是**把闸门代码退回原版，
+确认正好那几条用例挂**，再还原：
+
+```python
+# 把 if blockers: 改成 if False and blockers:，只跑那一条用例
+# 期望：FAILED ...::test_blocker_blocks_approval_and_waiver
+```
+
+这一步做过并留下记录：
+
+| 闸门 | 退回后的失败用例 |
+|---|---|
+| `approval_cmd.cmd_approve` 的 BLOCKER 判断 | `test_t05_cli.py::test_blocker_blocks_approval_and_waiver` |
+| `ApprovalStore.verify` 的逐文件复核 | `test_approvals.py::test_verify_treats_missing_file_as_stale` |
+| `ChangeStore.approve` 的 RETCON 断言 | `test_t05_cli.py::test_retcon_takes_its_own_path` |
+
+第二行是补出来的：`verify` 被退回后集成测试**仍然通过**，因为 `_approval_state`
+里还有一道包哈希校验顺手兜住了同样的错误。两道闸门共存是对的，但它们必须各有
+各的用例——否则删掉一道永远不会有人发现。
+
 ## CI 上的三层
 
 1. `privacy`：扫工作区 + 扫最近 50 条提交信息；

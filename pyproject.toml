@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "novel-system"
-version = "0.6.0"
+version = "0.8.0"
 description = "Long-form fiction management system: explicit-path config, project isolation, staging-first writes."
 readme = "README.md"
 requires-python = ">=3.11"

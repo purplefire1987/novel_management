@@ -120,9 +120,16 @@ Vault 路径、项目列表（含 Markdown 计数）、索引（库文件名 `bu
   **不落临时目录、不切工作树**，也不碰 `00_Canon` 里的任何文件。
   不给时读工作树，并把当前 HEAD（如果 Vault 自己是 git 仓库）记进索引。
 
-17 张表照 PRD §16.1 建，**本轮只有 8 张会填**：`index_metadata` `artifacts` `entities`
-`aliases` `source_refs` `narrative_order` `blocks` `fts_blocks`。其余 9 张是空表，
-留给 T04/T05/T07。输出里这两类**分两行打**，不合并成「已支持」。
+17 张表照 PRD §16.1 建，**当前 14 张会填**：`index_metadata` `artifacts` `entities`
+`aliases` `source_refs` `narrative_order` `blocks` `fts_blocks`，加 T04 的 `events`
+`event_edges` `assertions` `state_changes` `knowledge` `revelations`。
+
+剩下 3 张是空表：`foreshadowing`（伏笔契约待 T07/T09）、`dependencies`（T07 之后）、
+`issues`（**问题的权威副本在 runtime，不进索引**——见第 7 节）。
+
+「建了空表」不等于「已支持」，也**不等于「表里有数据」**：真库六个语义表里
+只有 `events` 有 7 行，其余五张是 0 行。输出里把「会填的表」「空表」「实际行数」
+分开打，不合并成一句「已支持」。
 
 坏文件（非 UTF-8、非法 YAML、没装 PyYAML 而 frontmatter 有嵌套）逐份记入 `失败` 计数后继续，
 不会中断整次重建。
@@ -159,7 +166,55 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 
 ---
 
-## 4. 任务
+## 4. 时间线与认知
+
+### `novel state <实体ID> [--field <字段>] [--after <事件>|--before <事件>] [--json]`
+
+查**客观**状态：某实体在某时点的字段值。只读 `assertions` 与 `state_changes`。
+
+```bash
+novel state CHAR-0001 --field location --after EVT-0007
+novel state CHAR-0001 --json
+```
+
+返回五个值之一，含义不合并：
+
+| 返回 | 含义 | 该怎么补 |
+|---|---|---|
+| `RESOLVED` | 唯一确定 | —— |
+| `NOT_RECORDED` | 没有记录 | 补记录。**这不等于「没有」或「不知道」** |
+| `AMBIGUOUS` | 有记录但结论不唯一 | 看输出的多条候选 |
+| `UNORDERED` | 涉及事件排不出先后 | 补 `event_edges`，不要按 ID 猜 |
+| `DISPUTED` | 记录被标为争议 | 先处理争议 |
+
+区间是 `[since, until)`：`--after X` 把 X 本身算在内（开始事件即生效），
+`--before X` 把 X 本身排除（失效事件即失效）。没绑事件的记录视为恒成立。
+
+退出码：`RESOLVED` → 0；其余 → **1**（「查不到唯一答案」不是错误，是答案）。
+
+### `novel knowledge <角色ID> [--about <命题>] [--after <事件>] [--json]`
+
+查**人物认知**：谁在什么时候知道/相信/怀疑/误信了什么。读 `knowledge` 表，
+带 `attitude` 前缀（如 `BELIEVES:父亲已死`）。
+
+`NOT_RECORDED` 的含义在这里尤其重要：查不到只说明「没记他知不知道」，
+不能推断成「他不知道」。
+
+### `novel reveal <命题> [--json]`
+
+查某个真相是在哪一章、以什么方式揭开的（`revelations` 表）。输出形如
+`CH-0003/S02#p0012`，可直接回跳正文。
+
+**当前真库的实际数据**（2026-11-21 现数）：事件 **7** 个（在 `05_Ledgers/Events/`，
+复合 ID 形如 `EVT-CH-0001-001`）、**边 0 条**；断言、状态变化、认知、揭示各 **0** 行。
+
+所以 `state` / `knowledge` / `reveal` 现在一律返回 `NOT_RECORDED`；一旦有记录绑定了
+两个事件，因为没有任何先后关系，会返回 `UNORDERED` 并提示「事件图里 0 条先后关系」。
+**命令能用，数据没有——两者不要混为一谈。**
+
+---
+
+## 5. 任务
 
 ### `novel task create --type <类型> [--assignee <agent>] [--mode <模式>] [--scope <前缀>] [--input <文件>] [--note <备注>] [--as <操作者>]`
 
@@ -172,7 +227,7 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 
 ---
 
-## 5. 提案与批准
+## 6. 提案与批准
 
 ### `novel stage --task <ID> --from <文件|-> --to <项目内正式路径> [--note] [--replace] [--as]`
 
@@ -182,9 +237,42 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 - 同一任务内同名目标已存在时拒绝；确需替换加 `--replace`。
 - 每次 stage 都记下目标正式文件当时的 sha256（`base_sha256`），供后续判冲突。
 
+### `novel inspect <TASK-ID|TASK-ID:路径> [--json]`
+
+批准之前要看的七项，一次给全：
+
+1. 候选清单与每个文件**此刻**的 sha256；
+2. staging 与磁盘的 `drift`（stage 之后被直接改过的文件）；
+3. 这笔候选当前的批准状态（`NONE` / `VALID` / `STALE`）；
+4. 指向它（任务 ID 或产物 ID）的 OPEN `BLOCKER`；
+5. 覆盖它、但还没批准的 RETCON；
+6. 变更范围（落哪几个正式区）；
+7. 风险等级（`HIGH` / `MEDIUM` / `LOW`）。
+
+**哈希按磁盘现算，不读 manifest。** manifest 是 stage 那一刻的记录，之后有人直接
+改了 staging 里的文件它就过期了；拿过期哈希去批，批的是一份此刻已经不存在的字节。
+
+### `novel approve artifact|proposal|release|change <对象> --hash <sha256> [--note] [--as author]`
+
+四类对象各绑不同的东西：
+
+| 子命令 | 绑什么 |
+|---|---|
+| `artifact` | 候选文件的 sha256（多个文件时是整包哈希） |
+| `proposal` | 提案文件的 sha256 |
+| `release` | 发布计划的哈希 |
+| `change` | **影响报告的哈希**（见下一节） |
+
+- 非 `author` 一律拒绝（退出码 3）；
+- `--hash` 必填，且必须等于 `inspect` 报出的当前值——不接受「大致同意」；
+- 批准后**改一个字节就失效**，没有「非实质修改」白名单；
+- 文件消失也算失效（取不到当前哈希 ≠ 没改动）。
+
 ### `novel approve --task <ID> [--note] [--reject] [--force] [--as author]`
 
-- 非 `author` 一律拒绝（退出码 3）。
+旧入口，保留兼容：它绑的同样是每个 staged 文件的内容指纹，`publish` 照它校验。
+新内容应当用上面带对象类型的入口——旧入口说不出「批的是哪个对象」。
+
 - 批准前先跑一遍 diff：存在冲突则拒绝，除非 `--force`（等于作者确认「以 staging 为准，覆盖我的手改」）。
 - 批准记录写入 `<runtime>/approvals/APR-00000N.json`，绑定每个 staged 文件的 `target` / `staged` / `sha256` / `bytes`。
 - `--reject` 记一条驳回，任务 `approval_state` 变为 `rejected`。
@@ -192,12 +280,17 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 
 ### `novel publish --task <ID> --confirm [--confirm-canon] [--as author]`
 
-四道闸：
+六道闸：
 
 1. 有 `decision=approved` 的批准记录；
 2. staging 里每个批准过的文件，当前 sha256 与批准时一致；
 3. staging 里没有批准范围外的新增文件；
-4. 目标落在正式区；涉及 `01_Canon/` 时还要 `--confirm-canon`。
+4. 目标上没有 OPEN 的 `BLOCKER`（记在任务 ID 或产物 ID 上都算）；
+5. 目标上没有「未批准的 RETCON」覆盖；
+6. 目标落在正式区；涉及 `01_Canon/` 时还要 `--confirm-canon`。
+
+第 4、5 道放在主路径而不是做成可选检查：BLOCKER 被绕过一次，正式版就带着已知硬伤
+出门；RETCON 被绕过一次，「独立审批」就没有意义了。
 
 通过后：目标已存在则先复制到 `90_Archive/publish_archive/<TASK-ID>/<时间戳>/<目标路径>`，再原子写入。任务标 `done`，作者基线推进。
 
@@ -205,7 +298,63 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 
 ---
 
-## 6. 作者手改
+## 7. 问题、变更与影响
+
+问题单与变更单存 `<runtime>/issues/` 与 `<runtime>/changes/`，**不进正式区、不进索引**。
+理由：它们是审核判词，进正式区就被算进连续性签字基线；进索引就让索引不再是
+「Vault + commit」的纯函数。
+
+### `novel issue new|list|resolve|waive`
+
+```bash
+novel issue new --severity BLOCKER --category CONTINUITY --target CHAR-0001 \
+                --description "第三章人物已死却又出场" --as editor
+novel issue list [--status OPEN] [--severity BLOCKER]
+novel issue resolve ISSUE-000001 --note "已改第三章，正文 sha256 见下" --as editor
+novel issue waive  ISSUE-000002 --note "措辞问题，不影响设定" --as editor
+```
+
+等级：`BLOCKER` / `NON_BLOCKING` / `SUGGESTION`。
+状态：`OPEN` / `RESOLVED` / `WAIVED`。
+类别：`KNOWLEDGE_BOUNDARY` `CONTINUITY` `TIMELINE` `RULES` `SCOPE` `QUALITY` `OTHER`。
+
+**`waive` 对 BLOCKER 一律拒绝**（退出码 4），报错里给两条合法路径：修掉后 `resolve`
+（必须写核验依据），或者先批准缩小范围的变更。豁免一个已知硬伤等于让它带着章号
+进正式版。
+
+目标可以写任务 ID 也可以写产物 ID：`inspect` 两种都扫——同一个问题可能记在任务上
+（还没发布），也可能记在产物上（发布后才发现）。
+
+### `novel change create|list`
+
+```bash
+novel change create --type RETCON --reason "父亲其实没死" \
+                    --target 01_Canon/Characters/CHAR-0001.md --as chief_editor
+novel change list [--status IMPACTED]
+```
+
+五类：`PLAN_CHANGE` `STATE_CHANGE` `CORRECTION` `RETCON` `EDITORIAL`。
+
+状态机：`DRAFT → IMPACTED → APPROVED|REJECTED`。**RETCON 必须走独立审批**：
+
+1. 先 `impact` 生成报告，没有报告不许批（闭眼签字）；
+2. `approve change` 绑的是**影响报告的哈希**，报告重新生成过就失效；
+3. 报告列出受影响正文，而作者既没 `--rewrite-chapters` 也没 `--narrow-scope` → 拒绝。
+   PRD §19.3：只改档案不处理正文时不能宣称 RETCON 完成；
+4. 有未批准的 RETCON 覆盖某路径时，这条路径上的普通文件审批会被拦下
+   （否则独立审批只是可绕过的装饰）。
+
+### `novel impact <CR-ID> [--json]`
+
+生成影响报告：受影响的产物、正文块、事件、断言、认知、伏笔、依赖七类。
+报告内容整体取规范化哈希，即变更批准的对象。
+
+**报告是快照**。改完正文再生成一次，哈希就变了，旧批准自动失效——这是设计意图，
+不是需要「刷新一下」的麻烦。
+
+---
+
+## 8. 作者手改
 
 ### `novel adopt [--dry-run] [--note] [--as author]`
 
@@ -218,7 +367,7 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 
 ---
 
-## 7. 备份与恢复
+## 9. 备份与恢复
 
 ### `novel backup [--out <目录>] [--label <标签>] [--no-git] [--list]`
 
@@ -239,7 +388,7 @@ FTS5 `trigram` 不可用时**不会**改用英文分词顶上：全部走 `LIKE`
 
 ---
 
-## 8. 地图
+## 10. 地图
 
 三个子命令共用一套路径解析，唯一来源是 `Config` + `ProjectPaths`；代码里没有任何
 `private/00_Canon/...` 这类硬编码路径。
@@ -284,7 +433,7 @@ novel maps build --confirm                          # 连档案一起重跑（�
 
 ---
 
-## 9. 契约与发号
+## 11. 契约与发号
 
 ### `novel schema list [--schema-dir <目录>]`
 
@@ -341,7 +490,7 @@ novel package-hash tmp/release_plan.json --canonical   # 同时看规范化后�
 
 ---
 
-## 10. 退出码
+## 12. 退出码
 
 | 码 | 含义 |
 |---|---|
@@ -357,12 +506,14 @@ novel package-hash tmp/release_plan.json --canonical   # 同时看规范化后�
 
 ---
 
-## 11. 目录与文件落在哪
+## 13. 目录与文件落在哪
 
 | 内容 | 位置 | 可否重建 |
 |---|---|---|
 | 任务记录 | `<runtime>/tasks/TASK-*.yaml` | 否（但可重开任务） |
 | 批准记录 | `<runtime>/approvals/APR-*.json` | 否 |
+| 问题单 | `<runtime>/issues/ISSUE-*.json` | 否 |
+| 变更单 | `<runtime>/changes/CR-*.json` | 否 |
 | 操作日志 | `<runtime>/logs/ops.jsonl` | 否 |
 | 索引库 | `<runtime>/index/builds/<build_id>.sqlite` | 是 |
 | 索引指针 | `<runtime>/index/active.json` | 是（指向哪一份 build） |

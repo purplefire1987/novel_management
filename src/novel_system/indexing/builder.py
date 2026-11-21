@@ -26,6 +26,8 @@ from pathlib import Path
 from .. import markdown as md
 from ..errors import ParseError
 from ..storage import sha256_text, write_text_atomic
+from ..timeline import EventGraph
+from ..timeline import extract as extract_semantics
 from . import schema
 
 # 进 `entities` 表的类型。章节/场景不是实体，它们去 `narrative_order`。
@@ -46,7 +48,33 @@ ENTITY_TYPES = frozenset(
 )
 NARRATIVE_TYPES = frozenset({"chapter", "scene"})
 
+# 「打算怎么写」不是「已经发生」。规划类产物里的语义记录一律不入事实表。
+#
+# 这一条不是靠约定，靠两道判定同时生效：类型在名单里，或路径落在 02_Planning 下。
+# 只判类型不够——规划文件常常没写 type；只判路径也不够——规划类档案可能被
+# 建在别处。两道都不中才允许入库。
+PLANNING_TYPES = frozenset(
+    {
+        "chapter_plan",
+        "chapter_outline",
+        "scene_beat",
+        "volume",
+        "volume_design",
+        "outline",
+        "series_outline",
+        "template",
+    }
+)
+PLANNING_DIR = "/02_Planning/"
+
 _DIGITS_RE = re.compile(r"(\d+)(?!.*\d)")
+
+
+def is_planning(rel: str, artifact_type: str) -> bool:
+    """这份产物是不是规划件。规划件里的「事件」是计划，不是事实。"""
+    if (artifact_type or "").strip().lower() in PLANNING_TYPES:
+        return True
+    return PLANNING_DIR in f"/{rel}"
 
 
 def _now() -> str:
@@ -93,6 +121,12 @@ class BuildResult:
     failed: list[tuple[str, str]] = field(default_factory=list)
     tables: dict[str, int] = field(default_factory=dict)
     manifest: dict = field(default_factory=dict)
+    # ---- T04：时间线与语义记录 ----
+    semantic: dict[str, int] = field(default_factory=dict)
+    planning_skipped: int = 0
+    event_cycle: tuple[str, ...] = ()
+    semantic_warnings: list[str] = field(default_factory=list)
+    dangling_edges: tuple[str, ...] = ()
 
 
 def _write_metadata(conn: sqlite3.Connection, rows: dict[str, object]) -> None:
@@ -141,6 +175,15 @@ def build_index(
         entries: list[dict] = []
         failed: list[tuple[str, str]] = []
         block_count = 0
+        # ---- T04：语义记录的累加器 ----
+        all_events: list = []
+        all_edges: list = []
+        all_assertions: list = []
+        all_changes: list = []
+        all_knowledge: list = []
+        all_reveals: list = []
+        planning_skipped = 0
+        semantic_warnings: list[str] = []
 
         for item in source.files():
             try:
@@ -251,6 +294,29 @@ def build_index(
                 )
                 block_count += len(doc.blocks)
 
+            # ---- T04：时间线与认知记录 ----
+            sem = extract_semantics(doc.meta, path=item.rel, project=project)
+            semantic_warnings.extend(sem.warnings)
+            if not sem.is_empty():
+                if is_planning(item.rel, artifact_type):
+                    # 规划里写的事件是「打算发生」，不是「已经发生」。不入事实表。
+                    # 但要计数：静默丢弃会让人以为写进去了。
+                    planning_skipped += (
+                        len(sem.events)
+                        + len(sem.edges)
+                        + len(sem.assertions)
+                        + len(sem.state_changes)
+                        + len(sem.knowledge)
+                        + len(sem.revelations)
+                    )
+                else:
+                    all_events.extend(sem.events)
+                    all_edges.extend(sem.edges)
+                    all_assertions.extend(sem.assertions)
+                    all_changes.extend(sem.state_changes)
+                    all_knowledge.extend(sem.knowledge)
+                    all_reveals.extend(sem.revelations)
+
             entries.append(
                 {
                     "path": item.rel,
@@ -261,6 +327,104 @@ def build_index(
                     "title": title,
                 }
             )
+
+        # ---- 写语义表（T04） ----
+        conn.executemany(
+            "insert into events"
+            "(id, project, title, summary, story_time, precision, narrated_in, path)"
+            " values (?,?,?,?,?,?,?,?)",
+            [
+                (e.id, e.project, e.title, e.summary, e.story_time, e.precision, e.narrated_in, e.path)
+                for e in all_events
+            ],
+        )
+        conn.executemany(
+            "insert into event_edges(project, from_id, to_id, relation, path) values (?,?,?,?,?)",
+            [(x.project, x.from_id, x.to_id, x.relation, x.path) for x in all_edges],
+        )
+        conn.executemany(
+            "insert into assertions"
+            "(id, project, subject_id, predicate, value, epistemic_type, review_status,"
+            " valid_from_event, valid_until_event, path) values (?,?,?,?,?,?,?,?,?,?)",
+            [
+                (
+                    a.id,
+                    a.project,
+                    a.subject_id,
+                    a.predicate,
+                    a.value,
+                    a.epistemic_type,
+                    a.review_status,
+                    a.valid_from_event,
+                    a.valid_until_event,
+                    a.path,
+                )
+                for a in all_assertions
+            ],
+        )
+        conn.executemany(
+            "insert into state_changes"
+            "(id, project, entity_id, attribute, from_value, to_value, event_id, path)"
+            " values (?,?,?,?,?,?,?,?)",
+            [
+                (c.id, c.project, c.entity_id, c.attribute, c.from_value, c.to_value, c.event_id, c.path)
+                for c in all_changes
+            ],
+        )
+        conn.executemany(
+            "insert into knowledge"
+            "(id, project, holder_id, subject_id, predicate, value, attitude,"
+            " valid_from_event, valid_until_event, path) values (?,?,?,?,?,?,?,?,?,?)",
+            [
+                (
+                    k.id,
+                    k.project,
+                    k.holder_id,
+                    k.subject_id,
+                    k.predicate,
+                    k.value,
+                    k.attitude,
+                    k.valid_from_event,
+                    k.valid_until_event,
+                    k.path,
+                )
+                for k in all_knowledge
+            ],
+        )
+        conn.executemany(
+            "insert into revelations"
+            "(id, project, proposition_ref, chapter_id, scene_id, block_id, revelation_mode, path)"
+            " values (?,?,?,?,?,?,?,?)",
+            [
+                (
+                    r.id,
+                    r.project,
+                    r.proposition_ref,
+                    r.chapter_id,
+                    r.scene_id,
+                    r.block_id,
+                    r.revelation_mode,
+                    r.path,
+                )
+                for r in all_reveals
+            ],
+        )
+
+        # 建图只为两件事：查环、查悬空边。有环不阻止建库（索引是派生物，
+        # 建了才有东西可查），但必须报出来——`state` 查询遇到环会拒绝排序。
+        event_graph = EventGraph.from_edges(
+            [e.id for e in all_events], [(x.from_id, x.to_id) for x in all_edges]
+        )
+        event_cycle = event_graph.cycle()
+        dangling_edges = event_graph.dangling
+        semantic = {
+            "events": len(all_events),
+            "edges": len(all_edges),
+            "assertions": len(all_assertions),
+            "state_changes": len(all_changes),
+            "knowledge": len(all_knowledge),
+            "revelations": len(all_reveals),
+        }
 
         seen: dict[str, int] = {}
         for raw in ids:
@@ -289,6 +453,10 @@ def build_index(
                 "failed_count": len(failed),
                 "populated": ",".join(schema.POPULATED_TABLES),
                 "empty": ",".join(schema.EMPTY_TABLES),
+                "planning_skipped": planning_skipped,
+                "event_cycle": " → ".join(event_cycle),
+                "dangling_edges": len(dangling_edges),
+                "semantic_warnings": len(semantic_warnings),
             },
         )
         conn.commit()
@@ -313,6 +481,11 @@ def build_index(
         duplicate_ids=duplicates,
         failed=failed,
         tables=tables,
+        semantic=semantic,
+        planning_skipped=planning_skipped,
+        event_cycle=event_cycle,
+        semantic_warnings=semantic_warnings,
+        dangling_edges=dangling_edges,
     )
 
     manifest = {
@@ -330,6 +503,11 @@ def build_index(
         "duplicate_ids": duplicates,
         "failed": [{"path": path, "reason": reason} for path, reason in failed],
         "tables": tables,
+        "semantic": semantic,
+        "planning_skipped": planning_skipped,
+        "event_cycle": list(event_cycle),
+        "dangling_edges": list(dangling_edges),
+        "semantic_warnings": semantic_warnings,
         "entries": entries,
     }
     result.manifest = manifest

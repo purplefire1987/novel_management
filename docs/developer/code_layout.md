@@ -8,6 +8,9 @@ cli/          只做参数解析与输出格式化，不写业务判断
   ├── read.py       doctor / status / validate / diff
   ├── init.py       init-author / init-project
   ├── index_cmd.py  rebuild-index / search
+  ├── timeline_cmd.py state / knowledge / reveal
+  ├── approval_cmd.py inspect / approve <object>
+  ├── change_cmd.py issue / change / impact
   ├── flow.py       task / stage / diff / approve / adopt / publish
   ├── backup_cmd.py backup / restore
   ├── maps_cmd.py   maps paths / import-admin / build
@@ -24,20 +27,23 @@ ids.py        稳定 ID 分配：前缀表、查重、加锁、审计
 storage/      哈希、原子写、不覆盖写、可验证复制
 audit/        操作日志（ops.jsonl）与操作者校验
 tasks/        任务记录与状态流转
-approvals/    批准记录（绑定 sha256）
+approvals/    批准记录（绑定对象类型 + 内容 sha256，按当前字节复核）
+changes/      问题单（ISSUE）、变更请求（CR）、影响分析；存 runtime，不进索引
 staging/      staging 落盘与 manifest
-release/      发布四道闸与旧版归档
+release/      发布六道闸与旧版归档（含 BLOCKER / 未批准 RETCON 两道内容闸）
 baseline/     作者编辑基线（adopt）
 backup/       备份、校验、恢复
 adapters/     模型适配层；当前只有 MockLLM（确定性、不联网、不需密钥）
 indexing/     SQLite 索引：schema 建表 / source 取文件 / builder 建库 / search 查询 / locate 定位
-validation/ workflows/ agents/ core/   预留扩展位（T04–T09）
+timeline/     事件 DAG（graph）/ 状态区间与认知查询（query）/ 前言提取（model）
+validation/ workflows/ agents/ core/   预留扩展位（T06 之后）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
 
 ```
-cli → release / backup / staging / tasks / approvals / baseline
+cli → release / backup / staging / tasks / approvals / changes / baseline
+    → timeline / indexing
     → paths / storage / audit / config
     → errors
 ```

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..approvals import ApprovalFile
+from ..changes import ChangeStore, IssueStore
 from ..audit import ensure_actor, file_stamp
 from ..errors import SecurityError, UsageError
 from ..release import describe_result, publish_task
@@ -25,6 +26,7 @@ from ._common import (
     task_store,
     warn,
 )
+from .approval_cmd import approve_object
 
 
 # --------------------------------------------------------------------------
@@ -150,6 +152,20 @@ def cmd_stage(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------
 
 def cmd_approve(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
+    """两条入口：`approve <kind> <candidate> --hash`（T05）与旧的 `approve --task`。
+
+    旧入口保留是因为它已经绑了文件指纹、publish 也照着它校验；新入口只是把
+    「批哪个对象」说清楚，并把哈希变成必填。两条路最后都写同一种批准记录。
+    """
+    kind = getattr(args, "kind", None)
+    if kind:
+        if not getattr(args, "candidate", None):
+            raise UsageError(f"approve {kind} 需要候选 ID：novel approve {kind} TASK-000001 --hash <sha256>")
+        return approve_object(cfg, args, kind)
+
+    if not getattr(args, "task", None):
+        raise UsageError("approve 需要 --task TASK-000001，或用 approve artifact <candidate> --hash <sha256>")
+
     actor = ensure_actor(getattr(args, "actor", None), "approve")
     pp = project(cfg, args)
     store = task_store(cfg)
@@ -302,6 +318,8 @@ def cmd_publish(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         actor=actor,
         note=getattr(args, "note", "") or "",
         confirm_canon=getattr(args, "confirm_canon", False),
+        issue_store=IssueStore(cfg.require_runtime()),
+        change_store=ChangeStore(cfg.require_runtime()),
     )
     op = oplog(cfg).record(
         actor=actor,

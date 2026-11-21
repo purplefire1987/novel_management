@@ -49,12 +49,22 @@ def _indexes(conn: sqlite3.Connection) -> set[str]:
 
 
 def test_table_lists_cover_all_seventeen() -> None:
-    """PRD §16.1 要 17 张表：已填 8 + 空表 9。两份清单必须正好拼满且不重叠。"""
-    assert len(schema.POPULATED_TABLES) == 8
-    assert len(schema.EMPTY_TABLES) == 9
+    """PRD §16.1 要 17 张表。两份清单必须正好拼满且不重叠。
+
+    不写死「已填 8 / 空 9」：每过一个任务（T04 填语义表、T05 填问题与依赖）
+    这个数字都会变，写死的结果是每次都要改测试，改着改着就把「清单漏表」
+    这个真问题一起改掉了。这里只守结构：拼满 17、不重叠、不重复。
+    """
+    assert len(schema.POPULATED_TABLES) + len(schema.EMPTY_TABLES) == 17
     assert len(schema.ALL_TABLES) == 17
-    assert len(set(schema.ALL_TABLES)) == 17, "两份清单有重叠"
+    assert len(set(schema.ALL_TABLES)) == 17, "两份清单有重叠或重复"
     assert set(schema.POPULATED_TABLES).isdisjoint(schema.EMPTY_TABLES)
+    # 关键表必须在已填清单里：这几张是 T03/T04 的实际交付，掉了就是回归。
+    # `issues` / `dependencies` 不在此列：问题的权威副本在 `<runtime>/issues/`，
+    # 索引是「Vault + commit」的派生物，把 runtime 状态塞进来会让同一个 commit
+    # 建出两个不同库（T03 验收「指定 commit 可独立构建」会变成假的）。
+    for table in ("artifacts", "blocks", "events", "assertions", "knowledge", "revelations"):
+        assert table in schema.POPULATED_TABLES, f"{table} 应已填"
 
 
 def test_created_tables_match_declared_lists(built) -> None:

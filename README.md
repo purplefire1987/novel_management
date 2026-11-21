@@ -61,10 +61,13 @@ active_project:
 
 ## 4. 命令
 
-V4.0 §5.3 的 16 项命令全部实现。另有九条不在 §5.3 内：三条地图命令
-（`maps paths` / `import-admin` / `build`，把原先散在 Vault 里的两个生成器收进系统）、
-四条契约命令（`schema list` / `schema check` / `allocate-id` / `package-hash`，T02 产物）、
-两条索引命令（`rebuild-index` / `search`，T03 产物）。
+V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务补入地图、契约、索引、
+时间线、审批与变更几组命令，命令行**现为 26 条**：
+三条地图命令（`maps paths` / `import-admin` / `build`）、四条契约命令
+（`schema list` / `schema check` / `allocate-id` / `package-hash`，T02）、
+两条索引命令（`rebuild-index` / `search`，T03）、三条时间线与认知命令
+（`state` / `knowledge` / `reveal`，T04）、四条审批与变更命令
+（`inspect` / `issue` / `change` / `impact`，T05）。
 
 | 命令 | 用途 | 写入 |
 |---|---|---|
@@ -83,7 +86,15 @@ V4.0 §5.3 的 16 项命令全部实现。另有九条不在 §5.3 内：三条�
 | `novel task inspect` | 查看任务详情、staging 产物与批准状态 | 否 |
 | `novel stage` | 把 Agent 产出写入 staging | 是（仅 staging） |
 | `novel diff` | 查看 staging 与正式文件的差异，标出冲突 | 否 |
-| `novel approve` | 作者批准（绑定内容指纹）；`--reject` 驳回 | 是（仅 Runtime） |
+| `novel state` | 某实体在某时点的客观字段值；排不出先后返回 `UNORDERED` | 否 |
+| `novel knowledge` | 某人物在某时点知道/相信什么（与客观事实分表） | 否 |
+| `novel reveal` | 某个真相在第几章哪一块被揭开 | 否 |
+| `novel inspect` | 批准前要看七项：候选与哈希、drift、批准状态、BLOCKER、未批准 RETCON、范围、风险 | 否 |
+| `novel approve <对象>` | 按对象批准（artifact / proposal / release / change），必给 `--hash` | 是（仅 Runtime） |
+| `novel approve --task` | 旧入口，保留兼容；同样绑定内容指纹 | 是（仅 Runtime） |
+| `novel issue` | 问题单：新建/列/解决/豁免；BLOCKER 不可豁免 | 是（仅 Runtime） |
+| `novel change` | 变更请求：五类，RETCON 走独立审批 | 是（仅 Runtime） |
+| `novel impact` | 生成影响报告（报告哈希即变更批准的对象） | 是（仅 Runtime） |
 | `novel adopt` | 登记作者手改、推进基线；`--dry-run` 只报告 | 是（仅 Runtime） |
 | `novel publish` | 已批准内容转正式；旧版先归档 | 是（正式区） |
 | `novel backup` | 本地备份，含清单与回读校验；`--list` 列备份 | 是（Runtime） |
@@ -100,12 +111,14 @@ novel task create --type draft --assignee writer            # 拿到 TASK-000001
 novel stage  --task TASK-000001 --from 草稿.md \
              --to 03_Manuscripts/Drafts/CH-0001.md --as writer
 novel diff   --task TASK-000001                             # 作者审阅
-novel approve --task TASK-000001 --as author                # 绑定内容指纹
+novel inspect TASK-000001                                   # 七项：哈希、drift、BLOCKER、风险…
+novel approve artifact TASK-000001 --hash <sha256> --as author   # 绑定当前字节
 novel publish --task TASK-000001 --as author --confirm      # 写正式区
 ```
 
 - `approve` / `publish` / `adopt` / `restore` 只接受 `--as author`，Agent 无法代办。
-- 批准绑定每个文件当时的 sha256。批准后 staging 被改动 → 发布直接拒绝，需重新批准。
+- 批准绑定每个文件**此刻**的 sha256。批准后 staging 被改动（哪怕一个字节）→ 发布直接拒绝，需重新批准。
+- 发布前还会拦两道：目标上有 OPEN 的 `BLOCKER`、有未批准的 `RETCON` 覆盖。
 - 同一条任务不能发布两次；内容有更新请新建任务。
 - 写入 `01_Canon/` 时 `publish` 额外要求 `--confirm-canon`。
 - 发布前若目标已存在，旧版本先复制到 `90_Archive/publish_archive/<TASK-ID>/<时间戳>/`。

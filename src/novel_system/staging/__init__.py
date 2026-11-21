@@ -203,3 +203,14 @@ class StagingArea:
                 }
             )
         return rows
+
+
+def artifact_id_of(target: str) -> str:
+    """从 `01_Canon/Characters/CHAR-0001_某人.md` 里取 `CHAR-0001`。
+
+    文件名带标题后缀（真实库的约定是 `{id}_{标题}.md`），所以不能直接拿 stem 当 ID。
+    取不到合法前缀时原样返回 stem——宁可多拦一格，也不要静默变成空串。
+    """
+    name = target.rsplit("/", 1)[-1]
+    stem = name[:-3] if name.endswith(".md") else name
+    return stem.split("_", 1)[0]

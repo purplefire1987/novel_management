@@ -44,21 +44,42 @@ diff 会标出三类东西：
 冲突的含义是「你可能在 Agent 写稿期间自己改了同一个文件」。处理方式二选一：
 要么让 Agent 基于你改后的版本重写，要么 `approve --force` 明确承担覆盖风险。
 
-## 4. 入库：批准 → 发布
+## 4. 入库：看一眼 → 批准 → 发布
 
 ```bash
-novel approve --task TASK-000002 --as author --note "第 7 章通过"
+novel inspect TASK-000002 --as author        # 批准前看这七项
+novel approve artifact TASK-000002 --hash <inspect 报的 sha256> --as author --note "第 7 章通过"
 novel publish --task TASK-000002 --as author --confirm
 ```
 
-`approve` 记下每个文件的 sha256。`publish` 会重新算一遍再比对——所以「批准的是 A、发的是 B」
-在这条链路上不可能发生。
+`inspect` 要看的七项：对象 ID、内容 hash、与正式版的差异、风险等级、阻断问题、
+来源、所需批准范围（PRD §20.3）。其中两项最容易漏：
+
+- **drift**：stage 之后 staging 里的文件被直接改过。哈希按**磁盘现算**，
+  所以批的一定是你此刻看到的字节；
+- **BLOCKER**：有未解决的阻断问题时，`approve` 与 `publish` 都会拒绝。
+  阻塞级不能豁免——只有「修掉后 resolve」或「缩范围」两条路。
+
+`approve` 记下每个文件的 sha256。`publish` 会重新算一遍再比对——所以「批准的是 A、
+发的是 B」在这条链路上不可能发生。**改一个字节也要重批**，没有「差不多就行」。
 
 写设定（`01_Canon/`）要额外加：
 
 ```bash
 novel publish --task TASK-000003 --as author --confirm --confirm-canon
 ```
+
+想改已经发生过的设定（RETCON），走的是另一条路：
+
+```bash
+novel change create --type RETCON --reason "父亲其实没死" --target 01_Canon/Characters/CHAR-0001.md
+novel impact CR-000001                        # 看这次改动会波及哪些章
+novel approve change CR-000001 --hash <报告的 sha256> --rewrite-chapters --as author
+```
+
+`impact` 会列出受影响的正文。只要列出正文、而你没有承诺改写（`--rewrite-chapters`）
+或明确缩小范围（`--narrow-scope`），批准就会被拒绝——PRD §19.3 不允许
+「只改档案就宣称 RETCON 完成」。
 
 旧版本会自动复制到 `90_Archive/publish_archive/<TASK-ID>/<时间戳>/`，不用自己备份。
 

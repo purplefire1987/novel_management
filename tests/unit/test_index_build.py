@@ -144,7 +144,7 @@ def test_metadata_records_build_and_revision(tmp_path: Path) -> None:
     assert meta["canon_revision"] == "工作树"
     assert meta["build_id"] == result.build_id
     assert meta["fts_mode"] in (schema.FTS_MODE_TRIGRAM, schema.FTS_MODE_LIKE)
-    assert "events" in meta["empty"]
+    assert "foreshadowing" in meta["empty"]
 
 
 def test_blocks_keep_ids_and_line_numbers(tmp_path: Path) -> None:

@@ -20,7 +20,7 @@ from ..audit import now_iso
 from ..baseline import AuthorBaseline
 from ..errors import ApprovalError, ConflictError, SecurityError, UsageError
 from ..paths import ProjectPaths
-from ..staging import StagingArea
+from ..staging import StagingArea, artifact_id_of
 from ..storage import copy_verified, sha256_file, write_atomic
 from ..tasks import Task, TaskStore
 
@@ -81,6 +81,42 @@ def check_approval(
     return approved_targets
 
 
+def check_gates(
+    pp: ProjectPaths,
+    task: Task,
+    staging: StagingArea,
+    *,
+    issue_store=None,
+    change_store=None,
+) -> None:
+    """发布前的两道内容闸：未解决的 BLOCKER、未批准的 RETCON。
+
+    这两道**不能靠「记得别按那个键」守**：BLOCKER 被豁免一次，正式版就带着
+    已知硬伤出门；RETCON 绕过独立审批一次，「独立」二字就没有意义了。
+    所以它们放进 publish 主路径，而不是做成可选的检查命令。
+    """
+    targets = sorted({item.target for item in staging.files()})
+    upstream = {task.task_id} | {artifact_id_of(t) for t in targets}
+
+    if issue_store is not None:
+        blockers = issue_store.open_blockers(upstream, project_id=pp.project_id)
+        if blockers:
+            raise ApprovalError(
+                "存在未解决的 BLOCKER，拒绝发布："
+                + "、".join(f"{i.issue_id}（{i.target_id}：{i.description}）" for i in blockers)
+                + "。BLOCKER 只能修掉后 resolve，或先走变更审批缩小范围"
+            )
+
+    if change_store is not None:
+        pending = change_store.blocking_scope(targets, project_id=pp.project_id)
+        if pending:
+            raise ApprovalError(
+                "这些路径有未批准的 RETCON："
+                + "、".join(c.change_id for c in pending)
+                + "。先 `novel change approve <CR> --hash <影响报告哈希>`"
+            )
+
+
 def publish_task(
     pp: ProjectPaths,
     task_store: TaskStore,
@@ -90,6 +126,8 @@ def publish_task(
     actor: str,
     note: str = "",
     confirm_canon: bool = False,
+    issue_store=None,
+    change_store=None,
 ) -> PublishResult:
     task = task_store.load(task_id)
     if task.write_mode == "read_only":
@@ -103,6 +141,7 @@ def publish_task(
 
     approval = approval_store.latest_for(task_id)
     staging = StagingArea(pp, task)
+    check_gates(pp, task, staging, issue_store=issue_store, change_store=change_store)
     targets = check_approval(pp, task, approval, staging)
     assert approval is not None  # check_approval 已保证
 

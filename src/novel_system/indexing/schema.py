@@ -1,21 +1,21 @@
 """索引库的建表语句与能力探测。
 
-表清单照 PRD §16.1（17 张）。本轮**只有一部分会被填满**，其余建空表：
+表清单照 PRD §16.1（17 张）。
 
 | 已填充 | 依据 |
 |---|---|
 | `index_metadata` `artifacts` `blocks` `fts_blocks` | T03 本体的产物 |
 | `entities` `aliases` `source_refs` | frontmatter 里就有 |
 | `narrative_order` | 章节/场景的编号可从 id 与目录推 |
+| `events` `event_edges` `assertions` `state_changes` `knowledge` `revelations` | T04 时间与认知 |
 
 | 建空表 | 谁来填 |
 |---|---|
-| `events` `event_edges` | T04 时间线 |
-| `assertions` `state_changes` `knowledge` `revelations` | T05 认知 |
-| `foreshadowing` `dependencies` `issues` | T07 之后 |
+| `foreshadowing` `dependencies` `issues` | T05／T07 之后 |
 
-**建空表不算交付**。空表只保证「查询不会因为表不存在而报错」，不能当成
-「这些语义已经支持」。`index_metadata.populated` 会把这件事写进库里。
+**「本版会填」与「这次有数据」是两件事。** 真库当前没有事件/断言一类档案，
+所以 T04 的表在真库上是空的——这不算支持，`rebuild-index` 会把两件事分开打印。
+`index_metadata.populated` 只声明能力，不声明数据的存在。
 
 为什么不担心改表结构：索引是**派生**的（ADR-003），每次重建都从 Markdown 重来，
 没有迁移负担。要加列直接改这里，重跑 `rebuild-index`。
@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 1
-BUILDER_VERSION = "0.6.0"
+SCHEMA_VERSION = 2
+BUILDER_VERSION = "0.8.0"
 
 FTS_MODE_TRIGRAM = "trigram"
 FTS_MODE_LIKE = "none"  # 明确退化：没有 FTS，查询走 LIKE
@@ -45,16 +45,23 @@ POPULATED_TABLES = (
     "narrative_order",
     "blocks",
     "fts_blocks",
-)
-
-# 建表但不填的表：留给后续任务
-EMPTY_TABLES = (
     "events",
     "event_edges",
     "assertions",
     "state_changes",
     "knowledge",
     "revelations",
+)
+
+# 建表但不填的表。
+#
+# `issues` / `dependencies` 的权威副本不在 Vault：问题与变更存在 `<runtime>/issues/`
+# 与 `<runtime>/changes/`，依赖要到 T07 之后才有。索引必须是「Vault + commit」的
+# 纯函数，把 runtime 状态塞进来，同一个 commit 就能建出两个不同内容的库，
+# T03 的验收「指定 commit 可独立构建索引」当场变成假的。所以宁可空着。
+#
+# `foreshadowing` 同理：伏笔档案在 02_Planning，尚待 T07/T09 定契约。
+EMPTY_TABLES = (
     "foreshadowing",
     "dependencies",
     "issues",
@@ -129,34 +136,75 @@ _DDL = [
         kind text not null default '',
         ordinal integer not null default 0
     )""",
-    # ---- 以下本版建表不填 ----
+    # ---- 时间线（T04） ----
+    # events 是节点，event_edges 是「谁在谁之前」。边有向，图必须无环（PRD §9.3）。
+    # 存 id 不存外键：索引是派生库，不靠约束保证一致性，靠构建时检测+报错。
     """create table events (
-        id text not null, project text not null, title text not null default '',
-        summary text not null default '', story_time text not null default ''
+        id text not null,
+        project text not null,
+        title text not null default '',
+        summary text not null default '',
+        story_time text not null default '',
+        precision text not null default '',
+        narrated_in text not null default '',
+        path text not null default ''
     )""",
     """create table event_edges (
-        project text not null, from_id text not null, to_id text not null,
-        relation text not null default ''
+        project text not null,
+        from_id text not null,
+        to_id text not null,
+        relation text not null default '',
+        path text not null default ''
     )""",
+    # ---- 语义记录（T04） ----
+    # assertions 只放「客观断言」；人物认知另走 knowledge 表，物理隔开。
+    # 为什么要分表而不是加一列 epistemic_type 过滤：分开存，写查询时就不可能
+    # 「忘了加 where」而把角色误判当事实。库结构本身挡住这类错。
     """create table assertions (
-        id text not null, project text not null, subject_id text not null default '',
-        predicate text not null default '', value text not null default '',
-        epistemic_type text not null default '', review_status text not null default ''
+        id text not null,
+        project text not null,
+        subject_id text not null default '',
+        predicate text not null default '',
+        value text not null default '',
+        epistemic_type text not null default '',
+        review_status text not null default '',
+        valid_from_event text not null default '',
+        valid_until_event text not null default '',
+        path text not null default ''
     )""",
     """create table state_changes (
-        id text not null, project text not null, entity_id text not null default '',
-        attribute text not null default '', from_value text not null default '',
-        to_value text not null default '', event_id text not null default ''
+        id text not null,
+        project text not null,
+        entity_id text not null default '',
+        attribute text not null default '',
+        from_value text not null default '',
+        to_value text not null default '',
+        event_id text not null default '',
+        path text not null default ''
     )""",
     """create table knowledge (
-        id text not null, project text not null, holder_id text not null default '',
-        subject_id text not null default '', predicate text not null default '',
-        value text not null default '', since_event text not null default ''
+        id text not null,
+        project text not null,
+        holder_id text not null default '',
+        subject_id text not null default '',
+        predicate text not null default '',
+        value text not null default '',
+        attitude text not null default '',
+        valid_from_event text not null default '',
+        valid_until_event text not null default '',
+        path text not null default ''
     )""",
     """create table revelations (
-        id text not null, project text not null, subject_id text not null default '',
-        chapter_id text not null default ''
+        id text not null,
+        project text not null,
+        proposition_ref text not null default '',
+        chapter_id text not null default '',
+        scene_id text not null default '',
+        block_id text not null default '',
+        revelation_mode text not null default '',
+        path text not null default ''
     )""",
+    # ---- 建表不填 ----
     """create table foreshadowing (
         id text not null, project text not null, title text not null default '',
         status text not null default '', planted_in text not null default '',
@@ -176,6 +224,16 @@ _DDL = [
     "create index idx_entities_name on entities (project, name)",
     "create index idx_aliases_alias on aliases (project, alias)",
     "create index idx_artifacts_path on artifacts (project, path)",
+    # 时间线与语义记录的查询热路径：都是「按主体 + 按事件」两向
+    "create index idx_events_id on events (project, id)",
+    "create index idx_events_narrated on events (project, narrated_in)",
+    "create index idx_edges_from on event_edges (project, from_id)",
+    "create index idx_edges_to on event_edges (project, to_id)",
+    "create index idx_assertions_subject on assertions (project, subject_id, predicate)",
+    "create index idx_state_entity on state_changes (project, entity_id, attribute)",
+    "create index idx_state_event on state_changes (project, event_id)",
+    "create index idx_knowledge_holder on knowledge (project, holder_id)",
+    "create index idx_revelations_prop on revelations (project, proposition_ref)",
 ]
 
 

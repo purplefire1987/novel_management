@@ -23,6 +23,8 @@
 | [ADR-010](ADR-010-license-and-governance.md) | 公共仓库的许可证与贡献治理 | 已接受（GPL-3.0-only） |
 | [ADR-011](ADR-011-schema-as-contract.md) | 字段契约以 JSON Schema 为真源，校验器自实现 | 已接受 |
 | [ADR-012](ADR-012-sqlite-index-and-cjk-search.md) | 索引改用 SQLite；中文检索按长度分派 | 已接受（部分取代 003） |
+| [ADR-013](ADR-013-event-dag-and-state-intervals.md) | 时间线用事件 DAG；状态按区间；认知与事实分表 | 已接受 |
+| [ADR-014](ADR-014-approval-binds-bytes.md) | 批准绑定对象与当前字节；BLOCKER 不可豁免；RETCON 独立审批 | 已接受（细化 006） |
 
 ## 这些 ADR 里最重要的三句话
 
