@@ -70,12 +70,18 @@ class ClosureResult:
 
 
 def chapters_of_task(pp: ProjectPaths, runtime: Path, task_id: str) -> list[str]:
-    """这个任务的 staging 里有哪些章节的正文。"""
+    """这个任务的 staging 里有哪些章节的正文。
+
+    前缀从 layout 取，不写字面量：`release/engine.py` 判定「这一批含不含正文」
+    用的是 `pp.manuscripts`，这里若写死 `03_Manuscripts/`，改过目录名的库会出现
+    「engine 认为有正文、closure 说没有」的分裂。
+    """
     task = TaskStore(runtime).load(task_id)
     staging = StagingArea(pp, task)
+    prefix = pp.manuscripts.relative_to(pp.root).as_posix() + "/"
     found: set[str] = set()
     for item in staging.files():
-        if not item.target.startswith("03_Manuscripts/"):
+        if not item.target.startswith(prefix):
             continue
         name = item.target.rsplit("/", 1)[-1]
         if name.endswith(".md"):

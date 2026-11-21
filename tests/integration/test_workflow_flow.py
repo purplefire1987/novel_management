@@ -88,7 +88,10 @@ def _release_ids(runtime: Path) -> list[str]:
 def _prepare(vault: Path, runtime: Path, task: str, *, expect: int = 0) -> str:
     """准备发布计划。T06 之后 publish 必须基于「已准备且已批准」的计划。"""
     code = main(
-        ["release", "prepare", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"]
+        [
+            "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
+            "--task", task, "--skip-closure", "--as", "author",
+        ]
     )
     assert code == expect
     return _release_ids(runtime)[-1] if code == 0 else ""

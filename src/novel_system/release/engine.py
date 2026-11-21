@@ -121,6 +121,7 @@ def prepare_plan(
     reuse_index_of: str = "",
     bytes_from: str = "",
     reason: str = "",
+    skip_closure: bool = False,
 ) -> tuple[ReleasePlan, PlanMeta]:
     """把「已批准的 staging」翻译成 ReleasePlan。
 
@@ -143,6 +144,26 @@ def prepare_plan(
         changes.append(Change(path=item.target, op=op, content_hash=digest))
 
     targets = [c.path for c in changes]
+
+    # ---- 共同发布闸（T10）：正文与记忆不许半边生效 ----
+    #
+    # 放在准备阶段而不是执行阶段：计划是作者要批的东西，如果计划里只有正文、
+    # 记忆是旧的，作者在批准的那一刻就该知道。等到执行第 3 步再拦，
+    # 作者已经看过一遍计划了。
+    # 正文目录名从 layout 取，不写字面量——目录改名后这里要跟着走。
+    manuscript_prefix = pp.manuscripts.relative_to(pp.root).as_posix() + "/"
+    chapter_ids = sorted({Path(c.path).stem for c in changes if c.path.startswith(manuscript_prefix)})
+    if chapter_ids and not skip_closure:
+        from ..validation import closure as closure_mod
+
+        closure = closure_mod.check(pp, Path(store.runtime), chapter_ids=chapter_ids)
+        if not closure.ok:
+            detail = "\n".join(f"  - [{i.code}] {i.message}" for i in closure.blocking)
+            raise ApprovalError(
+                "正文与记忆必须同批发布，现在这批不满足：\n" + detail
+                + "\n  真要单独发正文，用 --skip-closure 并在计划里留下这条豁免"
+            )
+
     text_approvals = [approval.approval_id] if any(_scope_of(t) == TEXT_PREFIX for t in targets) else []
     memory_approvals = [
         approval.approval_id for _ in [0] if any(_scope_of(t) in MEMORY_PREFIXES for t in targets)
@@ -180,6 +201,9 @@ def prepare_plan(
         schema_version=__version__,
         index_config_version=f"{index_schema.SCHEMA_VERSION}/{index_schema.BUILDER_VERSION}",
         prepared_at=utc_now(),
+        # 只在「这一批确实有正文、且确实跳了闸」时记 True：
+        # 没有正文的一批跳过与否都无意义，记 True 会制造虚假的豁免痕迹。
+        closure_skipped=bool(skip_closure and chapter_ids),
     )
     meta = PlanMeta(
         release_id=release_id,
@@ -325,8 +349,10 @@ def _verify_approval(pp: ProjectPaths, plan: ReleasePlan, meta: PlanMeta, approv
 def _validate_candidate(pp: ProjectPaths, snapshot: Path, plan: ReleasePlan, files_dir: Path) -> None:
     """第 6 步：路径、字节、解析、正式区归属。
 
-    PRD 要求这里还校验 Schema、ID、引用、依赖。依赖表本版为空（T07 之后才有），
-    如实只做能做的四样，并把「没做的」写在 known_risks 里，不假装做过。
+    PRD 要求这里还校验 Schema、ID、引用、依赖。**这四样至今没做**：
+    依赖表从索引第 4 版（0.12.0）起会填，但发布闸仍不读它——依赖失效只由
+    `deps check` / `deps closure` 报出来，且不阻断发布。如实只做能做的四样，
+    并把「没做的」写在 known_risks（R-28）里，不假装做过。
     """
     for change in plan.changes:
         target = pp.at(change.path)

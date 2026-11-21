@@ -366,10 +366,11 @@ def draft_of(pp: ProjectPaths, runtime: Path, task_id: str, chapter_id: str) -> 
     """从 staging 取这一章的草稿。返回 (staging 文件路径, 目标相对路径, 字节)。"""
     task = TaskStore(runtime).load(task_id)
     staging = StagingArea(pp, task)
+    prefix = pp.manuscripts.relative_to(pp.root).as_posix() + "/"
     matches = [
         item
         for item in staging.files()
-        if item.target.endswith(f"{chapter_id}.md") and item.target.startswith("03_Manuscripts/")
+        if item.target.endswith(f"{chapter_id}.md") and item.target.startswith(prefix)
     ]
     if not matches:
         raise UsageError(

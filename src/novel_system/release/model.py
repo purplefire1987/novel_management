@@ -112,10 +112,14 @@ class ReleasePlan:
     schema_version: str = ""
     index_config_version: str = ""
     prepared_at: str = ""
+    # 本批含正文却跳过共同发布闸时置 True。只在 True 时进 `as_dict`——
+    # 0.11.0 及更早写下的计划没有这个键，无条件输出会让它们重新序列化后
+    # 哈希变化，已批准待执行的计划会突然「批准的是另一份计划」。
+    closure_skipped: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         """只输出 schema 里有的字段，顺序固定；`None` 表示首次发布。"""
-        return {
+        out = {
             "release_id": self.release_id,
             "base_release": self.base_release,
             "changes": [c.as_dict() for c in self.changes],
@@ -128,6 +132,9 @@ class ReleasePlan:
             "index_config_version": self.index_config_version,
             "prepared_at": self.prepared_at,
         }
+        if self.closure_skipped:
+            out["closure_skipped"] = True
+        return out
 
     @property
     def hash(self) -> str:
@@ -150,6 +157,7 @@ class ReleasePlan:
             schema_version=str(data.get("schema_version") or ""),
             index_config_version=str(data.get("index_config_version") or ""),
             prepared_at=str(data.get("prepared_at") or ""),
+            closure_skipped=bool(data.get("closure_skipped")),
         )
 
 

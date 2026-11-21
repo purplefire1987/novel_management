@@ -18,6 +18,7 @@ cli/          只做参数解析与输出格式化，不写业务判断
   ├── schema_cmd.py schema list / check、package-hash
   ├── import_cmd.py import scan / report / stage / where / list
   ├── agent_cmd.py  preflight / agent list / agent prompt / agent usage
+  ├── work_cmd.py   plan show|check|derive、write、review submit|status、proposal *、deps *
   └── id_cmd.py     allocate-id
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
@@ -62,13 +63,24 @@ agents/       Agent 适配器与写前资料包（ADR-017）
   ├── metering.py  <runtime>/usage/YYYYMMDD.jsonl，一行一次调用，只追加、不记正文
   ├── runner.py    信封：去围栏 → 解析 → schema 校验 → 核对 role；失败不猜
   └── preflight.py 八级检索落成七次工具调用，出 PRD §13.4 结构，判 PASS/BLOCKED
-validation/ workflows/ core/   预留扩展位（T09 之后）
+validation/ 发布前的语义校验（ADR-018）
+  ├── proposals.py     记忆提案：KINDS 十类、绑源哈希、模型失败退骨架、declare-none
+  ├── dependencies.py  依赖四级判定（VALID/STALE/NEEDS_REVIEW）、传递只走一级
+  └── closure.py       共同发布闸：四种阻断码，供 deps closure 与 release prepare 共用
+workflows/  创作链路（ADR-018）
+  ├── plan.py           §10.2 十六字段认法、八项必需、只派生确定性可读的两处、写回只增不覆盖
+  ├── draft.py          两道前置（plan.check + preflight PASS）、目标路径结构性固定、
+  │                     只落 staging；_target_rel() 拼完再校验不在 Canon 下
+  ├── review.py         风险路由（只能升不能降）、按风险配角色、自审拒绝、返修预算、
+  │                     规则检查只判形状；ReviewStore 在 <runtime>/reviews/
+  └── text_approval.py  正文批准：审过 + 角色齐 + 无 BLOCKER 才批，绑整份字节 sha256
+core/       预留扩展位（T11 之后）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
 
 ```
-cli → release / importing / agents / backup / staging / tasks / approvals / changes / baseline
+cli → release / workflows / validation / importing / agents / backup / staging / tasks / approvals / changes / baseline
     → timeline / indexing
     → paths / storage / audit / config
     → errors
@@ -187,6 +199,41 @@ PAID_OFF / ABANDONED` 存在 `state`。只读通用 `status` 会把所有伏笔�
 `issues[].evidence[]` 这种三层嵌套会被写成一个字符串——写下去不报错，读回来是字符串，
 schema 校验才发现对不上。`_yaml_scalar(None)` 写 `null` 而不是 `""`，
 否则 `base_release` 回读成空串，过不了自己的 schema。
+
+**草稿目标路径必须由代码拼，不能做参数。** `draft._target_rel()` 固定拼
+`03_Manuscripts/Drafts/<CH>.md`，拼完**再校验一次**不在 `01_Canon` 下，违反直接
+`SecurityError`。给一个「指定目标路径」的选项，等于把「写稿」变成「写正式区」的入口；
+而校验放在拼完之后，是为了防 `chapter_id` 本身被塞成 `../01_Canon/x`。
+
+**写回 frontmatter 不能「解析成 dict 再整体 dump」。** `plan --write` 只做插入：
+找出原本不存在的键，插在 `---` 之后，正文逐字节不动（变了抛 `ConflictError` 并回滚），
+写前先备份到 `<runtime>/backups/plan/`。整体 dump 会重排原有键、改掉引号风格、
+把作者手写的多行块压成一行——一次「补一个字段」能把章卡格式全冲掉。
+
+**审核拿全文还是拿正文，是两回事。** 最初的 `submit()` 把**整份文件**（含 frontmatter
+的 `---`）当正文喂给规则检查，于是每份稿都被判「正文里混了两份文档」BLOCKER，
+同时风险词一个也读不到（关键词在正文里，但判定被前面的 BLOCKER 短路了）。
+现在 `digest = sha256_text(整个文件)` 与 `body = md.parse(...).body` 分开用：
+哈希要整份字节，风险与规则检查只要正文。
+
+**单字风险词必须过搭配过滤。** 死亡关键词里放了单字「死」，「死寂的院子」「死守城门」
+会让每一章都变成 HIGH——判多了的结果是没人再看风险等级。`_DEATH_EXCLUDE`
+（`路/角/寂/守/心/板/锁/账/扛/磕/缠/党/规矩`）宁可漏判（`--risk HIGH` 能补），
+也不让场景描写被判成死亡事件。
+
+**审核记录的「轮」是轮号，不是提交次数。** `rounds_used = len({round for r in history
+if r.verdict == "REVISE"})`：同一轮三个审核人都判 REVISE 只消耗一轮。反过来，
+全是 APPROVE 但角色没齐（`PARTIAL`）不消耗预算——这条缺口写在 `known_risks` R-50。
+
+**`draft_of()` 必须唯一。** 按「任务 + 章号」找 staging 里的草稿，找到两份就抛，
+不取最新。理由与「哈希按磁盘现算」相同：两个候选里挑一个，挑错的那个后果是
+「批的是一份后来又改过的字节」，而系统毫不知情。
+
+**共同发布闸放在准备阶段，不是执行阶段。** 计划是作者要批的东西，如果计划里只有正文、
+记忆是旧的，作者在批准那一刻就该知道；等到执行第 3 步再拦，作者已经看过一遍计划了。
+`--skip-closure` 的豁免记进计划的 `closure_skipped` 字段，因此它也在作者批准的哈希里。
+这个字段**只在为 `true` 时输出**：0.11.0 及更早写下的计划没有这个键，无条件输出会让
+它们重新序列化后哈希变化，已批准待执行的计划会突然变成「批准的是另一份计划」。
 
 ## 加一个新命令的步骤
 

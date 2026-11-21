@@ -1,4 +1,4 @@
-"""CLI 入口。V4.0 §5.3 的命令集，按 T01–T08 逐步落地。
+"""CLI 入口。V4.0 §5.3 的命令集，按 T01–T10 逐步落地。
 
 设计约束：
 - 不硬编码任何私人路径，一律走 config.load()。
@@ -38,6 +38,7 @@ from . import (
     release_cmd,
     schema_cmd,
     timeline_cmd,
+    work_cmd,
 )
 
 from ..version import __version__ as __version__  # noqa: E402  版本只有一处定义
@@ -74,6 +75,11 @@ HANDLERS = {
     "package-hash": schema_cmd.cmd_package_hash,
     "preflight": agent_cmd.cmd_preflight,
     "agent": agent_cmd.cmd_agent,
+    "plan": work_cmd.cmd_plan,
+    "write": work_cmd.cmd_write,
+    "review": work_cmd.cmd_review,
+    "proposal": work_cmd.cmd_proposal,
+    "deps": work_cmd.cmd_deps,
 }
 
 
@@ -222,12 +228,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve.add_argument(
         "kind",
         nargs="?",
-        choices=["artifact", "proposal", "release"],
-        help="按对象批准：artifact（staging 产物）／release（发布计划）／proposal（T10 才有）。省略则走 --task",
+        choices=["artifact", "proposal", "release", "text"],
+        help="按对象批准：artifact（staging 产物）／text（正文，要求先过审核）／"
+        "release（发布计划）／proposal（记忆提案）。省略则走 --task",
     )
     p_approve.add_argument("candidate", nargs="?", help="候选 ID：TASK-000001 或 TASK-000001:<目标路径>")
     p_approve.add_argument("--hash", dest="hash", default="", help="当前内容哈希（非交互批准必填）")
     p_approve.add_argument("--task", default=None, help="任务 ID（旧用法：一次批准该任务全部 staging）")
+    p_approve.add_argument("--chapter", default=None, help="章节 ID（approve text 用）")
     p_approve.add_argument("--note", default="")
     p_approve.add_argument("--reject", action="store_true", help="驳回而不是批准")
     p_approve.add_argument("--force", action="store_true", help="有冲突仍批准（承担覆盖作者手改的风险）")
@@ -339,6 +347,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_rprep.add_argument("--task", required=True, help="任务 ID")
     p_rprep.add_argument("--confirm-canon", action="store_true", help="计划里含 Canon 写入时预先确认")
+    p_rprep.add_argument(
+        "--skip-closure",
+        action="store_true",
+        help="跳过「正文与记忆同批」检查（会让记忆滞后于正文；只在明确知情时用）",
+    )
     p_rprep.add_argument("--as", dest="actor", default=None, help="操作者")
 
     p_rshow = release_sub.add_parser("show", help="查看计划、批准、事务日志与清单", parents=[sub_common])
@@ -532,6 +545,133 @@ def build_parser() -> argparse.ArgumentParser:
     p_au = agent_sub.add_parser("usage", help="看调用计量台账", parents=[sub_common])
     p_au.add_argument("--day", default="", help="日期 YYYYMMDD；省略为今天")
     p_au.add_argument("--json", action="store_true")
+
+    # ---- plan（T09 规划契约）----
+    p_plan = sub.add_parser(
+        "plan",
+        help="规划契约：章卡够不够开写、能从散文里派生哪些结构化约束（PRD §10）",
+        parents=[sub_common],
+    )
+    plan_sub = p_plan.add_subparsers(dest="plan_command", required=True)
+
+    p_ps = plan_sub.add_parser("show", help="逐项看 §10.2 的字段有没有、出处在哪", parents=[sub_common])
+    p_ps.add_argument("chapter", help="章节 ID，如 CH-0001")
+    p_ps.add_argument("--json", action="store_true")
+
+    p_pc = plan_sub.add_parser("check", help="只判够不够开写（缺必需字段返回非零）", parents=[sub_common])
+    p_pc.add_argument("chapter")
+    p_pc.add_argument("--json", action="store_true")
+
+    p_pd = plan_sub.add_parser(
+        "derive",
+        help="从「必须发生／禁止发生」派生结构化字段（只派生确定性可读的部分）",
+        parents=[sub_common],
+    )
+    p_pd.add_argument("chapter")
+    p_pd.add_argument("--write", action="store_true", help="写回章卡 frontmatter（只增不覆盖，正文不动）")
+    p_pd.add_argument("--as", dest="actor", default=None, help="写回只接受 author")
+    p_pd.add_argument("--json", action="store_true")
+
+    # ---- write（T09 主笔写稿）----
+    p_write = sub.add_parser(
+        "write",
+        help="主笔写草稿：前置规划与资料包，产物只进 staging（永不写 01_Canon）",
+        parents=[sub_common],
+    )
+    p_write.add_argument("--task", required=True, help="写作任务 ID")
+    p_write.add_argument("--chapter", required=True, help="章节 ID")
+    p_write.add_argument("--mock-response", default="", help="演练：从文件读一段模型输出（本版未接真实适配器）")
+    p_write.add_argument("--model", default="", help="模型名（给真适配器用）")
+    p_write.add_argument("--base-release", default="")
+    p_write.add_argument("--preflight", default="", help="指定资料包 ID；省略则复用最新 PASS，没有就现跑一次")
+    p_write.add_argument("--note", default="")
+    p_write.add_argument("--replace", action="store_true", help="覆盖本任务已有的同名草稿（返修时用）")
+    p_write.add_argument("--as", dest="actor", default=None, help="执行角色，默认 writer")
+
+    # ---- review（T09 审核与风险路由）----
+    p_review = sub.add_parser(
+        "review",
+        help="审核草稿：风险路由、返修预算、高风险不许自审（PRD §14.2）",
+        parents=[sub_common],
+    )
+    review_sub = p_review.add_subparsers(dest="review_command", required=True)
+
+    p_rv = review_sub.add_parser("submit", help="登记一次审核结论", parents=[sub_common])
+    p_rv.add_argument("--task", required=True)
+    p_rv.add_argument("--chapter", required=True)
+    p_rv.add_argument("--role", default="editor", help="审核角色（九角色之一），默认 editor")
+    p_rv.add_argument("--verdict", default="approve", help="approve 或 revise")
+    p_rv.add_argument("--risk", default="", help="人工调整风险：LOW/MEDIUM/HIGH（只能升不能降）")
+    p_rv.add_argument("--max-rounds", type=int, default=3, help="返修预算（默认 3 轮）")
+    p_rv.add_argument("--note", default="")
+    p_rv.add_argument("--as", dest="actor", default=None, help="审核人")
+
+    p_rs = review_sub.add_parser("status", help="看这一章现在能不能过", parents=[sub_common])
+    p_rs.add_argument("--task", required=True)
+    p_rs.add_argument("--chapter", required=True)
+    p_rs.add_argument("--json", action="store_true")
+
+    # ---- proposal（T10 记忆提案）----
+    p_prop = sub.add_parser(
+        "proposal",
+        help="记忆提案：从已批准正文提取、校验源哈希、作者批准（PRD §15）",
+        parents=[sub_common],
+    )
+    prop_sub = p_prop.add_subparsers(dest="proposal_command", required=True)
+
+    p_pe = prop_sub.add_parser("extract", help="从已批准正文提取记忆候选（不要求正文已发布）", parents=[sub_common])
+    p_pe.add_argument("--task", required=True)
+    p_pe.add_argument("--chapter", required=True)
+    p_pe.add_argument("--mock-response", default="", help="演练：从文件读模型输出；不给则走确定性骨架")
+    p_pe.add_argument("--model", default="")
+    p_pe.add_argument("--base-release", default="")
+    p_pe.add_argument("--note", default="")
+
+    p_pl = prop_sub.add_parser("list", help="列出记忆提案", parents=[sub_common])
+    p_pl.add_argument("--task", default="")
+    p_pl.add_argument("--chapter", default="")
+
+    p_psh = prop_sub.add_parser("show", help="看一份提案的条目", parents=[sub_common])
+    p_psh.add_argument("proposal_id")
+    p_psh.add_argument("--json", action="store_true")
+
+    p_pv = prop_sub.add_parser("verify", help="源哈希变了没有（STALE 检查）", parents=[sub_common])
+    p_pv.add_argument("proposal_id")
+
+    p_pa = prop_sub.add_parser("approve", help="作者批准一份提案", parents=[sub_common])
+    p_pa.add_argument("proposal_id")
+    p_pa.add_argument("--note", default="")
+    p_pa.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_pr = prop_sub.add_parser("reject", help="作者驳回一份提案", parents=[sub_common])
+    p_pr.add_argument("proposal_id")
+    p_pr.add_argument("--reason", default="")
+    p_pr.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_pn = prop_sub.add_parser(
+        "declare-none", help="显式声明本章不产记忆（发布闸门据此放行）", parents=[sub_common]
+    )
+    p_pn.add_argument("--task", default="")
+    p_pn.add_argument("--chapter", required=True)
+    p_pn.add_argument("--reason", required=True, help="必须写理由：没有理由的声明等于跳过检查")
+    p_pn.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    # ---- deps（T10 依赖失效与共同发布）----
+    p_deps = sub.add_parser("deps", help="依赖失效与共同发布检查（PRD §10.5／§15）", parents=[sub_common])
+    deps_sub = p_deps.add_subparsers(dest="deps_command", required=True)
+
+    p_dc = deps_sub.add_parser("check", help="逐条判依赖是否还成立（只有相关变化才失效）", parents=[sub_common])
+    p_dc.add_argument("--json", action="store_true")
+
+    p_ds = deps_sub.add_parser("show", help="看某份产物的依赖与状态", parents=[sub_common])
+    p_ds.add_argument("artifact", help="产物 ID，如 PLAN-CH-0001")
+
+    p_dl = deps_sub.add_parser(
+        "closure", help="发布前问：每条正文的记忆都说清楚了吗", parents=[sub_common]
+    )
+    p_dl.add_argument("--task", default="", help="按任务的 staging 推出正文清单")
+    p_dl.add_argument("--chapter", action="append", default=[], help="直接指定章节，可重复")
+    p_dl.add_argument("--json", action="store_true")
 
     return parser
 

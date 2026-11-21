@@ -297,9 +297,11 @@ def _approve_release(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
 
 def approve_object(cfg: cfg_mod.Config, args: argparse.Namespace, kind: str) -> int:
-    """`approve artifact|proposal|release` 的实际执行。"""
+    """`approve artifact|text|proposal|release` 的实际执行。"""
     if kind == "release":
         return _approve_release(cfg, args)
+    if kind == "text":
+        return _approve_text(cfg, args)
 
     actor = ensure_actor(getattr(args, "actor", None), "approve")
     pp = project(cfg, args)
@@ -307,9 +309,12 @@ def approve_object(cfg: cfg_mod.Config, args: argparse.Namespace, kind: str) -> 
     task, files, expected, current = resolve_candidate(cfg, pp, candidate)
 
     if kind == "proposal":
-        # 记忆提案要到 T10 才存在。现在能批的只有 staging 产物；
-        # 硬凑一个「提案」等于让审批范围说得比实际更大。
-        raise UsageError("本版还没有记忆提案（T10 才生成）；当前可批的对象是 artifact 与 release")
+        # 记忆提案的批准走 `novel proposal approve <PROP-ID>`：它要绑提案的
+        # **源哈希**，而不是 staging 包哈希。两个哈希混用会让「批的是哪一版」说不清。
+        raise UsageError(
+            "记忆提案请用 `novel proposal approve PROP-0001 --as author`；"
+            "它绑的是提案的源哈希，与 staging 包哈希不是同一个东西"
+        )
 
     given = (getattr(args, "hash", "") or "").strip()
     if not given:
@@ -383,4 +388,36 @@ def approve_object(cfg: cfg_mod.Config, args: argparse.Namespace, kind: str) -> 
         info(f"{record.target}  {record.sha256[:16]}…")
     print(f"  op: {op.op_id}")
     print(f"下一步：novel publish --task {task.task_id} --as author --confirm")
+    return 0
+
+def _approve_text(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
+    """`approve text`：正文批准。要求先过审核，且不许有 OPEN BLOCKER。"""
+    from ..workflows import text_approval
+
+    actor = ensure_actor(getattr(args, "actor", None), "approve text")
+    pp = project(cfg, args)
+    task_id = (getattr(args, "task", "") or "").strip()
+    chapter = (getattr(args, "chapter", "") or getattr(args, "candidate", "") or "").strip()
+    if not task_id or not chapter:
+        raise UsageError("approve text 需要 --task TASK-000001 与 --chapter CH-0001")
+
+    runtime = cfg.require_runtime()
+    result = text_approval.approve_text(
+        pp,
+        runtime,
+        task_id=task_id,
+        chapter_id=chapter,
+        store=approval_store(cfg),
+        actor=actor,
+        note=getattr(args, "note", "") or "",
+        issue_store=IssueStore(runtime),
+    )
+    heading(f"正文已批准 {chapter}")
+    ok(f"批准号：{result.approval.approval_id}")
+    info(f"哈希：{result.sha256[:16]}…（绑字节，改一个字节就失效）")
+    info(f"范围：CHAPTER_TEXT   风险：{result.risk_level}")
+    info(f"经手角色：{'、'.join(result.reviewers) or '（无）'}")
+    print()
+    print("批准后任何字节变化都要重新审、重新批（PRD §14.5）。")
+    print(f"下一步：novel proposal extract --task {task_id} --chapter {chapter}")
     return 0

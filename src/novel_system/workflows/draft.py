@@ -37,8 +37,10 @@ from ..tasks import TaskStore
 from ..storage import dump_yaml, sha256_text
 from . import plan as plan_mod
 
-DRAFT_DIR = "03_Manuscripts/Drafts"
-CANON_DIR = "01_Canon"
+DRAFTS_SUBDIR = "Drafts"
+# 第二道锁：即便 layout 被配错（把 canon_root 指到草稿目录），这一道也要拦住。
+# 所以不走配置，直接写字面量。
+CANON_LITERAL = "01_Canon"
 
 TASK_TYPES = ("draft", "revision", "outline")
 
@@ -181,7 +183,7 @@ def write(
 
     text = str(result.get("chapter_text") or "")
     title = str(result.get("title") or "").strip() or _title_of(text) or chapter_id
-    target = _target_rel(chapter_id)
+    target = _target_rel(pp, chapter_id)
     document = render_document(
         chapter_id=chapter_id,
         title=title,
@@ -308,11 +310,23 @@ def _blockers(doc: dict) -> str:
     return "\n".join(lines) or "  （没有具体阻断项，但 gate 判了 BLOCKED——先看 coverage.unresolved_gaps）"
 
 
-def _target_rel(chapter_id: str) -> str:
-    target = f"{DRAFT_DIR}/{chapter_id}.md"
-    # 结构性硬拦：拼出来的路径不许落在 Canon 下。这里不靠调用方自觉。
-    if target.startswith(CANON_DIR + "/") or f"/{CANON_DIR}/" in target:
-        raise SecurityError(f"草稿目标 {target} 落在正式区 {CANON_DIR}，拒绝写入")
+def _target_rel(pp: ProjectPaths, chapter_id: str) -> str:
+    """草稿的目标路径。**由代码拼出来，不由调用方传入**。
+
+    正文根从 layout 取（目录改名后这里跟着走）；Canon 那一侧除了 layout，
+    还额外认字面量 `01_Canon`——配置写错时也要拦得住。
+    """
+    base = pp.manuscripts.relative_to(pp.root).as_posix()
+    target = f"{base}/{DRAFTS_SUBDIR}/{chapter_id}.md"
+
+    canon_dirs = {CANON_LITERAL}
+    try:
+        canon_dirs.add(pp.canon.relative_to(pp.root).as_posix())
+    except ValueError:  # canon 在项目根之外，这一侧就只剩字面量
+        pass
+    for canon in canon_dirs:
+        if target == canon or target.startswith(canon + "/") or f"/{canon}/" in target:
+            raise SecurityError(f"草稿目标 {target} 落在正式区 {canon}，拒绝写入")
     return target
 
 

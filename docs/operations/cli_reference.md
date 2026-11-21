@@ -1,8 +1,10 @@
 # CLI 参考
 
 对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§10）、T03 的 `rebuild-index`/`search`、
-T06 的 `release`、T07 的 `import` 与 T08 的 `preflight`/`agent`。顶层命令共 **30** 条
-（`task` / `maps` / `schema` / `release` / `import` / `agent` 是命令组，各自还有子命令）。
+T06 的 `release`、T07 的 `import`、T08 的 `preflight`/`agent`，以及 T09/T10 的
+`plan` / `write` / `review` / `proposal` / `deps`。顶层命令共 **35** 条
+（`task` / `maps` / `schema` / `release` / `import` / `agent` / `plan` / `review` /
+`proposal` / `deps` 是命令组，各自还有子命令）。
 全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
@@ -269,6 +271,30 @@ novel state CHAR-0001 --json
 - 批准后**改一个字节就失效**，没有「非实质修改」白名单；
 - 文件消失也算失效（取不到当前哈希 ≠ 没改动）。
 
+### `novel approve text --task <ID> --chapter <CH> [--note] [--as author]`
+
+第五类对象：**正文本身**（PRD §14.5）。与上面四类的区别是它没有候选 ID 可给——
+正文的「候选」就是这一章当前的草稿，所以用 `--task` + `--chapter` 定位，
+哈希由程序按磁盘现算，**不接受命令行传入**。
+
+```bash
+$ novel approve text --task TASK-000004 --chapter CH-0001 --as author
+CH-0001 还没有审核记录。先 `novel review --task TASK-000004 --chapter CH-0001 --as editor --verdict approve`
+
+$ novel approve text --task TASK-000004 --chapter CH-0001 --as editor
+正文批准只能由作者做（收到 'editor'）
+```
+
+递进条件全满足才写记录：
+
+1. `review status` 的结论是 `APPROVE`（不是 `PARTIAL`，更不是 `REVISE`）；
+2. 按风险等级该过的角色都过了（LOW：编辑；MEDIUM：+世界架构师；HIGH：+总编）；
+3. 这一章没有 OPEN 的 `BLOCKER`。
+
+批准记录额外带 `scope: CHAPTER_TEXT` 与整份文件字节的 sha256。**它不是确认弹窗**：
+上面三条少一条就抛 `ApprovalError`，没有 `--force`。`proposal extract` 会回来核这个哈希，
+所以「批完又改了两个字再提取」会被拦在提取那一步。
+
 ### `novel approve --task <ID> [--note] [--reject] [--force] [--as author]`
 
 旧入口，保留兼容：它绑的同样是每个 staged 文件的内容指纹，`publish` 照它校验。
@@ -322,6 +348,41 @@ novel publish --task TASK-000007 --as author --confirm     # 3) 执行
 | 执行 | `release execute <REL> --confirm` / `publish` | **只能 author** |
 
 恢复类：`status` 谁都能查；`resume` / `abort` / `repair` / `rollback` 只能 author。
+
+### 共同发布闸（正文 + 记忆）
+
+`release prepare` 在这一批里看到 `03_Manuscripts/` 的文件时，会先问
+`deps closure`：每条正文的记忆都说清楚了吗（PRD §15.1 / AC-15）。不满足就不生成计划：
+
+```bash
+$ novel release prepare --task TASK-000012 --as author
+正文与记忆必须同批发布，现在这批不满足：
+  - [NO_MEMORY_DECISION] CH-0001 既没有记忆提案，也没有「本章不产记忆」的声明。允许不产记忆，但不允许没人说过要不要——`novel proposal extract --task TASK-000012 --chapter CH-0001` 或 `novel proposal declare-none --chapter CH-0001 --reason ...`
+  真要单独发正文，用 --skip-closure 并在计划里留下这条豁免
+```
+
+四种阻断码：
+
+| 码 | 含义 |
+|---|---|
+| `NO_MEMORY_DECISION` | 既没提案，也没声明「本章不产记忆」 |
+| `NO_MEMORY_NO_REASON` | 声明了不产记忆，但没写理由（等于跳过检查） |
+| `PROPOSAL_STALE` | 提案绑的源哈希与正文当前字节不符 |
+| `PROPOSAL_NOT_APPROVED` | 提案还没被作者批准 |
+
+`--skip-closure` 是**唯一**的「这一批只发正文」出口，必须显式写在命令行上。
+跳过时计划里会留下 `closure_skipped: true`，`release prepare` 与 `release show` 都会打一行
+
+```
+[WARN] 豁免      : 本批含正文但跳过了共同发布闸（--skip-closure），记忆可能落后于正文
+```
+
+这一条进计划的规范化 JSON，所以它也在作者批准的哈希里——豁免不是口头约定，
+是批准对象的一部分。旧版（0.11.0 及更早）写的计划没有这个键，只在为 `true` 时才输出，
+保证它们重新序列化后哈希不变、已批准的计划不会突然失效。
+
+存在但非阻断的 `DEPENDENCY_*` 也会一并报出来，不拦发布——判不了的事情要让人看见，
+但不该拿它当否决票。
 
 ### 22 步走什么
 
@@ -654,6 +715,291 @@ writer（主笔）提示词
 **没有记录就是没调用过**，不打印一个全零的假汇总。只记元数据（角色、工具、耗时、
 tokens、成败、任务号），**不记正文**——与 `ops.jsonl` 同一口径。
 失败的调用也记：只记成功的账，等于把「试了三次才成」记成一次。
+
+---
+
+## 8.8 规划够不够格（`novel plan`）
+
+开写之前先回答一个问题：这一章的规划**说得清要写什么吗**。分不清就是没准备好，
+硬写出来的东西只能靠返修找补。对应 PRD §10.2 的十六个字段。
+
+### `novel plan show <CH> [--json]`
+
+逐项给出处。**「有」不等于填得对，只表示这一项能找到来源**：
+
+```
+CH-0001 规划：02_Planning/Chapter_Outlines/CH-0001_雨夜的血案.md
+  可开写：否
+  [有] chapter_id                 frontmatter:id
+  [有] pov                        frontmatter:pov
+  [有] story_anchor               frontmatter:timeline
+  [有] entities                   正文小节「角色出场」
+  [有] locations                  正文小节「时间与地点」
+  [有] core_conflict              正文小节「核心冲突」
+  [有] must_happen                正文小节「必须发生的剧情事实」
+  [有] must_not_happen            正文小节「禁止发生的内容」
+  [缺/建议] entry_state                入场状态
+  [缺/必需] creative_scope             创作授权（creative_scope）
+
+  [WARN] 缺必需字段：preflight 会判 BLOCKED，write 会拒绝开写
+```
+
+每个字段有两条认法：frontmatter 的键，或正文的某个小节标题。章卡是作者手写的，
+不该逼迫某种排版——但也不能因为换了标题就判「没规划」。
+
+### `novel plan check <CH> [--json]`
+
+只判够不够开写，缺必需字段返回 `1`：
+
+```
+  [WARN] CH-0001 规划还缺 1 项必需字段
+    - 创作授权（creative_scope）
+```
+
+八项必需（缺了不是「规划偏薄」，是「不知道能写什么」）：
+`chapter_id` / `pov` / `story_anchor` / `entities` / `core_conflict` /
+`must_happen` / `must_not_happen` / `creative_scope`。
+其余八项缺了只算建议，不进判词。
+
+### `novel plan derive <CH> [--write] [--as author] [--json]`
+
+把散文里的约束解析成结构化字段，**每条带回溯定位符**：
+
+```
+CH-0001 可派生的结构化约束
+  必须发生：10 条
+    - 武安城暴雨骤至，街巷封闭，明工造夜间作业照常    [02_Planning/Chapter_Outlines/CH-0001_雨夜的血案.md#L56-L56]
+    - 公主避难奔逃，进入武区街巷，被"东星帮"追捕，误为逃犯目标    [...#L57-L57]
+  ...
+  禁止发生：5 条
+    - 不得让陈默在本章觉醒灵能或使用「金手指」的具体能力（他在 CH-0002 才被注意到）。    [...#L69-L69]
+  creative_scope.forbidden：5 条（只收明确禁令语气的条目）
+```
+
+只派生**确定性可读的两处**：
+
+| 来源 | 派生到 |
+|---|---|
+| 编号表格的第二列 | `must_happen` |
+| 以「不得／禁止／不许／不准／不能／严禁／不可」开头的列表项 | `must_not_happen` + `creative_scope.forbidden` |
+
+**`allowed` 与 `approval_required` 一律不派生**。散文里没有这两项的来源，
+编一个出来就是替作者扩权——比漏派生危险得多。
+禁令用「开头词」判而不是关键词包含：「他不知道路」是叙述，不是约束。
+
+`--write` 才真的写回，三条硬线：
+
+- 只插入**原本不存在**的键，已有的一律不覆盖；
+- 正文**逐字节不变**（变了抛 `ConflictError` 并回滚）；
+- 写之前先备份到 `<runtime>/backups/plan/`。
+
+写回只接受 `--as author`。不做「解析成 dict 再整体 dump」——那会重排原有键、
+改掉引号风格，把作者的手写格式冲掉。
+
+---
+
+## 8.9 写稿（`novel write`）
+
+```bash
+novel write --task TASK-000004 --chapter CH-0001 \
+            --mock-response ./draft.json --as writer
+```
+
+### 两道前置，缺一条就不写
+
+1. `plan check` 说规划够格——缺必需字段直接拒；
+2. `preflight` 说资料包 `PASS`——`--preflight <PF-id>` 指定，省略则复用最新 `PASS`，
+   没有就现跑一次（`write=False`，即不落盘）。判 `BLOCKED` 就拒。
+
+**只认 `PASS`**：更新的 `BLOCKED` 不能顶掉更旧的 `PASS`，否则「多跑一次就把闸门跑松了」。
+
+### 目标路径是结构性的，不是参数
+
+草稿固定落 `03_Manuscripts/Drafts/<CH>.md`，由代码拼出后**再校验一次不在 `01_Canon` 下**，
+违反直接 `SecurityError`。没有 `--to` 参数可给：能指定目标路径的写稿命令，
+迟早会被用成「直接写正式区」。
+
+落盘只走 `StagingArea.stage()` ——写稿本身永远不会动正式区。
+
+### 本期未接真实适配器
+
+`--mock-response` 从文件读一段（约定的）模型输出。不给就直接报错，**不静默生成占位稿**：
+一份看起来像正文的占位稿，比一个明确的报错更容易被当真。`--model` 留给真适配器。
+`--replace` 覆盖本任务已有的同名草稿（返修时用）。
+
+---
+
+## 8.10 审核（`novel review`）
+
+### `novel review submit --task <ID> --chapter <CH> [--role <角色>] [--verdict approve|revise] [--risk LOW|MEDIUM|HIGH] [--max-rounds N] [--note] [--as <审核人>]`
+
+```
+审核记录 REVIEW-0002
+  CH-0001 第 2 轮   world_architect / world_architect
+  结论：APPROVE   风险：LOW
+
+发现
+  [NON_BLOCKING/QUALITY] 正文只有 41 字，短于常见章节；确认不是被截断的输出
+
+下一步：novel approve text --task TASK-000004 --chapter CH-0001 --as author
+```
+
+### 风险只有一个方向
+
+确定性标签命中即**至少**该等级，人工与模型只能往上抬：
+
+| 标签 | 触发词（示例） | 底线 |
+|---|---|---|
+| 死亡 | 死亡、身亡、丧命、殒命、断气、咽气、尸体、暴毙、死 | `HIGH` |
+| 复活 | 复活、复生、死而复生、起死回生 | `HIGH` |
+| 核心规则变更 | 规则变更、新增规则、改写规则、能力规则 | `HIGH` |
+| 身份揭露 | 身份揭露、暴露身份、真实身份、真正的身份 | `HIGH` |
+| RETCON | RETCON、改写历史、推翻既有、推翻前文 | `HIGH` |
+
+`--risk` 传更低的等级会被**忽略并留说明**，不是报错——降级请求要留下痕迹，
+否则事后没人知道有人试过。
+
+单字「死」必须过搭配过滤（`路/角/寂/守/心/板/锁/账/扛/磕/缠/党/规矩`）：
+宁可漏判（`--risk HIGH` 能补），也不要让「死寂的院子」把每一章都抬成 HIGH。
+
+### 按风险配审核角色
+
+| 风险 | 必须过的角色 |
+|---|---|
+| `LOW` | 编辑 |
+| `MEDIUM` | 编辑、世界架构师 |
+| `HIGH` | 编辑、世界架构师、总编 |
+
+**高风险不许自审**：`reviewer_role == author_role` 且 `APPROVE` → `SecurityError`，
+没有 `--force`。给 `--force` 就等于把这个检查删了。
+
+### 返修预算
+
+`--max-rounds`（默认 3）按**提交轮次**计，超了就不收新记录并说清已用几轮。
+判定顺序是「先算预算 → 再判资格 → 最后写记录」：反过来会让预算耗尽的稿子
+仍写进一条 `REVISE`，看起来像「还有人在推进」。
+
+### 规则检查只判形状，不判语义
+
+机器能看的是：空正文、正文里混了系统注释标记、正文里出现第二份文档、
+禁令条目里点了名的专有名词却出现在正文里。
+
+「人物用了还没获得的信息」这类**语义**问题，每次明确写成一条 `SUGGESTION` 并注
+「判不了，需人工」——不假装查过，也不假装没问题。
+
+### `novel review status --task <ID> --chapter <CH> [--json]`
+
+```
+CH-0001 审核状态
+  结论：APPROVE   风险：LOW
+  返修轮次：0/3
+  已通过角色：editor
+```
+
+结论五态：`NOT_REVIEWED` / `APPROVE` / `PARTIAL`（该过的角色没齐）/ `REVISE` / `BLOCKED`。
+`PARTIAL` 不能拿去批正文。
+
+---
+
+## 8.11 记忆提案（`novel proposal`）
+
+正文批准之后、发布之前，把正文里的记忆提取成**提案**——作者先看，再决定要不要进正式区。
+
+### `novel proposal extract --task <ID> --chapter <CH> [--mock-response <文件>] [--model] [--note]`
+
+```
+记忆提案 PROP-0002
+  [OK]   CH-0001 提取出 3 条候选
+  源：03_Manuscripts/Drafts/CH-0001.md  7a6a301d83ec2619…
+  绑定批准：APR-000003
+  提取方式：确定性骨架
+    [SUMMARY] CH-0001 正文共 41 字、2 段
+    [ENTITY] 正文出现已登记实体：抄书人
+    [ISSUE] 本提案由确定性骨架生成：只含摘要与实体清单，语义级事件／状态／认知未提取，需记忆管理员补
+```
+
+三条规则：
+
+1. **输入是已批准的候选，不要求正文已 ACTIVE**（PRD §15.1）。正文还没发布，
+   记忆照样可以合法提取出来——否则「正文与记忆同批发布」永远无法成立。
+2. **必须绑源哈希**。找不到 `CHAPTER_TEXT` 批准、或批准哈希与当前字节不符，直接拒。
+   这样「改完正文拿旧提案去发」在提取这一步就断掉。
+3. **模型不可用就退回确定性骨架**，不退化成「什么都没提取」。骨架只含摘要与已登记实体，
+   并自报一条 `ISSUE` 说「语义级未提取，需记忆管理员补」。有提取总比空手强，
+   但必须自己声明缺了什么。
+
+`--mock-response` 的信封 `role` 与本次角色不一致时会拒收并说明（角色写错会让审核记录归错人）。
+
+### 其余子命令
+
+| 命令 | 做什么 |
+|---|---|
+| `proposal list` | 列出提案：`PROP-0001  CH-0001  APPROVED  3 条` |
+| `proposal show <PROP>` | 逐条看，每条带引用出处 |
+| `proposal verify <PROP>` | 按当前字节重算源哈希，变了就是 `STALE` |
+| `proposal approve <PROP> --as author` | 作者批准（只能 author） |
+| `proposal reject <PROP> --note "..." --as author` | 驳回 |
+| `proposal declare-none --chapter <CH> --reason "..." --as author` | 显式声明本章不产记忆 |
+
+**「没有提案」与「声明不产记忆」是两件事**：前者是漏做，后者是决定。
+`declare-none` 的 `--reason` 必填——没有理由的声明等于跳过检查，发布闸门会判
+`NO_MEMORY_NO_REASON`。
+
+---
+
+## 8.12 依赖与共同发布（`novel deps`）
+
+`dependencies` 表从索引 v4 起会填，来源是档案 frontmatter 的 `depends_on`。
+**权威在 Markdown，索引只是派生视图**，所以 `deps check` 直接读文件不读索引——
+索引可能是上一轮的。
+
+### `novel deps check [--json]`
+
+```
+依赖状态
+  [WARN] CH-0001            STALE         02_Planning/Chapter_Outlines/CH-0001_smoke.md
+      CHAR-0002 内容已变（HARD）：deadbeef0000… → a1a9566ce678…
+  [WARN] 1 份产物声明了依赖，1 份需要处理
+```
+
+四级判定：
+
+| 情形 | 结果 | 为什么 |
+|---|---|---|
+| 哈希与记录一致 | `VALID` | 没变 |
+| 不一致（`HARD`） | `STALE` | 依赖的规则变了，产物可能已不成立 |
+| 不一致（`SOFT`） | `NEEDS_REVIEW` | 软依赖只影响观感，不该一票判死 |
+| 没记 `content_hash` 或目标不存在 | `NEEDS_REVIEW` | **判不了不等于没问题** |
+
+**只有真正变了的那条依赖才让产物失效**。`RULE-000003` 改一个字不该让全书每份档案
+都变「需要复核」——那样 STALE 会多到没人看，等于没有。
+
+传递性**只走一级**：A 依赖 B、B 自己 `STALE` 时 A 记 `NEEDS_REVIEW` 而不是 `STALE`。
+B 的失效源于「它依赖的东西变了」，不等于 B 的内容变了；直接升级成 STALE 会让
+一次局部改动沿引用链炸开。
+
+### `novel deps show <产物ID>`
+
+```
+CH-0001  STALE
+  路径：02_Planning/Chapter_Outlines/CH-0001_smoke.md
+    → CHAR-0001  HARD  c65be8bae7d3…
+    → CHAR-0002  HARD  deadbeef0000…
+  [WARN] CHAR-0002 内容已变（HARD）：deadbeef0000… → a1a9566ce678…
+```
+
+### `novel deps closure (--task <ID> | --chapter <CH>...) [--json]`
+
+发布前问「每条正文的记忆都说清楚了吗」，也是 `release prepare` 调用它的那道闸：
+
+```
+共同发布检查
+  正文：CH-0001
+    CH-0001：提案 PROP-0001，3 条
+  [OK]   可以同批发布
+```
+
+阻断码见 §6.5「共同发布闸」。
 
 ---
 

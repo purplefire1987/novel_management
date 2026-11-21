@@ -92,7 +92,11 @@ def _stage_release(
     assert _run(vault, runtime, "approve", "artifact", task, "--hash", digest, "--as", "author") == 0
 
     capsys.readouterr()
-    assert _run(vault, runtime, "release", "prepare", "--task", task, "--as", "author") == 0
+    # --skip-closure：这个用例测的是 22 步发布协议本身，不是「正文与记忆同批」；
+    # 共同发布闸有自己的用例（tests/integration/test_t10_closure.py）。
+    assert (
+        _run(vault, runtime, "release", "prepare", "--task", task, "--skip-closure", "--as", "author") == 0
+    )
     release_id = sorted((runtime / "releases").glob("REL-*"))[-1].name
     plan_hash = _json(vault, runtime, capsys, "release", "show", release_id)["plan_hash"]
     assert _run(vault, runtime, "approve", "release", release_id, "--hash", plan_hash, "--as", "author") == 0
@@ -549,7 +553,11 @@ def test_canon_write_needs_second_confirmation(env, tmp_path, capsys):
     digest = _json(vault, runtime, capsys, "inspect", task)["hash"]
     assert _run(vault, runtime, "approve", "artifact", task, "--hash", digest, "--as", "author") == 0
     capsys.readouterr()
-    assert _run(vault, runtime, "release", "prepare", "--task", task, "--as", "author") == 0
+    # --skip-closure：这个用例测的是 22 步发布协议本身，不是「正文与记忆同批」；
+    # 共同发布闸有自己的用例（tests/integration/test_t10_closure.py）。
+    assert (
+        _run(vault, runtime, "release", "prepare", "--task", task, "--skip-closure", "--as", "author") == 0
+    )
     release_id = sorted((runtime / "releases").glob("REL-*"))[-1].name
     plan_hash = _json(vault, runtime, capsys, "release", "show", release_id)["plan_hash"]
     assert _run(vault, runtime, "approve", "release", release_id, "--hash", plan_hash, "--as", "author") == 0

@@ -118,17 +118,32 @@ novel diff --task TASK-000001
 批准并发布：
 
 ```bash
+novel review submit --task TASK-000001 --chapter CH-0001 --verdict approve --as editor
 novel approve --task TASK-000001 --as author
+novel approve text --task TASK-000001 --chapter CH-0001 --as author   # 批正文本身
+novel proposal extract --task TASK-000001 --chapter CH-0001           # 从已批准正文提记忆
+novel proposal approve PROP-000001 --as author
 novel release prepare --task TASK-000001 --as author      # 生成发布计划
 novel approve release REL-000001 --hash <计划哈希> --as author
 novel publish --task TASK-000001 --as author --confirm
 novel release status                                      # 判词 OK 才算落地
 ```
 
+第一次跑会撞到两道闸，都是设计好的：
+
+- **`approve text` 要求先有 `APPROVE` 的审核结论。** 没审、角色没齐、有 BLOCKER 都不批，
+  它会直接说缺什么。这一步不是确认弹窗，没有 `--force`；
+- **`release prepare` 要求每条正文的记忆都说清楚。** 没有提案就去 `proposal extract`；
+  确实是过渡章不产记忆，用 `proposal declare-none --chapter CH-0001 --reason "..." --as author`
+  明确说一句——「没人说过要不要」和「决定不产」是两件事。
+
 发布为什么是三步而不是一步：批准对象必须是一份**看得见的计划**。
 少了 `release prepare`，批准就只能绑任务，于是「批的是 A、发的是 B」又开口子了。
 详见 [ADR-014](architecture/adr/ADR-014-approval-binds-bytes.md) 与
 [ADR-015](architecture/adr/ADR-015-release-protocol-and-recovery.md)。
+
+这七步各自守住什么、为什么不能合并，见
+[ADR-018](architecture/adr/ADR-018-draft-review-and-memory-closure.md)。
 
 四条硬规则：
 
@@ -185,6 +200,14 @@ B 你自己摆好。
 | `preflight` 说「未回收伏笔 0 条」 | 库还在用第 2 版索引。跑一次 `novel rebuild-index`（0.11.0 起伏笔表才会填） |
 | `preflight` 说「有 N 处结果被截断」 | 不是故障。检索到 37 条只放进去 6 条，想多看就调大 `--budget` |
 | `agent list` 里某角色工具是「（无）」 | 正常：`ingestor` 只读源稿，读不到 Canon |
+| `plan check` 说缺 `creative_scope` | 章卡里没有创意范围。`allowed` 只能自己写；`forbidden` 可以用 `plan derive --write` 从「禁止发生」列表补 |
+| `write` 说「规划还缺必需字段」 | 同上，先 `plan check` 看缺哪项。这是「不知道能写什么」的硬前置，不是配置问题 |
+| `write` 说「需要模型输出」 | 本期未接真实适配器。模型输出存成文件，用 `--mock-response` 传进来 |
+| `approve text` 说「还没有审核记录」 | 先 `review submit`。正文批准不是确认弹窗：结论要 `APPROVE`、按风险该过的角色要齐、不能有 BLOCKER |
+| `review` 说「不能自审」 | 高风险章节的审核人不能与作者同一角色。换一个角色重审，没有 `--force` |
+| `release prepare` 说「正文与记忆必须同批发布」 | 要么 `proposal extract` 走完提案，要么 `proposal declare-none --reason "..."` 声明不产记忆 |
+| `proposal extract` 说「源哈希与批准不符」 | 批准之后正文又改过。重新 `approve text`，再提取 |
+| `deps check` 报 `NEEDS_REVIEW` | 依赖目标没记 `content_hash` 或找不到。**判不了不等于没问题**，逐条看 `deps show` |
 
 任何情况下都**不要**手工删除 `00_System/` 或 `01_Canon/` 里的文件来「修问题」。
 先备份，再看报告。

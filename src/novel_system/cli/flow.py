@@ -160,7 +160,8 @@ def cmd_approve(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     """
     kind = getattr(args, "kind", None)
     if kind:
-        if not getattr(args, "candidate", None):
+        # `approve text` 指对象的方式是 `--task` + `--chapter`，没有候选 ID 这个说法。
+        if kind != "text" and not getattr(args, "candidate", None):
             raise UsageError(f"approve {kind} 需要候选 ID：novel approve {kind} TASK-000001 --hash <sha256>")
         return approve_object(cfg, args, kind)
 

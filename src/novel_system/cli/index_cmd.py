@@ -96,9 +96,9 @@ def cmd_rebuild_index(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
     heading("建了但索引不填（不是「已支持」）")
     info("、".join(EMPTY_TABLES))
-    info("问题与变更的权威副本在 <runtime>/issues、<runtime>/changes，不进索引：")
+    info("问题的权威副本在 <runtime>/issues，不进索引：")
     info("索引必须是「Vault + commit」的纯函数，掺进 runtime 状态就没法按 commit 复现")
-    info("依赖（dependencies）要到 T09 之后才有")
+    info("依赖（dependencies）从 v4 起会填，来源是档案 frontmatter 的 depends_on")
     thin = [
         f"{name}={count}"
         for name, count in result.tables.items()

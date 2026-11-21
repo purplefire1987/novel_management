@@ -45,7 +45,7 @@ def publish_task(vault: Path, runtime: Path, task: str, *extra: str) -> int:
     assert (
         run(
             "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
-            "--task", task, "--as", "author",
+            "--task", task, "--skip-closure", "--as", "author",
         )
         == 0
     )
@@ -472,14 +472,15 @@ def test_14_4_publish_requires_author_approval(vault_env, draft_md: Path, task_f
     # 产物未批准：计划准备即被拒
     assert run(
         "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
-        "--task", task, "--as", "author",
+        "--task", task, "--skip-closure", "--as", "author",
     ) == 4
 
     # 产物批了，但计划没批：publish 仍被拒
     assert run("approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author") == 0
+    # --skip-closure：本用例测的是审批门，不是「正文与记忆同批」。
     assert run(
         "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
-        "--task", task, "--as", "author",
+        "--task", task, "--skip-closure", "--as", "author",
     ) == 0
     assert run(
         "publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task,

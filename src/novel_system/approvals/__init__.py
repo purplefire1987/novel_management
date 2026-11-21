@@ -125,8 +125,11 @@ class ApprovalStore:
     ) -> Approval:
         if approver != AUTHOR:
             raise ApprovalError(f"批准主体只能是作者，收到：{approver}")
-        if not files and decision == "approved" and target_type not in ("release", "change"):
-            # 发布与变更批准绑的是「计划/影响报告的哈希」，不绑具体文件；
+        if not files and decision == "approved" and target_type not in ("release", "change", "proposal"):
+            # 发布、变更、记忆提案批准绑的都是「对象的哈希」，不绑具体文件：
+            #   release  → 发布计划的规范化哈希
+            #   change   → 影响报告的哈希
+            #   proposal → 提案的**源正文哈希**（正文一变，提案即失效）
             # 其余批准必须落在文件上，否则「批准了什么」无从核验。
             raise UsageError("批准记录必须至少绑定一个文件")
         approval = Approval(
@@ -169,12 +172,24 @@ class ApprovalStore:
         return out
 
     def latest_for(self, task_id: str) -> Approval | None:
-        """任务最近一次有效批准。驳回记录不返回。"""
-        candidates = [a for a in self.all() if a.task_id == task_id and a.decision == "approved"]
+        """任务最近一次**内容批准**。驳回记录不返回。
+
+        「内容批准」= 绑了文件的产物批准。发布计划、变更、记忆提案这三类批准
+        绑的是对象哈希，不绑 staging 文件——它们也记在同一个 task_id 下，
+        如果不过滤，一次 `proposal approve` 会顶掉正文批准，
+        让 `release prepare` 拿着「批准覆盖 0 个文件」的记录去核对 staging。
+        """
+        candidates = [
+            a
+            for a in self.all()
+            if a.task_id == task_id and a.decision == "approved" and a.files and a.target_type in ("", "artifact")
+        ]
         return candidates[-1] if candidates else None
 
     def status_for(self, task_id: str) -> str:
-        approvals = [a for a in self.all() if a.task_id == task_id]
+        approvals = [
+            a for a in self.all() if a.task_id == task_id and a.target_type in ("", "artifact")
+        ]
         if not approvals:
             return "pending_author"
         return approvals[-1].decision

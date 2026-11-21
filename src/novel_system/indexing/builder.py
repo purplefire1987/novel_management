@@ -188,6 +188,35 @@ class BuildResult:
     dangling_edges: tuple[str, ...] = ()
 
 
+
+def dependency_rows(meta: dict, *, artifact_id: str, project: str) -> list[tuple]:
+    """`depends_on` → dependencies 表的行。
+
+    只认显式声明的依赖。`derived_from` 是「我从哪来」，不是「我依赖谁」——
+    把两者混在一起，会让一份档案因为「它的来源文件改了个错别字」而失效。
+    """
+    raw = meta.get("depends_on")
+    if raw is None:
+        raw = meta.get("dependencies")
+    if isinstance(raw, dict):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    rows: list[tuple] = []
+    for item in raw:
+        if isinstance(item, str):
+            target, digest, kind = item.strip(), "", "HARD"
+        elif isinstance(item, dict):
+            target = str(item.get("artifact_id") or item.get("id") or "").strip()
+            digest = str(item.get("content_hash") or item.get("sha256") or "").strip()
+            kind = str(item.get("dependency_type") or item.get("type") or "HARD").strip().upper()
+        else:
+            continue
+        if not target:
+            continue
+        rows.append((project, artifact_id, target, kind if kind in ("HARD", "SOFT") else "HARD", digest, ""))
+    return rows
+
 def _write_metadata(conn: sqlite3.Connection, rows: dict[str, object]) -> None:
     conn.executemany(
         "insert into index_metadata(key, value) values (?, ?)",
@@ -254,6 +283,7 @@ def build_index(
         all_reveals: list = []
         planning_skipped = 0
         foreshadow_count = 0
+        dependency_count = 0
         semantic_warnings: list[str] = []
 
         for item in source.files():
@@ -339,6 +369,15 @@ def build_index(
                     ),
                 )
                 foreshadow_count += 1
+
+            for row in dependency_rows(doc.meta, artifact_id=artifact_id, project=project):
+                conn.execute(
+                    "insert into dependencies"
+                    "(project, from_id, to_id, kind, content_hash, validation_status)"
+                    " values (?,?,?,?,?,?)",
+                    row,
+                )
+                dependency_count += 1
 
             for ref in doc.meta.get("source_refs") or []:
                 if not isinstance(ref, dict):
@@ -518,6 +557,29 @@ def build_index(
             seen[raw] = seen.get(raw, 0) + 1
         duplicates = sorted(key for key, count in seen.items() if count > 1)
 
+        # 依赖状态在全部行插完后统一判：逐行判的时候，被依赖的档案可能还没入库。
+        #
+        #   HARD 且哈希不符 → STALE
+        #   SOFT 且哈希不符 → NEEDS_REVIEW
+        #   没记 content_hash、或目标根本不在库里 → NEEDS_REVIEW（判不了不等于没问题）
+        conn.execute(
+            """
+            update dependencies set validation_status = case
+                when content_hash = '' then 'NEEDS_REVIEW'
+                when not exists (
+                    select 1 from artifacts a
+                    where a.project = dependencies.project and a.id = dependencies.to_id
+                ) then 'NEEDS_REVIEW'
+                when not exists (
+                    select 1 from artifacts a
+                    where a.project = dependencies.project and a.id = dependencies.to_id
+                      and a.sha256 = dependencies.content_hash
+                ) then (case when kind = 'SOFT' then 'NEEDS_REVIEW' else 'STALE' end)
+                else 'VALID'
+            end
+            """
+        )
+
         tables = {
             name: conn.execute(f"select count(*) from {name}").fetchone()[0]
             for name in schema.POPULATED_TABLES
@@ -539,8 +601,10 @@ def build_index(
                 "block_count": block_count,
                 "failed_count": len(failed),
                 "populated": ",".join(schema.POPULATED_TABLES),
-                "empty": ",".join(schema.EMPTY_TABLES),                "planning_skipped": planning_skipped,
+                "empty": ",".join(schema.EMPTY_TABLES),
+                "planning_skipped": planning_skipped,
                 "foreshadowing": foreshadow_count,
+                "dependencies": dependency_count,
                 "event_cycle": " → ".join(event_cycle),
                 "dangling_edges": len(dangling_edges),
                 "semantic_warnings": len(semantic_warnings),

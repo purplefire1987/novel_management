@@ -5,9 +5,14 @@
 ## 1. 写前：拿资料包
 
 ```bash
-novel rebuild-index                 # 库刚升级到 0.11 时跑一次，否则伏笔表是空的
-novel preflight CH-0007
+novel rebuild-index                 # 库刚升级到 0.12 时跑一次，否则伏笔表与依赖表是空的
+novel plan check CH-0007            # 规划说得清要写什么吗（八项必需字段）
+novel preflight CH-0007             # 拿资料包
 ```
+
+`plan check` 在 `preflight` 之前跑，是因为**没有创意范围就没有「禁止发生」的清单**，
+资料包会把「什么都可能」当默认，等于白做。缺字段时它会点名是哪一项，例如
+`创作授权（creative_scope）`——`allowed` 那一栏只能你自己写，机器不代笔。
 
 资料官产出的是**资料包**，不是正文。它回答：这一章要用到的人物当前状态、地点、前文伏笔，
 以及几条**不能违反**的硬约束。落 `<runtime>/preflight/PF-000001.yaml`，不进 Canon。
@@ -39,6 +44,24 @@ novel preflight CH-0007 --budget 16000      # 挤小预算，看哪些先被截�
 
 ```bash
 novel task create --type draft --assignee writer
+novel write --task TASK-000002 --chapter CH-0007 \
+            --mock-response 模型输出.json --as writer
+```
+
+`write` 有两道前置，缺一条就不写：`plan check` 说规划够格、`preflight` 判 `PASS`。
+**只认 `PASS`**——多跑一次拿到 `BLOCKED` 不会把旧的 `PASS` 顶掉，否则「多跑一次就把
+闸门跑松了」。
+
+目标路径由代码拼成 `03_Manuscripts/Drafts/<CH>.md`，**没有 `--to` 参数可给**：
+能指定目标路径的写稿命令，迟早会被用成「直接写正式区」。落盘只走 staging，
+写稿本身永远不动正式区。
+
+本期未接真实模型接口，`--mock-response` 从文件读一段模型输出；不给就直接报错，
+**不会**生成一份看起来像正文的占位稿。要追加写入（返修）加 `--replace` 覆盖同名草稿。
+
+手工路线仍然有效：模型输出存成文件后
+
+```bash
 novel stage --task TASK-000002 --from 初稿.md \
             --to 03_Manuscripts/Drafts/CH-0007.md --as writer
 ```
@@ -48,7 +71,7 @@ novel stage --task TASK-000002 --from 初稿.md \
 
 初稿和修订稿分开：`Drafts/` 放初稿，`Revisions/` 放修订，别覆盖。
 
-## 3. 审阅：只看 diff
+## 3. 审阅：先看 diff，再过审核闸
 
 ```bash
 novel diff --task TASK-000002                # 概览
@@ -65,15 +88,57 @@ diff 会标出三类东西：
 冲突的含义是「你可能在 Agent 写稿期间自己改了同一个文件」。处理方式二选一：
 要么让 Agent 基于你改后的版本重写，要么 `approve --force` 明确承担覆盖风险。
 
-## 4. 入库：看一眼 → 批准 → 准备 → 批计划 → 发布
+diff 只看「变了什么」，不看「该不该过」。后者走审核：
+
+```bash
+novel review submit --task TASK-000002 --chapter CH-0007 --role editor \
+                    --verdict approve --as editor
+novel review status --task TASK-000002 --chapter CH-0007
+```
+
+三条规矩：
+
+- **风险只能往上抬。** 死亡、复活、核心规则变更、身份揭露、RETCON 命中即至少 `HIGH`；
+  `--risk` 传更低的等级会被忽略并留一句说明，不是报错；
+- **高风险不许自审。** 同一角色的审核人与作者相同、结论又是 `APPROVE`，直接拒绝，
+  没有 `--force`；
+- **角色按风险配齐**：LOW 编辑；MEDIUM 加世界架构师；HIGH 再加总编。
+  `review status` 判 `PARTIAL` 就是「还缺角色」，这时候批不了正文。
+
+机器只查形状（空正文、混入系统注释、拼了两份文档、禁令里的专名出现在正文里）。
+人物认知边界、时间线这类语义问题机器判不了，它会明写成一条 `SUGGESTION` 而不是
+给你一个「检查通过」。
+
+## 4. 入库：看一眼 → 批准 → 批正文 → 提取记忆 → 准备 → 批计划 → 发布
 
 ```bash
 novel inspect TASK-000002 --as author        # 批准前看这七项
 novel approve artifact TASK-000002 --hash <inspect 报的 sha256> --as author --note "第 7 章通过"
+novel approve text --task TASK-000002 --chapter CH-0007 --as author   # 作者批正文
+novel proposal extract --task TASK-000002 --chapter CH-0007           # 从已批准正文提取记忆
+novel proposal approve PROP-000001 --as author
 novel release prepare --task TASK-000002 --as author    # 生成发布计划（还没动正式区）
 novel approve release REL-000001 --hash <计划哈希> --as author
 novel publish --task TASK-000002 --as author --confirm
 ```
+
+`approve text` 与 `approve artifact` 批的是两件事：前者批**这一章正文的字节**，
+后者批这批判候选中所有文件的字节。正文批准有三道前置——审核结论是 `APPROVE`、
+按风险该过的角色都过了、没有 OPEN 的 `BLOCKER`。少一条就拒绝并说清缺什么；
+它**不是确认弹窗**，也没有 `--force`。
+
+`proposal extract` 不要求正文已经发布（否则「正文与记忆同批发布」永远无法成立），
+但它要求**哈希对得上**：绑的是你刚才批的那份字节。所以「批完又改两个字再提取」会被拦下。
+
+`release prepare` 看到这一批里有正文，会先问 `deps closure`：每条正文的记忆都说清楚了吗？
+没有提案也没声明不产记忆，就不生成计划。确实是过渡章、不产记忆的，明确说一句：
+
+```bash
+novel proposal declare-none --chapter CH-0007 --reason "纯动作过场，没有新信息" --as author
+```
+
+**「没有提案」与「声明不产记忆」是两件事**：前者是漏做，后者是决定。
+理由必填——没有理由的声明等于跳过检查。
 
 `inspect` 要看的七项：对象 ID、内容 hash、与正式版的差异、风险等级、阻断问题、
 来源、所需批准范围（PRD §20.3）。其中两项最容易漏：

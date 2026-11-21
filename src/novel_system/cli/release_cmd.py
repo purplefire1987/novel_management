@@ -62,6 +62,12 @@ def _plan_lines(plan: ReleasePlan) -> list[str]:
     return lines
 
 
+def _closure_exemption_line(plan: ReleasePlan) -> None:
+    """跳过共同发布闸的批次，在计划里留下可见的豁免痕迹。"""
+    if plan.closure_skipped:
+        warn("豁免      : 本批含正文但跳过了共同发布闸（--skip-closure），记忆可能落后于正文")
+
+
 def cmd_release(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     action = getattr(args, "release_command", None)
     if action == "prepare":
@@ -123,6 +129,7 @@ def _prepare(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         issue_store=IssueStore(cfg.require_runtime()),
         change_store=ChangeStore(cfg.require_runtime()),
         confirm_canon=getattr(args, "confirm_canon", False),
+        skip_closure=getattr(args, "skip_closure", False),
     )
     oplog(cfg).record(
         actor=actor,
@@ -134,6 +141,7 @@ def _prepare(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     heading(f"已生成发布计划 {plan.release_id}")
     for line in _plan_lines(plan):
         info(line)
+    _closure_exemption_line(plan)
     print("  变更清单：")
     for change in plan.changes:
         print(f"    {change.op:6} {change.path}  {change.content_hash[:12]}…")
@@ -177,6 +185,7 @@ def _show(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     heading(f"发布 {plan.release_id}")
     for line in _plan_lines(plan):
         info(line)
+    _closure_exemption_line(plan)
     info(f"任务      : {meta.task_id or '（回退包）'}")
     info(f"批准      : {'、'.join(a.approval_id for a in approvals) or '尚无'}")
     current = approvals[-1].target_hash if approvals else ""

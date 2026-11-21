@@ -114,7 +114,10 @@ def _release(vault: Path, runtime: Path, task: str, capsys) -> str:
     capsys.readouterr()
     assert _run(vault, runtime, "approve", "artifact", task, "--hash", digest, "--as", "author") == 0
     capsys.readouterr()
-    assert _run(vault, runtime, "release", "prepare", "--task", task, "--as", "author") == 0
+    # 导入发布测的是分批与来源保全，不测共同发布；后者有专门用例。
+    assert (
+        _run(vault, runtime, "release", "prepare", "--task", task, "--skip-closure", "--as", "author") == 0
+    )
     capsys.readouterr()
 
     release_id = sorted((runtime / "releases").glob("REL-*"))[-1].name
