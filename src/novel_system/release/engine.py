@@ -51,7 +51,7 @@ from .model import (
 from .store import ACTIVE_NAME, PlanMeta, ReleaseStore
 from .workspace import (
     apply_changes,
-    build_snapshot,
+    commit_snapshot,
     copy_tree,
     project_rel,
     release_change_loader,
@@ -704,19 +704,14 @@ def execute(
         revision, revision_kind = "", ""
     if 8 not in done or not revision:
         _maybe_fault("before:8")
-        built = build_snapshot(
-            pp,
-            snapshot,
-            plan=plan,
-            files_dir=files_dir,
-            release_id=release_id,
-            plan_hash=plan.hash,
-        )
-        revision, revision_kind = built.revision, built.revision_kind
+        # 第 4/5/7 步已经把快照建好、变更写进去、文件集核对完了，这里只差一次独立提交。
+        # 不要走 build_snapshot：它会先 rmtree 掉刚建好的快照再全量复制一遍，
+        # 等于把前三步的活作废重做，而且在任何禁止删除的环境里必炸（known_risks R-56）。
+        revision, revision_kind, warnings = commit_snapshot(snapshot, release_id, plan.hash)
         write_atomic(revision_path, revision.encode("utf-8"))
         detail = f"{revision_kind}:{revision[:12]}"
-        if built.warnings:
-            detail += "；" + "；".join(built.warnings)
+        if warnings:
+            detail += "；" + "；".join(warnings)
         _mark(store, journal, 8, "done", detail)
 
     resolved_index_dir = Path(index_dir) if index_dir is not None else store.runtime / "index"

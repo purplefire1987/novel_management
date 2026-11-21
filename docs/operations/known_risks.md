@@ -630,20 +630,19 @@
 - **状态**：现在补完禁止项之后，章卡仍会判「缺必需字段」，直到作者手写 `allowed`。
   这不是 bug，是这一项本来就不该由机器代笔。
 
-### R-56 发布第 8 步会把刚建好的快照删掉重建，多一次全量复制
+### R-56 发布第 8 步曾把刚建好的快照删掉重建（**已修，0.12.1**）
 
-- `execute` 的第 4 步已经 `copy_tree(vault → snapshot)`，第 5 步写入变更，
-  第 7 步核对完文件集；第 8 步又调 `workspace.build_snapshot()`，它第一件事是
-  `if dest.exists(): shutil.rmtree(dest)`，然后从头复制 + 应用 + 提交。
-- **后果一**：4–7 步的成果被作废重做，每次发布多一次全量删除 + 全量复制
-  （真库 1000+ 文件）。
-- **后果二**：任何禁止删除的环境里，发布直接 `PermissionError` 失败在
-  `build_snapshot` 的 `rmtree` 上——哪怕前面七步都已经成功。
-- **正确性没受影响**：`build_snapshot` 自己也是 copy→apply→commit 的完整实现，
-  结果与分步版本一致，所以 T06 的 18 个用例在正常环境下全过。
-- **修法（待办）**：第 8 步只需 `commit_snapshot(snapshot, release_id, plan.hash)`
-  与 `write_atomic(revision_path, ...)`，不要再走 `build_snapshot`。
-  已试改并回退——回退原因是没有可用的验证环境，未验证的 T06 核心改动不进交付。
+- 现象：`execute` 第 4 步 `copy_tree(vault → snapshot)`、第 5 步写变更、第 7 步核文件集，
+  第 8 步又调 `build_snapshot()`，它第一件事是 `if dest.exists(): shutil.rmtree(dest)`，
+  然后从头复制 + 应用 + 提交 —— 前三步的成果被作废重做。
+- 代价：每次发布多一次全量删除 + 全量复制（真库 1000+ 文件）；
+  且在禁止删除的环境里必炸在 `rmtree` 上，哪怕前面七步都已成功。
+- **修法（已落地）**：第 8 步只调 `commit_snapshot(snapshot, release_id, plan.hash)` +
+  `write_atomic(revision_path, ...)`；`build_snapshot` 与只被它使用的 `SnapshotResult`
+  一并删除，免得下次又有人走回去。
+- **验证**：T06 19 个用例全过；全量 658 用例 0 失败；selfcheck 50/50。
+- **残留**：`build_snapshot` 的 docstring 里那句「任一步失败都不留半个候选」不再有对应实现——
+  现在由 4/5/7 步各自负责，失败时靠 journal 与 `resume`/`abort` 收尾，不再整体回滚快照。
 
 ---
 

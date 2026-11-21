@@ -284,7 +284,7 @@ tests/              unit / integration / security / acceptance / fixtures
 ## 7. 测试与检查
 
 ```bash
-pytest                                    # 655 passed / 1 skipped
+pytest                                    # 658 用例：657 passed / 1 skipped
 python3 scripts/selfcheck.py              # 50 项端到端冒烟，不依赖 pytest
 python3 scripts/privacy_scan.py --repo .  # 公仓隐私扫描
 ```

@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import shutil
 import subprocess
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..errors import ConflictError, UsageError
@@ -42,17 +41,6 @@ BASE_SKIP_PARTS = frozenset(
 )
 
 GIT_TIMEOUT = 180
-
-
-@dataclass
-class SnapshotResult:
-    path: Path
-    files: list[ManifestFile] = field(default_factory=list)
-    revision: str = ""
-    revision_kind: str = ""
-    warnings: list[str] = field(default_factory=list)
-    skipped_parts: tuple[str, ...] = ()
-    written: list[str] = field(default_factory=list)
 
 
 def skip_parts(pp: ProjectPaths) -> tuple[str, ...]:
@@ -265,50 +253,6 @@ def _digest_revision(snapshot: Path) -> str:
         digest.update(rel.encode("utf-8"))
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     return "local:" + digest.hexdigest()
-
-
-def build_snapshot(
-    pp: ProjectPaths,
-    dest: Path,
-    *,
-    plan: ReleasePlan,
-    files_dir: Path,
-    release_id: str,
-    plan_hash: str,
-) -> SnapshotResult:
-    """复制 → 落字节 → 提交 → 列清单。任一步失败都不留半个「候选」。"""
-    skip = skip_parts(pp)
-    if dest.exists():
-        # 重试时复用同一个目录：上一次可能已经复制了一半。
-        # 不复用会留下两份内容，谁也不敢删。
-        shutil.rmtree(dest)
-    copy_tree(pp.vault, dest, skip)
-    written = apply_changes(pp, dest, plan, files_dir)
-    revision, kind, warnings = commit_snapshot(dest, release_id, plan_hash)
-    files = scan_snapshot(dest)
-
-    # 计划里的每一条都必须真的落在快照里：这是「文件集与计划一致」的第一次核对。
-    # 比较的是**换算后**的 Vault 相对路径——拿项目相对路径去比，会把上面说的
-    # 幽灵文件当成「已落位」，检查看着通过而实际发错了地方。
-    present = {item.path for item in files}
-    missing = [
-        c.path for c in plan.changes if c.op != "delete" and vault_rel(pp, c.path) not in present
-    ]
-    if missing:
-        raise ConflictError(f"隔离工作区缺少计划中的文件：{missing}")
-    absent = [rel for rel in plan.removals if vault_rel(pp, rel) in present]
-    if absent:
-        raise ConflictError(f"隔离工作区里 {absent} 应已删除但仍在")
-
-    return SnapshotResult(
-        path=dest,
-        files=files,
-        revision=revision,
-        revision_kind=kind,
-        warnings=warnings,
-        skipped_parts=skip,
-        written=written,
-    )
 
 
 def source_change_loader(pp: ProjectPaths, staging_paths: dict[str, str]):
