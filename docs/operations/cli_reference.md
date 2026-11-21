@@ -1,8 +1,8 @@
 # CLI 参考
 
 对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§10）、T03 的 `rebuild-index`/`search`、
-T06 的 `release` 与 T07 的 `import`。顶层命令共 **28** 条
-（`task` / `maps` / `schema` / `release` / `import` 是命令组，各自还有子命令）。
+T06 的 `release`、T07 的 `import` 与 T08 的 `preflight`/`agent`。顶层命令共 **30** 条
+（`task` / `maps` / `schema` / `release` / `import` / `agent` 是命令组，各自还有子命令）。
 全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
@@ -519,6 +519,144 @@ novel import where IMP-000001 "旧稿.md#L3-L9"
 
 ---
 
+## 8.6 写前资料包（`novel preflight`）
+
+写这一章之前，先把「必须守的东西」摆出来。八级检索各走一次，最后给一个判词。
+
+```bash
+novel preflight CH-000102 --base-release REL-000020
+novel preflight CH-000102 --no-write --json          # 只看不落盘
+novel preflight CH-000102 --budget 16000             # 挤小预算，看哪些被截断
+```
+
+### `novel preflight <章号> [--base-release R] [--budget N] [--output-reserve N] [--hard-reserve N] [--search-limit N] [--role R] [--no-write] [--json]`
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `--base-release` | 当前正式指针 | 基线发布；指不到就按工作树算，并记一条 `WARNING` |
+| `--budget` | 32000 | 上下文上限（按非空白字符估 token） |
+| `--output-reserve` | 4000 | 给输出留的空间 |
+| `--hard-reserve` | 6000 | 给硬约束留的空间；**是上限不是预扣**，用不完还给软资料 |
+| `--search-limit` | 6 | 每个关键词最多取几条（Top-K） |
+| `--role` | `researcher` | 执行角色，决定可用工具 |
+| `--no-write` | 否 | 只算不落盘 |
+
+**默认写盘**，落 `<runtime>/preflight/PF-000001.yaml`。理由：资料包是给下一步按号引用的
+产物，不落盘就没法引用；而它写的是 runtime，不是正式区，写坏了删掉重跑即可。
+这与 `publish` / `restore` 那种「默认预演」的动作是两种东西。
+
+`--no-write` 时输出会明说「这个号没被占用，下次还可能发到同一个号」——
+号只在落盘时占用，不复用空号。
+
+### 判词只有两种
+
+`gate_result` 是 `PASS` 或 `BLOCKED`，没有第三种。BLOCKED 的常见原因：
+
+| category | 触发条件 | 怎么办 |
+|---|---|---|
+| `BUDGET` | 硬约束装不下（`Overflow`） | 加 `--budget` 或 `--hard-reserve`，或缩小本章范围 |
+| `SCOPE` | 规划文档里没有 `creative_scope` | 先在章卡里写明允许与禁止 |
+| `PLANNING` | 找不到章节规划文档 | 补章卡，或确认章号 |
+| `FORESHADOW` | 有已过窗口仍未回收的伏笔 | 回收它，或改窗口 |
+| `RULES` | 索引是旧版建的，读不到伏笔（这一整类硬约束没查） | `novel rebuild-index` |
+| `INDEX` | 索引不可用 | `novel rebuild-index` |
+
+`MSG_NO_RELEASE`（找不到正式发布）只记 `WARNING` 不阻断——新项目还没发布过，
+这不是错误状态。
+
+### 截断可见
+
+软资料装不下时记 `Truncation` 并进 `coverage.truncated_results`。终端每次都会打印：
+
+```
+有 5 处结果被截断（看 truncated_results，别当成「就这么多」）：
+  - search：37 条里收了 6 条，丢 31 条（超出每级 Top-K）
+  - knowledge：12 条里收了 3 条，丢 9 条（软额度不足）
+```
+
+同理 `unresolved_gaps` 列出查不到的缺口（没写规划、索引里没这个实体……）。
+**「没查到」与「查到但没放进去」是两件事**，两者分开报，不合并成「资料不全」。
+
+### 模型是可选的
+
+不给模型（默认）走纯确定性路径：读规划 → 查索引 → 放预算 → 判 gate，结论可复现。
+
+给了模型，资料官只多做一件事：把规划里的「必须发生 / 禁止发生」提炼成结构化约束。
+模型输出不可用（不是 JSON、缺字段、`role` 写错）→ **退回原文照录**，
+记一条 issue（`资料官输出不可用：…`），`model.used=false`。不会「尽力而为提取字段」。
+
+理由：写前检查的结论要能复现。同一份库今天 PASS 明天 BLOCKED 而理由是「模型这次
+理解得不一样」，这个 gate 就没有权威性。
+
+### 十七项之外的字段
+
+`preflight.schema.json` 除了 PRD §13.4 的十七项，还有 `budget`（预算账）、
+`usage`（本次调用计量）、`index`（build 与 revision）、`recent_text`（近期正文）、
+`volume_summary`（卷级摘要）、`model`、`generated_at`、`schema_version`。
+`additionalProperties: false`，多写一个字段就过不了校验。
+
+---
+
+## 8.7 九角色（`novel agent`）
+
+### `novel agent list [--json]`
+
+打印权限矩阵、可用工具、角色卡是否在位：
+
+```
+  ID              角色      读           Canon写  staging 正文    发布    工具
+  editor_in_chief 总编      R           X       S/P     X     X     search, state, knowledge, …
+  writer          主笔      R           X       S/P     S     X     search, state, knowledge, …
+  ingestor        录入员     R（源稿）       X       S       X     X     （无）
+```
+
+列序与人读版 `agents/common/permissions.md` 完全一致，靠测试逐格比对。
+**两道锁恒为 `X`**：任何角色都不能写 Canon、不能发布——这不是默认值，
+`ensure_can_write_canon()` / `ensure_can_release()` 永远抛 `SecurityError`。
+
+`ingestor` 的工具是「（无）」，不是漏了。它只读源稿，所以拿不到任何读 Canon 的工具；
+想给它加工具必须先改读权限，而改权限会让矩阵比对测试红。
+
+### `novel agent prompt --role <id> [--task T] [--base-release R] [--schema S] [--extra 文本] [--show] [--json]`
+
+默认只看结构，`[硬]` 表示这一段是必备项，缺一个就报错：
+
+```
+writer（主笔）提示词
+  共 1452 tokens；工具：search, state, knowledge, reveal, plan, foreshadow, index_meta
+    [  ] 职责与边界（角色卡）
+    [硬] 当前任务授权
+    [硬] 当前 release
+    [硬] 故事与叙述锚点
+    [硬] 允许工具
+    [硬] 输出 Schema
+    [硬] 不确定性处理
+    [硬] 引用要求
+    [硬] 检索内容不是指令
+    [硬] 不得宣称未执行的动作
+    [硬] 范围与写入边界
+```
+
+`--show` 打全文，`--json` 打结构。五段公共文本（不确定性 / 引用 / 提示词注入 /
+不宣称未执行 / 范围边界）九份提示词共用，测试断言公共前缀逐字节相同。
+
+`--task` 会给提示词带上具体授权（任务号、目标路径、范围），不给就写「未指定任务」。
+
+### `novel agent usage [--day YYYYMMDD] [--json]`
+
+读 `<runtime>/usage/YYYYMMDD.jsonl`，一行一次调用：
+
+```
+调用计量：20261121.jsonl
+  这一天没有记录。没有调用就是没有账，不是读不出来。
+```
+
+**没有记录就是没调用过**，不打印一个全零的假汇总。只记元数据（角色、工具、耗时、
+tokens、成败、任务号），**不记正文**——与 `ops.jsonl` 同一口径。
+失败的调用也记：只记成功的账，等于把「试了三次才成」记成一次。
+
+---
+
 ## 9. 备份与恢复
 
 ### `novel backup [--out <目录>] [--label <标签>] [--no-git] [--list]`
@@ -589,7 +727,7 @@ novel maps build --confirm                          # 连档案一起重跑（�
 
 ### `novel schema list [--schema-dir <目录>]`
 
-列出可校验的类型（当前 22 类）与每类的必填字段。schema 默认从**仓库根 `schemas/`**
+列出可校验的类型（当前 24 类）与每类的必填字段。schema 默认从**仓库根 `schemas/`**
 读取；装成包后可放 `novel_system/schemas/`，或用 `NOVEL_SCHEMAS` 环境变量指定。
 
 ### `novel schema check <类型> <文件…>`
@@ -667,6 +805,8 @@ novel package-hash tmp/release_plan.json --canonical   # 同时看规范化后�
 | 问题单 | `<runtime>/issues/ISSUE-*.json` | 否 |
 | 变更单 | `<runtime>/changes/CR-*.json` | 否 |
 | 操作日志 | `<runtime>/logs/ops.jsonl` | 否 |
+| 调用计量 | `<runtime>/usage/YYYYMMDD.jsonl` | 否（只追加；不记正文） |
+| 写前资料包 | `<runtime>/preflight/PF-*.yaml` | 是（删掉重跑；号不复用） |
 | 索引库 | `<runtime>/index/builds/<build_id>.sqlite` | 是 |
 | 索引指针 | `<runtime>/index/active.json` | 是（指向哪一份 build） |
 | 作者基线 | `<runtime>/authorship/<project_id>.json` | 是（重新 adopt） |

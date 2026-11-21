@@ -291,6 +291,61 @@ def test_14_3_nine_agents_defined() -> None:
     assert found == AGENTS
 
 
+def test_14_3_registry_matches_documented_matrix() -> None:
+    """代码里的权限矩阵必须与 `agents/common/permissions.md` 逐格相同。
+
+    T08 之前这里只查「九个目录在不在」——那是文件存在性，不是权限。
+    现在代码里有一份可执行的矩阵，两边必须对得上：文档改了代码没改，
+    权限表就是摆设；代码改了文档没改，作者读到的是假的。
+    """
+    import re
+
+    from novel_system.agents import registry
+
+    documented: dict[str, tuple[str, ...]] = {}
+    text = (ROOT / "agents" / "common" / "permissions.md").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 6:
+            continue
+        match = re.match(r"^([a-z_]+)（.+?）$", cells[0])
+        if match:
+            documented[match.group(1)] = tuple(cells[1:])
+
+    assert set(documented) == AGENTS
+    assert set(registry.ROLE_IDS) == AGENTS
+    for role in registry.ROLES:
+        assert role.matrix_row() == documented[role.id], role.id
+
+
+def test_14_3_no_role_may_write_canon_or_publish() -> None:
+    """执行层硬拦：不是「提示词说了」，是调用就抛。"""
+    from novel_system.agents import registry
+    from novel_system.errors import SecurityError
+
+    for role in registry.ROLES:
+        assert role.canon_write is False
+        assert role.may_release is False
+        with pytest.raises(SecurityError):
+            registry.ensure_can_write_canon(role.id)
+        with pytest.raises(SecurityError):
+            registry.ensure_can_release(role.id)
+
+
+def test_14_3_each_role_has_prompt_with_common_prefix() -> None:
+    """PRD §6.4：九种职责各一份提示词，公共前缀九项齐全。"""
+    from novel_system.agents import prompts, registry
+
+    for role_id in registry.ROLE_IDS:
+        prompt = prompts.build(role_id)
+        keys = prompts.section_keys(prompt)
+        missing = [key for key in prompts.REQUIRED_KEYS if key not in keys]
+        assert not missing, f"{role_id} 缺公共约束：{missing}"
+        assert prompt.tokens > 0
+
+
 def test_14_3_each_agent_states_boundaries() -> None:
     for name in sorted(AGENTS):
         text = (ROOT / "agents" / name / "agent.md").read_text(encoding="utf-8")

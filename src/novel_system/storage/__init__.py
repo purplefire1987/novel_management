@@ -192,7 +192,10 @@ def human_size(num: int) -> str:
 
 def _yaml_scalar(value: object) -> str:
     if value is None:
-        return '""'
+        # 空值写 `null` 而不是 `""`：YAML 读回来是 None，与写进去的一致。
+        # 写成空字符串会让「没有值」和「值就是空串」混成一件事，
+        # 而这两件事在 `base_release` 这种字段上含义完全不同。
+        return "null"
     if value is True:
         return "true"
     if value is False:
@@ -206,33 +209,56 @@ def _yaml_scalar(value: object) -> str:
 
 
 def dump_yaml(data: dict, indent: int = 0) -> str:
+    """把记录类数据写成 YAML。
+
+    递归到任意深度。早先只支持「标量、列表、一层对象列表」，够任务记录用；
+    T08 的资料包有三层（列表里套对象，对象里再套列表，比如
+    `issues[].evidence[]`），一层就写坏了——`evidence: "[]"` 看着像空表，
+    读回来却是个字符串。宁可把 dumper 写全，也不要让派生文件静默变成错的数据。
+    """
+    return "\n".join(_dump_map(data, indent)) + "\n"
+
+
+def _dump_map(data: dict, indent: int) -> list[str]:
     pad = " " * indent
     lines: list[str] = []
     for key, value in data.items():
+        head = f"{pad}{key}:"
         if isinstance(value, dict):
             if not value:
-                lines.append(f"{pad}{key}: {{}}")
+                lines.append(f"{head} {{}}")
                 continue
-            lines.append(f"{pad}{key}:")
-            lines.append(dump_yaml(value, indent + 2).rstrip("\n"))
+            lines.append(head)
+            lines.extend(_dump_map(value, indent + 2))
         elif isinstance(value, (list, tuple)):
             if not value:
-                lines.append(f"{pad}{key}: []")
+                lines.append(f"{head} []")
                 continue
-            lines.append(f"{pad}{key}:")
-            for item in value:
-                if isinstance(item, dict):
-                    first = True
-                    for sub_key, sub_value in item.items():
-                        prefix = f"{pad}  - " if first else f"{pad}    "
-                        if isinstance(sub_value, dict):
-                            lines.append(f"{prefix}{sub_key}:")
-                            lines.append(dump_yaml(sub_value, indent + 6).rstrip("\n"))
-                        else:
-                            lines.append(f"{prefix}{sub_key}: {_yaml_scalar(sub_value)}")
-                        first = False
-                else:
-                    lines.append(f"{pad}  - {_yaml_scalar(item)}")
+            lines.append(head)
+            lines.extend(_dump_seq(value, indent + 2))
         else:
-            lines.append(f"{pad}{key}: {_yaml_scalar(value)}")
-    return "\n".join(lines) + "\n"
+            lines.append(f"{head} {_yaml_scalar(value)}")
+    return lines
+
+
+def _dump_seq(items, indent: int) -> list[str]:
+    pad = " " * indent
+    lines: list[str] = []
+    for item in items:
+        if isinstance(item, dict):
+            if not item:
+                lines.append(f"{pad}- {{}}")
+                continue
+            body = _dump_map(item, indent + 2)
+            # 第一行挂到 `- ` 后面，其余行保持缩进——这是 YAML 的块序列写法。
+            lines.append(f"{pad}- {body[0].lstrip()}")
+            lines.extend(body[1:])
+        elif isinstance(item, (list, tuple)):
+            if not item:
+                lines.append(f"{pad}- []")
+                continue
+            lines.append(f"{pad}-")
+            lines.extend(_dump_seq(item, indent + 2))
+        else:
+            lines.append(f"{pad}- {_yaml_scalar(item)}")
+    return lines

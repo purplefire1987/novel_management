@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/preflight.schema.json",
+  "title": "写前资料包（Preflight）",
+  "$comment": "字段依据 PRD §13.4，逐项同名。§13.4 没写的三样是本系统加的：budget（预算账，§13.5 要求「明确记录截断」）、usage（T08 调用计量）、index（这份包是按哪次建库算的）。加字段不改名，所以按 §13.4 写的消费者仍能读。gate_result 只有 PASS／BLOCKED——PRD 明写不许用「有条件通过」跳过前置要求。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "preflight_id",
+    "base_release",
+    "chapter_id",
+    "input_hashes",
+    "story_anchor",
+    "narrative_position",
+    "key_constraints",
+    "entity_states",
+    "character_knowledge",
+    "reader_revelations",
+    "related_events",
+    "foreshadowing",
+    "creative_scope",
+    "coverage",
+    "source_refs",
+    "issues",
+    "gate_result"
+  ],
+  "properties": {
+    "preflight_id": { "type": "string", "pattern": "^PREFLIGHT-[0-9]{4,6}$" },
+    "base_release": {
+      "type": ["string", "null"],
+      "description": "基线发布；从未发布过时为 null，并在 issues 里写明「读的是工作树」"
+    },
+    "chapter_id": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+    "input_hashes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "_common.schema.json#/$defs/sha256" }
+    },
+    "story_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "story_time": { "type": "string" },
+        "event_id": { "type": "string" },
+        "source": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "narrative_position": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chapter_id": { "type": "string" },
+        "scene_id": { "type": "string" },
+        "pov": { "type": "string" },
+        "position": { "type": "string" }
+      }
+    },
+    "key_constraints": {
+      "type": "array",
+      "description": "硬约束：规划里的「必须发生／禁止发生」、创作授权的 forbidden、规则边界。装不下就 BLOCKED，不许压缩",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["MUST", "MUST_NOT", "RULE", "SCOPE"] },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "entity_states": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entity_id", "status"],
+        "properties": {
+          "entity_id": { "type": "string" },
+          "field": { "type": "string" },
+          "value": { "type": "string" },
+          "status": {
+            "type": "string",
+            "description": "RESOLVED／NOT_RECORDED／AMBIGUOUS／UNORDERED／DISPUTED",
+            "enum": ["RESOLVED", "NOT_RECORDED", "AMBIGUOUS", "UNORDERED", "DISPUTED"]
+          },
+          "event": { "type": "string" },
+          "note": { "type": "string", "description": "为什么是这个状态；非 RESOLVED 时必读" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "character_knowledge": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["holder_id", "status"],
+        "properties": {
+          "holder_id": { "type": "string" },
+          "subject_id": { "type": "string" },
+          "predicate": { "type": "string" },
+          "value": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["RESOLVED", "NOT_RECORDED", "AMBIGUOUS", "UNORDERED", "DISPUTED"]
+          },
+          "note": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "reader_revelations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["proposition_id", "status"],
+        "properties": {
+          "proposition_id": { "type": "string" },
+          "status": { "type": "string" },
+          "position": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "related_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id"],
+        "properties": {
+          "event_id": { "type": "string" },
+          "title": { "type": "string" },
+          "relation": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "foreshadowing": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "state"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "state": { "type": "string" },
+          "window_policy": { "type": "string", "enum": ["", "ADVISORY", "HARD"] },
+          "window_end": { "type": "string" },
+          "planted_in": { "type": "string" },
+          "payoff_in": { "type": "string" },
+          "overdue": { "type": "boolean" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "creative_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": { "type": "array", "items": { "type": "string" } },
+        "approval_required": { "type": "array", "items": { "type": "string" } },
+        "forbidden": { "type": "array", "items": { "type": "string" } },
+        "source": { "type": "string" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked_entities", "checked_topics", "unresolved_gaps", "truncated_results"],
+      "properties": {
+        "checked_entities": { "type": "array", "items": { "type": "string" } },
+        "checked_topics": { "type": "array", "items": { "type": "string" } },
+        "unresolved_gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["topic", "detail"],
+            "properties": {
+              "topic": { "type": "string" },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "truncated_results": {
+          "type": "array",
+          "description": "被预算截掉的东西。空表表示一条都没丢——这是唯一可以当作「就这么多」的读法",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["section", "kept", "dropped", "total", "reason"],
+            "properties": {
+              "section": { "type": "string" },
+              "kept": { "type": "integer", "minimum": 0 },
+              "dropped": { "type": "integer", "minimum": 1 },
+              "total": { "type": "integer", "minimum": 1 },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "artifact_id": { "type": "string" },
+          "block_id": { "type": "string" },
+          "locator": { "type": "string" },
+          "quote": { "type": "string" }
+        }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["BLOCKER", "NON_BLOCKING", "SUGGESTION"] },
+          "category": {
+            "type": "string",
+            "enum": [
+              "KNOWLEDGE_BOUNDARY",
+              "CONTINUITY",
+              "TIMELINE",
+              "RULES",
+              "SCOPE",
+              "QUALITY",
+              "BUDGET",
+              "OTHER"
+            ]
+          },
+          "message": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "gate_result": { "type": "string", "enum": ["PASS", "BLOCKED"] },
+    "recent_text": {
+      "type": "object",
+      "description": "§13.2 第 6 级「近期正文」的产物。§13.4 的清单里没有这一格，但检索顺序要求读它，读完必须有地方放",
+      "additionalProperties": false,
+      "properties": {
+        "chapter_id": { "type": "string" },
+        "path": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "chars": { "type": "integer", "minimum": 0 },
+        "note": { "type": "string" }
+      }
+    },
+    "volume_summary": {
+      "type": "object",
+      "description": "§13.2 第 7 级「卷级摘要」的产物，同上",
+      "additionalProperties": false,
+      "properties": {
+        "volume_id": { "type": "string" },
+        "path": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "model": {
+      "type": "object",
+      "description": "模型这一路用没用上、为什么没用上。缺这一格，就看不出「约束是原文照录还是模型提炼」",
+      "additionalProperties": false,
+      "properties": {
+        "used": { "type": "boolean" },
+        "role": { "type": "string" },
+        "model": { "type": "string" },
+        "error": { "type": "string" },
+        "added_constraints": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "description": "预算账：上限、预留、实际用量、截断清单、硬约束溢出清单"
+    },
+    "usage": { "type": "object", "description": "调用计量：模型调用次数、工具调用次数与 token 数" },
+    "index": {
+      "type": "object",
+      "description": "这份包按哪次建库算的；包与索引对不上时，引用会指错地方",
+      "additionalProperties": false,
+      "properties": {
+        "build_id": { "type": "string" },
+        "canon_revision": { "type": "string" },
+        "fts_mode": { "type": "string" }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" }
+  }
+}

@@ -17,8 +17,14 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from .. import logs
+from ..agents.budget import (
+    DEFAULT_CONTEXT_LIMIT,
+    DEFAULT_HARD_RESERVE,
+    DEFAULT_OUTPUT_RESERVE,
+)
 from ..errors import NovelError
 from . import (
+    agent_cmd,
     approval_cmd,
     backup_cmd,
     change_cmd,
@@ -66,6 +72,8 @@ HANDLERS = {
     "schema": schema_cmd.cmd_schema,
     "allocate-id": id_cmd.cmd_allocate_id,
     "package-hash": schema_cmd.cmd_package_hash,
+    "preflight": agent_cmd.cmd_preflight,
+    "agent": agent_cmd.cmd_agent,
 }
 
 
@@ -476,6 +484,54 @@ def build_parser() -> argparse.ArgumentParser:
     p_ph.add_argument("path", help="JSON 文件；`-` 读 stdin")
     p_ph.add_argument("--check", default=None, help="比对期望哈希，不一致退出 1")
     p_ph.add_argument("--canonical", action="store_true", help="同时打印规范化 JSON 原文")
+
+    # ---- preflight（T08 写前资料包）----
+    p_pf = sub.add_parser(
+        "preflight",
+        help="产出写前资料包：八级检索、预算账、PASS／BLOCKED（PRD §13）",
+        parents=[sub_common],
+    )
+    p_pf.add_argument("chapter", help="章节 ID，如 CH-000102")
+    p_pf.add_argument("--base-release", default="", help="基线发布；省略则取当前正式指针")
+    p_pf.add_argument(
+        "--budget", type=int, default=DEFAULT_CONTEXT_LIMIT, help=f"上下文预算上限（默认 {DEFAULT_CONTEXT_LIMIT}）"
+    )
+    p_pf.add_argument(
+        "--output-reserve",
+        type=int,
+        default=DEFAULT_OUTPUT_RESERVE,
+        help="给输出预留的空间",
+    )
+    p_pf.add_argument(
+        "--hard-reserve",
+        type=int,
+        default=DEFAULT_HARD_RESERVE,
+        help="给硬约束预留的空间；硬约束超过它就直接 BLOCKED，不压缩",
+    )
+    p_pf.add_argument("--search-limit", type=int, default=6, help="每个关键词最多取几条（Top-K）")
+    p_pf.add_argument("--role", default="researcher", help="执行角色，默认资料官")
+    p_pf.add_argument("--no-write", action="store_true", help="只算不落盘")
+    p_pf.add_argument("--json", action="store_true", help="输出 JSON")
+
+    # ---- agent（T08 九角色）----
+    p_agent = sub.add_parser("agent", help="九角色：权限矩阵、提示词、调用计量", parents=[sub_common])
+    agent_sub = p_agent.add_subparsers(dest="agent_command", required=True)
+
+    p_al = agent_sub.add_parser("list", help="列出九角色的权限、可用工具与角色卡是否在位", parents=[sub_common])
+    p_al.add_argument("--json", action="store_true")
+
+    p_ap = agent_sub.add_parser("prompt", help="渲染某角色的提示词（默认只看结构）", parents=[sub_common])
+    p_ap.add_argument("--role", required=True, help="角色 ID，如 writer")
+    p_ap.add_argument("--task", default="", help="任务 ID；给了就把授权写进提示词")
+    p_ap.add_argument("--base-release", default="", help="基线发布")
+    p_ap.add_argument("--schema", default="", help="输出 schema 名")
+    p_ap.add_argument("--extra", default="", help="补充要求")
+    p_ap.add_argument("--show", action="store_true", help="打印全文")
+    p_ap.add_argument("--json", action="store_true")
+
+    p_au = agent_sub.add_parser("usage", help="看调用计量台账", parents=[sub_common])
+    p_au.add_argument("--day", default="", help="日期 YYYYMMDD；省略为今天")
+    p_au.add_argument("--json", action="store_true")
 
     return parser
 

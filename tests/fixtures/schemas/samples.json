@@ -19,17 +19,26 @@
       "created_at": "2026-11-20T10:00:00Z",
       "updated_at": "2026-11-20T10:00:00Z"
     },
-    "invalid": { "id": "CHAR-0001", "type": "dragon", "name": "示例人物" }
+    "invalid": {
+      "id": "CHAR-0001",
+      "type": "dragon",
+      "name": "示例人物"
+    }
   },
   "event": {
     "valid": {
       "event_id": "EVT-0001",
       "summary": "示例事件",
       "source_chapter": "CH-0001",
-      "participants": ["CHAR-0001"],
+      "participants": [
+        "CHAR-0001"
+      ],
       "created_at": "2026-11-20T10:00:00Z"
     },
-    "invalid": { "event_id": "EVT-CH-0001-001", "summary": "复合型 ID 不合法" }
+    "invalid": {
+      "event_id": "EVT-CH-0001-001",
+      "summary": "复合型 ID 不合法"
+    }
   },
   "artifact": {
     "valid": {
@@ -53,7 +62,10 @@
       "block_id": "p0042",
       "quote": "示例引文"
     },
-    "invalid": { "kind": "CANON", "block_id": "p0042" }
+    "invalid": {
+      "kind": "CANON",
+      "block_id": "p0042"
+    }
   },
   "assertion": {
     "valid": {
@@ -103,7 +115,11 @@
       "holder_id": "CHAR-0001",
       "epistemic_type": "CHARACTER_BELIEF",
       "attitude": "BELIEVES",
-      "proposition": { "subject_id": "CHAR-0002", "predicate": "life_status", "value": "DEAD" },
+      "proposition": {
+        "subject_id": "CHAR-0002",
+        "predicate": "life_status",
+        "value": "DEAD"
+      },
       "valid_from_event": "EVT-0102",
       "source_refs": []
     },
@@ -111,19 +127,29 @@
       "holder_id": "CHAR-0001",
       "epistemic_type": "CHARACTER_BELIEF",
       "attitude": "HOPES",
-      "proposition": { "subject_id": "CHAR-0002", "predicate": "life_status", "value": "DEAD" }
+      "proposition": {
+        "subject_id": "CHAR-0002",
+        "predicate": "life_status",
+        "value": "DEAD"
+      }
     }
   },
   "revelation": {
     "valid": {
       "proposition_ref": "AST-0001",
-      "narrative_position": { "chapter_id": "CH-0001", "scene_id": "SCENE-0001", "block_id": "p0032" },
+      "narrative_position": {
+        "chapter_id": "CH-0001",
+        "scene_id": "SCENE-0001",
+        "block_id": "p0032"
+      },
       "revelation_mode": "EXPLICIT",
       "source_refs": []
     },
     "invalid": {
       "proposition_ref": "AST-0001",
-      "narrative_position": { "scene_id": "SCENE-0001" },
+      "narrative_position": {
+        "scene_id": "SCENE-0001"
+      },
       "revelation_mode": "EXPLICIT"
     }
   },
@@ -134,7 +160,10 @@
       "surface_meaning": "表层解释",
       "true_meaning": "真实含义",
       "window_policy": "ADVISORY",
-      "target_window": { "from_chapter": "CH-0010", "to_chapter": "CH-0020" }
+      "target_window": {
+        "from_chapter": "CH-0010",
+        "to_chapter": "CH-0020"
+      }
     },
     "invalid": {
       "id": "FORESHADOW-0001",
@@ -158,7 +187,12 @@
     },
     "invalid": {
       "artifact_id": "PLAN-CH-0102",
-      "depends_on": [{ "artifact_id": "RULE-0003", "dependency_type": "MAYBE" }],
+      "depends_on": [
+        {
+          "artifact_id": "RULE-0003",
+          "dependency_type": "MAYBE"
+        }
+      ],
       "validation_status": "VALID"
     }
   },
@@ -167,7 +201,10 @@
       "issue_id": "ISSUE-0102",
       "severity": "BLOCKER",
       "category": "KNOWLEDGE_BOUNDARY",
-      "target": { "artifact_id": "CH-0102", "block_id": "p0031" },
+      "target": {
+        "artifact_id": "CH-0102",
+        "block_id": "p0031"
+      },
       "description": "人物使用了尚未获得的信息",
       "evidence_refs": [],
       "suggested_actions": [],
@@ -190,7 +227,9 @@
       "target_id": "CH-0102",
       "target_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
       "decision": "APPROVE",
-      "approved_scope": ["CHAPTER_TEXT"],
+      "approved_scope": [
+        "CHAPTER_TEXT"
+      ],
       "notes": []
     },
     "invalid": {
@@ -207,9 +246,16 @@
       "change_id": "CR-0001",
       "change_type": "RETCON",
       "reason": "早期设定与正文冲突",
-      "old_record": { "artifact_id": "RULE-0003", "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d" },
-      "impacted_text": ["CH-0010"],
-      "required_approvals": ["AUTHOR"],
+      "old_record": {
+        "artifact_id": "RULE-0003",
+        "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d"
+      },
+      "impacted_text": [
+        "CH-0010"
+      ],
+      "required_approvals": [
+        "AUTHOR"
+      ],
       "release_strategy": "NEXT_RELEASE"
     },
     "invalid": {
@@ -255,13 +301,20 @@
           "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d"
         }
       ],
-      "text_approvals": ["APR-0102"],
+      "text_approvals": [
+        "APR-0102"
+      ],
       "schema_version": "2.1"
     },
     "invalid": {
       "release_id": "REL-0001",
       "base_release": "REL-0000",
-      "changes": [{ "path": "01_Canon/Chapters/CH-0001.md", "op": "rewrite" }],
+      "changes": [
+        {
+          "path": "01_Canon/Chapters/CH-0001.md",
+          "op": "rewrite"
+        }
+      ],
       "schema_version": "2.1"
     }
   },
@@ -297,8 +350,16 @@
       "base_release": "REL-0000",
       "state": "PREPARED",
       "steps": [
-        { "step": 1, "name": "创建 release_id 与事务日志", "status": "done" },
-        { "step": 2, "name": "验证 base_release", "status": "pending" }
+        {
+          "step": 1,
+          "name": "创建 release_id 与事务日志",
+          "status": "done"
+        },
+        {
+          "step": 2,
+          "name": "验证 base_release",
+          "status": "pending"
+        }
       ],
       "created_at": "2026-11-20T10:00:00Z"
     },
@@ -306,7 +367,12 @@
       "txn_id": "TXN-0001",
       "release_id": "REL-0001",
       "state": "ALMOST_DONE",
-      "steps": [{ "step": 99, "status": "done" }],
+      "steps": [
+        {
+          "step": 99,
+          "status": "done"
+        }
+      ],
       "created_at": "2026-11-20T10:00:00Z"
     }
   },
@@ -370,8 +436,22 @@
     "valid": {
       "layer": "hot",
       "project_id": "novel-001",
-      "scope": { "volume": 1, "chapter_range": ["CH-0001"], "entities": ["CHAR-0001"] },
-      "facts": [{ "statement": "示例事实", "source_chapter": "CH-0001", "confidence": "explicit" }],
+      "scope": {
+        "volume": 1,
+        "chapter_range": [
+          "CH-0001"
+        ],
+        "entities": [
+          "CHAR-0001"
+        ]
+      },
+      "facts": [
+        {
+          "statement": "示例事实",
+          "source_chapter": "CH-0001",
+          "confidence": "explicit"
+        }
+      ],
       "updated_at": "2026-11-20T10:00:00Z"
     },
     "invalid": {
@@ -398,6 +478,171 @@
       "task_type": "writing",
       "status": "pending",
       "created_at": "2026-11-20T10:00:00Z"
+    }
+  },
+  "preflight": {
+    "valid": {
+      "preflight_id": "PREFLIGHT-000102",
+      "base_release": "REL-000020",
+      "chapter_id": "CH-000102",
+      "input_hashes": {
+        "planning": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "story_anchor": {
+        "story_time": "兴元十二年七月初八夜",
+        "event_id": "EVT-000100"
+      },
+      "narrative_position": {
+        "chapter_id": "CH-000102",
+        "pov": "CHAR-000001"
+      },
+      "key_constraints": [
+        {
+          "text": "必须在渡口交出书匣",
+          "kind": "MUST",
+          "source": "02_Planning/x.md"
+        }
+      ],
+      "entity_states": [
+        {
+          "entity_id": "CHAR-000001",
+          "field": "life_status",
+          "value": "ALIVE",
+          "status": "RESOLVED",
+          "event": "EVT-000100",
+          "source": "01_Canon/Characters/CHAR-000001.md"
+        }
+      ],
+      "character_knowledge": [
+        {
+          "holder_id": "CHAR-000001",
+          "predicate": "identity",
+          "status": "NOT_RECORDED"
+        }
+      ],
+      "reader_revelations": [],
+      "related_events": [
+        {
+          "event_id": "EVT-000100",
+          "title": "渡口交货"
+        }
+      ],
+      "foreshadowing": [
+        {
+          "id": "FORE-0001",
+          "state": "PLANTED",
+          "window_policy": "HARD",
+          "window_end": "CH-000110",
+          "overdue": false
+        }
+      ],
+      "creative_scope": {
+        "allowed": [
+          "符合人物动机的对话"
+        ],
+        "forbidden": [
+          "人物复活"
+        ]
+      },
+      "coverage": {
+        "checked_entities": [
+          "CHAR-000001"
+        ],
+        "checked_topics": [
+          "keyword:CHAR-000001"
+        ],
+        "unresolved_gaps": [
+          {
+            "topic": "recent_text",
+            "detail": "没有更早的正文"
+          }
+        ],
+        "truncated_results": [
+          {
+            "section": "entity_states",
+            "kept": 1,
+            "dropped": 2,
+            "total": 3,
+            "reason": "预算不足"
+          }
+        ]
+      },
+      "source_refs": [
+        {
+          "path": "01_Canon/Characters/CHAR-000001.md",
+          "block_id": "p0001"
+        }
+      ],
+      "issues": [
+        {
+          "severity": "NON_BLOCKING",
+          "category": "OTHER",
+          "message": "尚无正式发布"
+        }
+      ],
+      "gate_result": "PASS"
+    },
+    "invalid": {
+      "preflight_id": "PREFLIGHT-000102",
+      "base_release": null,
+      "chapter_id": "CH-000102",
+      "input_hashes": {},
+      "story_anchor": {},
+      "narrative_position": {},
+      "key_constraints": [],
+      "entity_states": [],
+      "character_knowledge": [],
+      "reader_revelations": [],
+      "related_events": [],
+      "foreshadowing": [],
+      "creative_scope": {},
+      "coverage": {
+        "checked_entities": [],
+        "checked_topics": [],
+        "unresolved_gaps": [],
+        "truncated_results": []
+      },
+      "source_refs": [],
+      "issues": [],
+      "gate_result": "CONDITIONAL"
+    }
+  },
+  "agent_envelope": {
+    "valid": {
+      "task_id": "TASK-000001",
+      "role": "researcher",
+      "base_release": "REL-000001",
+      "input_hashes": {
+        "planning": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "result": {
+        "key_constraints": [
+          {
+            "text": "必须发生的事",
+            "kind": "MUST"
+          }
+        ]
+      },
+      "issues": [
+        {
+          "severity": "SUGGESTION",
+          "category": "QUALITY",
+          "message": "可再收紧"
+        }
+      ],
+      "source_refs": [
+        {
+          "path": "02_Planning/x.md"
+        }
+      ],
+      "usage": {
+        "model_calls": 1
+      }
+    },
+    "invalid": {
+      "task_id": "TASK-000001",
+      "role": "plot_planner",
+      "result": {}
     }
   }
 }

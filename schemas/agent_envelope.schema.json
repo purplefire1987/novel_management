@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/agent_envelope.schema.json",
+  "title": "Agent 输出信封",
+  "$comment": "字段依据 PRD §6.3。所有非正文结构化输出都必须套这一层：任务号、角色、基线发布、输入哈希、结果、问题、来源、用量。角色误填会让审核记录归错人，所以这里把 role 限制成九角色之一；runner 还会再核对一次「信封里的角色是否就是本次调用者」。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "role", "result"],
+  "properties": {
+    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "role": {
+      "type": "string",
+      "enum": [
+        "editor_in_chief",
+        "world_architect",
+        "editor",
+        "dice_mistress",
+        "researcher",
+        "writer",
+        "memory_keeper",
+        "ingestor",
+        "version_manager"
+      ]
+    },
+    "base_release": {
+      "type": ["string", "null"],
+      "description": "基线发布；没有正式发布时为 null，不要写成空字符串"
+    },
+    "input_hashes": {
+      "type": "object",
+      "description": "输入内容的哈希，键名自定；用来证明「算这段话时读的是哪一版」",
+      "additionalProperties": { "$ref": "_common.schema.json#/$defs/sha256" }
+    },
+    "result": { "type": "object", "description": "该角色的结构化产出，形状由任务约定" },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["BLOCKER", "NON_BLOCKING", "SUGGESTION"] },
+          "category": {
+            "type": "string",
+            "enum": [
+              "KNOWLEDGE_BOUNDARY",
+              "CONTINUITY",
+              "TIMELINE",
+              "RULES",
+              "SCOPE",
+              "QUALITY",
+              "BUDGET",
+              "OTHER"
+            ]
+          },
+          "message": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "artifact_id": { "type": "string" },
+          "block_id": { "type": "string" },
+          "locator": { "type": "string" },
+          "quote": { "type": "string" }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "description": "模型自报用量。只当参考——真正的计量由 runner 的 Meter 记，不信自报值"
+    }
+  }
+}

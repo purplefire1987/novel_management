@@ -5,14 +5,35 @@
 ## 1. 写前：拿资料包
 
 ```bash
-novel task create --type preflight --assignee researcher --mode read_only
+novel rebuild-index                 # 库刚升级到 0.11 时跑一次，否则伏笔表是空的
+novel preflight CH-0007
 ```
 
-资料官产出的是**资料包**，不是正文。它应该回答：这一章要用到的人物当前状态、地点、前文伏笔。
-资料包进 staging 供你查看，不进 Canon。
+资料官产出的是**资料包**，不是正文。它回答：这一章要用到的人物当前状态、地点、前文伏笔，
+以及几条**不能违反**的硬约束。落 `<runtime>/preflight/PF-000001.yaml`，不进 Canon。
+
+最后一行是判词，只有两种：
+
+- `PASS`：可以开写。资料包里 `key_constraints` 那几条必须逐条在正文里守到；
+- `BLOCKED`：**先别写**。输出会点名是哪一条——没写章卡的创意范围（`SCOPE`）、
+  有已过窗口还没回收的伏笔（`FORESHADOW`）、硬约束装不下预算（`BUDGET`）。
 
 判断资料包够不够用的标准：**凡是正文里会写到的具体事实，都能在里面找到出处**。
 找不到就要它补，不允许「大致符合」。
+
+两件容易被误读的事：
+
+- **「未回收伏笔 0 条」可能不是真的没有。** 索引第 2 版建的库没有伏笔表。
+  升级后第一次用先 `rebuild-index`；
+- **「有 N 处结果被截断」不是故障。** 意思是「检索到 37 条，只放进去 6 条」，
+  想看剩下的把 `--budget` 调大重跑。别把截断后的结果当成「库里就这么多」。
+
+想先看看不落盘：
+
+```bash
+novel preflight CH-0007 --no-write          # 只算不写；这个号不会被占用
+novel preflight CH-0007 --budget 16000      # 挤小预算，看哪些先被截断
+```
 
 ## 2. 写作：主笔产出到 staging
 
@@ -166,7 +187,7 @@ Agent 唯一能碰正式区的路径是 `publish`，而 `publish` 需要你的�
 
 | 时机 | 动作 |
 |---|---|
-| 每章开写前 | `task create --type preflight` 拿资料包 |
+| 每章开写前 | `preflight CH-xxxx` 拿资料包，看判词是不是 `PASS` |
 | 每章写完 | `stage` → `diff` → `approve artifact` → `release prepare` → `approve release` → `publish` |
 | 每章入库后 | 让记忆管理员提记忆更新，你批准后 `publish` |
 | 搬旧稿进来 | `import scan` → `import report` → `import stage --batch N`，之后同上 |

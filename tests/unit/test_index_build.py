@@ -144,7 +144,12 @@ def test_metadata_records_build_and_revision(tmp_path: Path) -> None:
     assert meta["canon_revision"] == "工作树"
     assert meta["build_id"] == result.build_id
     assert meta["fts_mode"] in (schema.FTS_MODE_TRIGRAM, schema.FTS_MODE_LIKE)
-    assert "foreshadowing" in meta["empty"]
+    # 伏笔表从 T08 起真的会填（Preflight 要查未回收承诺）；空表只剩依赖与问题，
+    # 它们的权威副本在 runtime 里，进索引会让同一个 commit 建出两个不同的库。
+    assert "foreshadowing" in meta["populated"]
+    assert "dependencies" in meta["empty"]
+    assert "issues" in meta["empty"]
+    assert "foreshadowing" not in meta["empty"]
 
 
 def test_blocks_keep_ids_and_line_numbers(tmp_path: Path) -> None:

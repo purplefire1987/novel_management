@@ -17,6 +17,7 @@ cli/          只做参数解析与输出格式化，不写业务判断
   ├── maps_cmd.py   maps paths / import-admin / build
   ├── schema_cmd.py schema list / check、package-hash
   ├── import_cmd.py import scan / report / stage / where / list
+  ├── agent_cmd.py  preflight / agent list / agent prompt / agent usage
   └── id_cmd.py     allocate-id
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
@@ -53,13 +54,21 @@ backup/       备份、校验、恢复
 adapters/     模型适配层；当前只有 MockLLM（确定性、不联网、不需密钥）
 indexing/     SQLite 索引：schema 建表 / source 取文件 / builder 建库 / search 查询 / locate 定位
 timeline/     事件 DAG（graph）/ 状态区间与认知查询（query）/ 前言提取（model）
-validation/ workflows/ agents/ core/   预留扩展位（T08 之后）
+agents/       Agent 适配器与写前资料包（ADR-017）
+  ├── registry.py  九角色定义 + 权限矩阵的机器副本（matrix_row() 逐字渲染 md 那一行）
+  ├── budget.py    三档预算、Truncation / Overflow、软额度必须是剩余额度
+  ├── tools.py     能力位 → 可用工具；七个只读工具；ToolContext 统一记计量
+  ├── prompts.py   九段装配（前九项 REQUIRED_KEYS）+ 五段公共文本常量
+  ├── metering.py  <runtime>/usage/YYYYMMDD.jsonl，一行一次调用，只追加、不记正文
+  ├── runner.py    信封：去围栏 → 解析 → schema 校验 → 核对 role；失败不猜
+  └── preflight.py 八级检索落成七次工具调用，出 PRD §13.4 结构，判 PASS/BLOCKED
+validation/ workflows/ core/   预留扩展位（T09 之后）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
 
 ```
-cli → release / importing / backup / staging / tasks / approvals / changes / baseline
+cli → release / importing / agents / backup / staging / tasks / approvals / changes / baseline
     → timeline / indexing
     → paths / storage / audit / config
     → errors
@@ -150,6 +159,34 @@ cli → release / importing / backup / staging / tasks / approvals / changes / b
 **规范化 JSON 让「文件字节哈希 == package_hash(对象)」。** 所以回执里的清单哈希
 可以直接 `sha256_file` 复核，不必再解析一遍。四类发布记录都走这条，
 并有两条测试盯着它们与 `schemas/*.schema.json` 的契约。
+
+**软额度必须是「剩余」额度。** `Budget.soft_allowance` 要扣掉 `_soft_used` 与
+`_hard_used`。初版没扣，八个检索级各领一份完整配额，32000 的预算装进了 48000 的内容——
+不是估得不准，是**每一级都以为别人没花**。回归测试
+`test_soft_allowance_is_not_double_spent`。
+
+**硬约束要排在软资料之前放置。** `_fill_foreshadowing` 在 `_fill_states` 之前调用。
+未回收伏笔属 §13.3 必须检查项，排在软资料后面会出现「因为读了太多无关档案而阻断写作」——
+理由错了，但系统给不出正确的那个。`_place_hard` 只记 `Overflow` 不丢条目，
+`_place_soft` 才记 `Truncation`。
+
+**截断要记在两个地方。** `Budget.truncations` 是预算账，`coverage.truncated_results`
+是资料包字段。初版只有前者，资料包里的 `truncated_results` 恒为空——
+截断在账上可见、在包里不可见，等于没做「截断可见」这条验收。
+
+**索引里的 `project` 是目录名，不是 `project_id`。** 存的是 `novel-001_smoke`，
+拿 `novel-001` 去等值比较会**静默返回空**。所有查询统一走
+`tools.project_clause()`（`project = ? or project like ? || '\_%' escape '\'`）。
+踩过的表现：伏笔一条都查不到，报「未回收 0 条」，看着像「这本书没有伏笔」。
+
+**伏笔的字段叫 `state`，不是 `status`。** `PLANNED / PLANTED / HINTED / TRIGGERED /
+PAID_OFF / ABANDONED` 存在 `state`。只读通用 `status` 会把所有伏笔读成「状态未知」，
+于是「已回收的」也被算进未回收。
+
+**`storage.dump_yaml` 必须递归。** 原版只支持「标量 / 列表 / 一层对象列表」，
+`issues[].evidence[]` 这种三层嵌套会被写成一个字符串——写下去不报错，读回来是字符串，
+schema 校验才发现对不上。`_yaml_scalar(None)` 写 `null` 而不是 `""`，
+否则 `base_release` 回读成空串，过不了自己的 schema。
 
 ## 加一个新命令的步骤
 

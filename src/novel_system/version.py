@@ -7,7 +7,7 @@ CLI 的 `--version`、发布清单的 `tool_version`、计划里的 `schema_vers
 
 from __future__ import annotations
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 
 # V4.0 规范版本与包版本不是一回事：前者是文档版本，后者是代码版本。
 SPEC_VERSION = "4.0.0"

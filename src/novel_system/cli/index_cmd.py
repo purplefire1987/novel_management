@@ -98,7 +98,7 @@ def cmd_rebuild_index(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     info("、".join(EMPTY_TABLES))
     info("问题与变更的权威副本在 <runtime>/issues、<runtime>/changes，不进索引：")
     info("索引必须是「Vault + commit」的纯函数，掺进 runtime 状态就没法按 commit 复现")
-    info("伏笔档案要走 T07/T09 的契约，依赖要到 T07 之后才有")
+    info("依赖（dependencies）要到 T09 之后才有")
     thin = [
         f"{name}={count}"
         for name, count in result.tables.items()

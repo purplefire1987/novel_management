@@ -2,6 +2,117 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.11.0 — 2026-11-21
+
+T08「Agent 适配器与写前资料包」。九角色接入流程、提示词统一装配、检索预算两条不变量、
+`novel preflight` 输出 PRD §13.4 结构。ADR-017 记了取舍。
+
+**兼容性影响**：无。新增 `preflight` 与 `agent` 两条命令，既有命令的参数与语义不变。
+
+**升级后要做的事**：**跑一次 `rebuild-index`**。索引版本 2 → 3，
+`foreshadowing` 表从空表变为会填的表。老库不重建时 preflight 的
+「未回收伏笔」一栏恒为 0——不报错，只是少了一整类硬约束。
+
+### 新增命令
+
+命令行 28 → **30 条**（新增 `preflight`；新增 `agent` 命令组，含三个子命令）。
+
+- `preflight <CH-xxx> [--base-release R] [--budget N] [--output-reserve N]
+  [--hard-reserve N] [--search-limit N] [--role R] [--no-write] [--json]`
+  ——产出写前资料包，判 PASS / BLOCKED。默认落盘；
+- `agent list [--json]`——九角色权限矩阵、可用工具、角色卡在位检查；
+- `agent prompt --role <id> [--task T] [--base-release R] [--schema S] [--extra 文本] [--show] [--json]`
+  ——渲染提示词；默认只看结构（带 `[硬]` 标记），`--show` 打全文；
+- `agent usage [--day YYYYMMDD] [--json]`——当天调用计量台账。
+
+### 一、权限矩阵是唯一真源，靠测试逐格比对
+
+`Role` 的字段不是权限枚举，而是 `agents/common/permissions.md` 那张表的**五列本身**，
+`matrix_row()` 一字不差渲染那一行。测试解析 md 表格逐格比对——三份副本里只有代码那份
+参与运行，让它长得跟文档一样，比对就退化成字符串相等。
+
+PRD §6.1 的 A1–A9 按规范 v1.7 §4 作废，本版以裁定后的九角色为准
+（`editor_in_chief` / `world_architect` / `editor` / `dice_mistress` / `researcher` /
+`writer` / `memory_keeper` / `ingestor` / `version_manager`），与 `audit.AGENTS` 同名同序。
+
+两道锁恒为 `False`：`ensure_can_write_canon()` / `ensure_can_release()` 永远抛
+`SecurityError`。**Agent 不写 Canon，Agent 不发布。**
+
+能力位（六个）从矩阵推出，`allowed_tools()` 不另维护清单。所以「`ingestor` 拿不到
+读 Canon 的工具」不是一条单独规则，是它只读源稿的结果——想加工具必须先改它的读权限，
+而改权限立刻会让矩阵比对测试红。
+
+「R（限授权）」是执行层拦截：`dice_mistress` 调工具必须显式给 `scope`，否则拒绝。
+`_check_params` 拒绝未知参数——拼错一个键会变成「查不到」，而「查不到」长得像
+「库里没有」。
+
+### 二、提示词九段装配，公共文本只写一遍
+
+固定顺序：`role_card → task → release → anchors → tools → schema → uncertainty →
+citation → injection → no_claim → scope → (extra)`。前九个是 `REQUIRED_KEYS`，
+缺一个就报错。五段公共文本（不确定性 / 引用 / 提示词注入 / 不宣称未执行 / 范围边界）
+是模块常量，测试断言九份提示词的公共前缀**逐字节相同**。
+
+### 三、预算两条不变量（其中一条修的是真缺陷）
+
+- **软额度必须是「剩余」额度**。初版没扣已用量，八个检索级各领一份完整配额，
+  32000 的预算装进了 48000 的内容。这不是估得不准，是每一级都以为别人没花。
+- **硬约束一条都不丢**。装不下记 `Overflow` 并让 gate 判 BLOCKED；只有软资料记
+  `Truncation`。顺带把未回收伏笔的填充挪到结构化状态**之前**——它是 §13.3 必须检查项，
+  排在软资料后面会出现「因为读了太多无关档案而阻断写作」。
+- 硬约束预留会回收：`hard_reserve` 是上限不是预扣，用不完的还给软资料。
+- `Truncation` 合并进 `coverage.truncated_results`。初版只记在预算账里，
+  资料包里的这个字段恒为空——截断在账上可见、在包里不可见，等于没做第一条验收。
+
+### 四、Preflight 默认不调模型，模型只做加值
+
+默认路径纯确定性 Python：读规划、查索引、放预算、判 gate。给模型时资料官只做一件
+加值的事——把「必须发生 / 禁止发生」提炼成结构化约束。模型输出不可用（非 JSON、
+缺字段、`role` 写错）就**退回原文照录**并记一条可读 issue，不「尽力而为提取字段」。
+
+理由：写前检查的结论必须可复现。同一份库今天 PASS 明天 BLOCKED 而理由是「模型这次
+理解得不一样」，这个 gate 就没有权威性。
+
+八级检索（PRD §13.2）落成七次工具调用，第八级是「截断为真时人再去查」。
+「一次 Top-K 不得视为完整知识」落实为 `truncated` 标志 + `coverage.truncated_results`，
+CLI 每次都打印「有 N 处结果被截断（别当成『就这么多』）」。
+
+### 五、调用计量落盘，只记元数据
+
+`<runtime>/usage/YYYYMMDD.jsonl`，一行一次调用，只追加。记角色、工具、耗时、
+tokens、成败、`task_id`，**不记正文**（与 `ops.jsonl` 同一口径）。
+失败的调用也记——只记成功的账，等于把「试了三次才成」记成一次。
+
+### 六、顺带修掉的四处基础缺陷
+
+- 旧索引上 `preflight` 直接抛栈：`foreshadow` 工具去查 `window_policy`，
+  而第 2 版建的表没有这一列，`sqlite3.OperationalError` 打满屏幕。真库实测撞到。
+  现在按空列读（行还在、窗口信息诚实留空），并记一条 **BLOCKER**
+  「未回收承诺这一整类硬约束本次无法检查，等于没做——先 rebuild-index」。
+  **这一类没查 ≠ 这一类没问题**，后者才允许 PASS；
+- `storage.dump_yaml` 重写为递归实现。原版只支持「标量 / 列表 / 一层对象列表」，
+  `issues[].evidence[]` 这种三层嵌套会被写成一个字符串；
+- `_yaml_scalar(None)` 从 `""` 改为 `null`。否则 `base_release` 写下去是空串，
+  读回来过不了自己的 schema；
+- 索引查询统一走 `project_clause()`。索引里 `project` 存的是目录名
+  （`novel-001_smoke`）而非 `project_id`，等值比较会静默返回空——
+  伏笔一条都查不到、报「未回收 0 条」，看着像「没有伏笔」。
+
+### 新增契约
+
+- `schemas/agent_envelope.schema.json`——PRD §6.3 信封，`role` 枚举九角色，
+  `task_id` 形如 `TASK-000001`，`additionalProperties: false`；
+- `schemas/preflight.schema.json`——PRD §13.4 十七项必填 + 预算 / 用量 / 索引 /
+  近期正文 / 卷级摘要 / 模型 / 生成时间，`gate_result` 只允许 `PASS|BLOCKED`。
+
+契约总数 22 → **24 类**。
+
+### 测试与自检
+
+- pytest 568 → **635 passed / 1 skipped**；`scripts/selfcheck.py` 33 → **39 项**；
+- 验收清单 §14.3 由「查九个目录在不在」升级为「权限矩阵逐格比对 + 执行层硬拦 +
+  九份提示词公共前缀」——文件存在性不是权限。
+
 ## 0.10.0 — 2026-11-21
 
 T07「原稿导入」。五条新子命令、一套定位符，外加**三个真缺陷的修复**（T06 留下的

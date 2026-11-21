@@ -62,14 +62,15 @@ active_project:
 ## 4. 命令
 
 V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务补入地图、契约、索引、
-时间线、审批与变更、发布、导入几组命令，命令行**现为 28 条**：
+时间线、审批与变更、发布、导入、Agent 几组命令，命令行**现为 30 条**：
 三条地图命令（`maps paths` / `import-admin` / `build`）、四条契约命令
 （`schema list` / `schema check` / `allocate-id` / `package-hash`，T02）、
 两条索引命令（`rebuild-index` / `search`，T03）、三条时间线与认知命令
 （`state` / `knowledge` / `reveal`，T04）、四条审批与变更命令
 （`inspect` / `issue` / `change` / `impact`，T05）、一条发布命令
 （`release`，含 10 个子命令，T06）、一条导入命令
-（`import`，含 5 个子命令，T07）。
+（`import`，含 5 个子命令，T07）、两条 Agent 命令
+（`preflight`、`agent` 含 3 个子命令，T08）。
 
 | 命令 | 用途 | 写入 |
 |---|---|---|
@@ -115,6 +116,10 @@ V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务�
 | `novel import stage` | 把某一批章节写进 staging | 是（仅 staging） |
 | `novel import where` | 按 `文件名#L起-L止` 回读原文 | 否 |
 | `novel import list` | 历次导入与可发布状态 | 否 |
+| `novel preflight CH-0001` | 写前资料包：八级检索 + 预算账 + PASS／BLOCKED；截断逐条可见 | 是（Runtime） |
+| `novel agent list` | 九角色权限矩阵、可用工具、角色卡是否在位 | 否 |
+| `novel agent prompt --role` | 渲染某角色提示词；默认只看结构，`--show` 打全文 | 否 |
+| `novel agent usage` | 当天调用计量台账（只记元数据，不记正文） | 否 |
 | `novel maps paths` | 打印地图生成用到的全部路径 | 否 |
 | `novel maps import-admin` | 从资产表重排行政区划表；默认预演 | 是（Canon） |
 | `novel maps build` | 重画地图页与两张 canvas；默认预演 | 是（Canon） |
@@ -143,6 +148,26 @@ novel release status                                        # 判词应为 OK
 - **发布不是覆盖写**：1–13 步全在隔离快照里做，第 18 步才切换正式指针。
   任何一步崩掉都能 `release status` 查、`resume` 续、`abort` 停，正式版不会被写坏（ADR-015）。
 - 旧版内容先复制到 `90_Archive/publish_archive/<任务或发布号>/<时间戳>/`，再写新内容。
+
+### 写前资料包
+
+开工前先让系统把「这一章要守的东西」摆出来，而不是靠记性：
+
+```bash
+novel rebuild-index                                  # 索引 3 版起才会填伏笔表
+novel preflight CH-000102                            # 出资料包，最后一行是判词
+novel agent list                                     # 九角色谁能做什么
+novel agent prompt --role writer --task TASK-000001   # 主笔这次拿到的提示词结构
+```
+
+- 判词只有两种：`PASS` 或 `BLOCKED`。`BLOCKED` 会说清是哪一条硬约束（未回收伏笔、
+  创意范围缺失、预算装不下硬约束），不写成「建议检查一下」；
+- **截断是可见的**：软资料装不下会进 `coverage.truncated_results`，
+  输出明确提示「有 N 处结果被截断」。所谓「没查到」与「查到但没放进去」是两回事；
+- **默认不调模型**。空着 `llm` 也能跑完，结论可复现；接了模型，资料官只多做一件事
+  ——把「必须发生 / 禁止发生」提炼成结构化约束，失败就退回原文照录并记一条 issue；
+- `agent list` 的矩阵与人读版 `agents/common/permissions.md` 逐格相同，靠测试比对，
+  不靠自觉同步。
 
 ### 项目怎么解析
 
@@ -180,6 +205,8 @@ novel release status                                        # 判词应为 OK
 - **写入前检查目标是否被作者改过。** `diff` 会标出「staging 生成后正式文件被改过」的冲突；`approve` 遇到冲突默认拒绝。
 - **越界即拒绝。** 所有路径经规范化校验，必须落在 Vault 根之内；`..` 与符号链接逃逸一律拒绝；`stage` 的目标必须在六个正式区内。
 - **Agent 不写 Canon。** Agent 只能写 staging 与草稿，正式入库需作者批准；Canon 还要二次确认。
+- **Agent 的权限只有一份真源。** 九角色的能力位从权限矩阵推出，工具清单不另维护；矩阵代码副本与人读版逐格比对，不一致就是测试红。这道锁是 `False` 而不是「默认」——任何角色都改不了「不写 Canon、不发布」这两句。
+- **写前资料包分软硬。** 软资料装不下会截断并**明确告诉你截断了几处**；硬约束（未回收伏笔、创意范围、必须发生的事）一条都不许丢，装不下就判 `BLOCKED`，不静默压缩。
 - **批准绑定内容，不是绑定任务。** 批准记录里存每个文件的 sha256，发布时逐个重算比对。
 - **作者手改不可被覆盖。** `adopt` 只登记、不回滚；`publish` 前发现正式文件在 staging 之后被改过，一律判冲突。
 - **`--yes` 不是万能开关。** 每个破坏性动作有自己的确认参数：`--confirm`、`--confirm-canon`、`--overwrite`。
@@ -213,11 +240,12 @@ src/novel_system/
   indexing/       SQLite 索引（17 表；schema/source/builder/search/locate）
   timeline/       事件 DAG、状态区间、认知查询
   importing/      原稿导入：定位符 / 保全 / 切章 / 提取 / 抽样 / 分批入 staging（T07）
-  validation/ workflows/ agents/ adapters/ core/   预留扩展位（T08–T09）
+  agents/         九角色注册与权限矩阵、预算、类型化工具、提示词装配、计量、Preflight（T08）
+  validation/ workflows/ adapters/ core/   预留扩展位（T09）
 config/             默认配置与配置 Schema
-schemas/            22 类数据契约（JSON Schema，additionalProperties 一律 false）
+schemas/            24 类数据契约（JSON Schema，additionalProperties 一律 false）
 templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）
-agents/             九 Agent 定义与权限
+agents/             九 Agent 角色卡与权限矩阵（人读版 permissions.md 与代码逐格比对）
 workflows/          六个工作流定义
 quality_gates/      质量门规则
 scripts/            selfcheck.py（端到端冒烟）、privacy_scan.py（隐私扫描）
@@ -232,8 +260,8 @@ tests/              unit / integration / security / acceptance / fixtures
 ## 7. 测试与检查
 
 ```bash
-pytest                                    # 568 条
-python3 scripts/selfcheck.py              # 33 项端到端冒烟，不依赖 pytest
+pytest                                    # 635 passed / 1 skipped
+python3 scripts/selfcheck.py              # 39 项端到端冒烟，不依赖 pytest
 python3 scripts/privacy_scan.py --repo .  # 公仓隐私扫描
 ```
 

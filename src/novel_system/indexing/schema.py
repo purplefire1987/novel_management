@@ -8,10 +8,11 @@
 | `entities` `aliases` `source_refs` | frontmatter 里就有 |
 | `narrative_order` | 章节/场景的编号可从 id 与目录推 |
 | `events` `event_edges` `assertions` `state_changes` `knowledge` `revelations` | T04 时间与认知 |
+| `foreshadowing` | T08 Preflight 要查「未回收承诺」，从伏笔档案的 frontmatter 填 |
 
 | 建空表 | 谁来填 |
 |---|---|
-| `foreshadowing` `dependencies` `issues` | T05／T07 之后 |
+| `dependencies` `issues` | T05／T09 之后 |
 
 **「本版会填」与「这次有数据」是两件事。** 真库当前没有事件/断言一类档案，
 所以 T04 的表在真库上是空的——这不算支持，`rebuild-index` 会把两件事分开打印。
@@ -29,8 +30,8 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 2
-BUILDER_VERSION = "0.8.0"
+SCHEMA_VERSION = 3
+BUILDER_VERSION = "0.11.0"
 
 FTS_MODE_TRIGRAM = "trigram"
 FTS_MODE_LIKE = "none"  # 明确退化：没有 FTS，查询走 LIKE
@@ -51,18 +52,16 @@ POPULATED_TABLES = (
     "state_changes",
     "knowledge",
     "revelations",
+    "foreshadowing",
 )
 
 # 建表但不填的表。
 #
 # `issues` / `dependencies` 的权威副本不在 Vault：问题与变更存在 `<runtime>/issues/`
-# 与 `<runtime>/changes/`，依赖要到 T07 之后才有。索引必须是「Vault + commit」的
+# 与 `<runtime>/changes/`，依赖要到 T09 之后才有。索引必须是「Vault + commit」的
 # 纯函数，把 runtime 状态塞进来，同一个 commit 就能建出两个不同内容的库，
 # T03 的验收「指定 commit 可独立构建索引」当场变成假的。所以宁可空着。
-#
-# `foreshadowing` 同理：伏笔档案在 02_Planning，尚待 T07/T09 定契约。
 EMPTY_TABLES = (
-    "foreshadowing",
     "dependencies",
     "issues",
 )
@@ -208,7 +207,9 @@ _DDL = [
     """create table foreshadowing (
         id text not null, project text not null, title text not null default '',
         status text not null default '', planted_in text not null default '',
-        payoff_in text not null default ''
+        payoff_in text not null default '',
+        window_policy text not null default '', window_end text not null default '',
+        reveal_scope text not null default ''
     )""",
     """create table dependencies (
         project text not null, from_id text not null, to_id text not null,

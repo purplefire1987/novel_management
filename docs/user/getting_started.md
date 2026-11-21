@@ -181,6 +181,10 @@ B 你自己摆好。
 | `import scan` 退出码 1 | 正常：有维度没达标（常见是某份文件非 UTF-8 被拒）。逐行看它标了哪一项 |
 | 导入切出的章不对 | 整篇一章多半是没有章节标记，用 `--level N` 指定层级，或手工搬（上面 B 路） |
 | `import stage` 说「换切分方式」 | 同一导入不能改 `--batch-size`。要改就 `import scan` 起一个新导入号 |
+| `preflight` 判 `BLOCKED` | 看阻断项的 category：`SCOPE`／`PLANNING` 是缺章卡（补 `02_Planning/Chapters/CH-xxxx.md`，frontmatter 带 `id` 与 `creative_scope`）；`FORESHADOW` 是伏笔过期未回收；`BUDGET` 加 `--budget` 或缩小本章范围 |
+| `preflight` 说「未回收伏笔 0 条」 | 库还在用第 2 版索引。跑一次 `novel rebuild-index`（0.11.0 起伏笔表才会填） |
+| `preflight` 说「有 N 处结果被截断」 | 不是故障。检索到 37 条只放进去 6 条，想多看就调大 `--budget` |
+| `agent list` 里某角色工具是「（无）」 | 正常：`ingestor` 只读源稿，读不到 Canon |
 
 任何情况下都**不要**手工删除 `00_System/` 或 `01_Canon/` 里的文件来「修问题」。
 先备份，再看报告。

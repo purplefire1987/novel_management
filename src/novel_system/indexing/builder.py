@@ -48,6 +48,12 @@ ENTITY_TYPES = frozenset(
 )
 NARRATIVE_TYPES = frozenset({"chapter", "scene"})
 
+# 伏笔档案。T08 的 Preflight 要查「未回收承诺」，必须先让它进索引——
+# 否则 `foreshadowing` 表永远是空的，「检查过伏笔」就成了一句空话
+# （空表和「没有伏笔」在查询里长得一模一样）。
+FORESHADOW_TYPES = frozenset({"foreshadowing", "foreshadow", "伏笔"})
+FORESHADOW_ID_PREFIXES = ("FORE-", "FSH-", "FORESHADOW-")
+
 # 「打算怎么写」不是「已经发生」。规划类产物里的语义记录一律不入事实表。
 #
 # 这一条不是靠约定，靠两道判定同时生效：类型在名单里，或路径落在 02_Planning 下。
@@ -102,6 +108,59 @@ def _as_list(value) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [str(item) for item in value if str(item).strip()]
     return []
+
+
+def is_foreshadowing(meta: dict, artifact_type: str) -> bool:
+    """是不是伏笔档案。类型优先，其次看 ID 前缀——老档案常常只写 id 不写 type。"""
+    if (artifact_type or "").strip().lower() in FORESHADOW_TYPES:
+        return True
+    raw_id = str(meta.get("id") or "").strip().upper()
+    if "{{" in raw_id:  # 模板占位符不是身份
+        return False
+    return raw_id.startswith(FORESHADOW_ID_PREFIXES)
+
+
+def _nested_str(meta: dict, key: str, inner: tuple[str, ...]) -> str:
+    value = meta.get(key)
+    if isinstance(value, dict):
+        for name in inner:
+            text = str(value.get(name) or "").strip()
+            if text:
+                return text
+    return ""
+
+
+def foreshadow_row(meta: dict, *, artifact_id: str, project: str, title: str, status: str) -> tuple:
+    """把一份伏笔档案压成索引行。
+
+    `window_policy` 与窗口终点是两个关键字段：ADVISORY 超期只告警，
+    HARD 超期阻断（PRD §10.4）。压丢了就没法在 Preflight 里判「该不该拦」。
+    所以字段缺失时留空串而不是猜一个默认值——空串在查询里能看出「没写」，
+    猜成 ADVISORY 就把「该拦」变成「放行」。
+    """
+    planted = _nested_str(meta, "plant_source", ("chapter_id",)) or str(
+        meta.get("planted_in") or ""
+    ).strip()
+    payoff = str(meta.get("payoff_in") or meta.get("paid_off_in") or "").strip()
+    window_end = _nested_str(meta, "target_window", ("to_chapter", "end_chapter", "to")) or str(
+        meta.get("window_end") or ""
+    ).strip()
+    reveal_scope = ",".join(_as_list(meta.get("reveal_scope")))
+    # 生命周期字段在 schema 里叫 `state`（PRD §10.4），不是通用元数据的 `status`。
+    # 只看 `status` 会把所有伏笔都读成「状态未知」，而「未知」既不算已回收、
+    # 也不算超期——于是该拦的一条都拦不住。
+    state = str(meta.get("state") or "").strip() or status
+    return (
+        artifact_id,
+        project,
+        title,
+        state,
+        planted,
+        payoff,
+        str(meta.get("window_policy") or "").strip().upper(),
+        window_end,
+        reveal_scope,
+    )
 
 
 @dataclass
@@ -194,6 +253,7 @@ def build_index(
         all_knowledge: list = []
         all_reveals: list = []
         planning_skipped = 0
+        foreshadow_count = 0
         semantic_warnings: list[str] = []
 
         for item in source.files():
@@ -263,6 +323,22 @@ def build_index(
                     "insert into narrative_order(project, artifact_id, kind, ordinal) values (?,?,?,?)",
                     (project, artifact_id, artifact_type, _ordinal(artifact_id)),
                 )
+
+            if is_foreshadowing(doc.meta, artifact_type):
+                conn.execute(
+                    "insert into foreshadowing"
+                    "(id, project, title, status, planted_in, payoff_in,"
+                    " window_policy, window_end, reveal_scope)"
+                    " values (?,?,?,?,?,?,?,?,?)",
+                    foreshadow_row(
+                        doc.meta,
+                        artifact_id=artifact_id,
+                        project=project,
+                        title=title,
+                        status=status,
+                    ),
+                )
+                foreshadow_count += 1
 
             for ref in doc.meta.get("source_refs") or []:
                 if not isinstance(ref, dict):
@@ -463,8 +539,8 @@ def build_index(
                 "block_count": block_count,
                 "failed_count": len(failed),
                 "populated": ",".join(schema.POPULATED_TABLES),
-                "empty": ",".join(schema.EMPTY_TABLES),
-                "planning_skipped": planning_skipped,
+                "empty": ",".join(schema.EMPTY_TABLES),                "planning_skipped": planning_skipped,
+                "foreshadowing": foreshadow_count,
                 "event_cycle": " → ".join(event_cycle),
                 "dangling_edges": len(dangling_edges),
                 "semantic_warnings": len(semantic_warnings),

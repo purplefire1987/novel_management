@@ -39,6 +39,46 @@ def _verdict(out: str) -> str:
         return ""
 
 
+def _all(*pairs) -> tuple[bool, str]:
+    """把多个 (判据, 失败说明) 合成一条结论：全真才真，否则报第一条失败的说明。"""
+    for ok, detail in pairs:
+        if not ok:
+            return False, detail
+    return True, ""
+
+
+def _write_t08_fixtures(project: Path) -> None:
+    """给 preflight 造一份最小规划 + 一个实体。
+
+    不加这一段，`preflight` 会因为「找不到规划」直接 BLOCKED——那也算跑通，
+    但验不到「正常输入能 PASS」，而后者才是这条自检想知道的事。
+    """
+    plan = project / "02_Planning" / "Chapter_Outlines" / "CH-0001_smoke.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text(
+        "---\n"
+        "id: CH-0001\n"
+        "type: chapter_outline\n"
+        "title: 自检章\n"
+        "timeline: 兴元十二年七月初八\n"
+        "pov: 抄书人\n"
+        "participants:\n- CHAR-0001\n"
+        "creative_scope:\n"
+        "  allowed:\n  - 符合人物动机的对话\n"
+        "  forbidden:\n  - 人物复活\n"
+        "must_happen:\n- 抄书人在渡口交出书匣\n"
+        "must_not_happen:\n- 任何人认出抄书人的真名\n"
+        "---\n\n# CH-0001\n\n## 场景\n\n灰石渡的石阶被雨泡了三天。\n",
+        encoding="utf-8",
+    )
+    char = project / "01_Canon" / "Characters" / "CHAR-0001.md"
+    char.parent.mkdir(parents=True, exist_ok=True)
+    char.write_text(
+        "---\nid: CHAR-0001\ntype: character\nname: 抄书人\n---\n\n抄书人常年在灰石渡替人抄经。\n",
+        encoding="utf-8",
+    )
+
+
 def run(label: str, argv: list[str], expect: int | None = 0, check=None) -> None:
     buffer = io.StringIO()
     try:
@@ -190,7 +230,64 @@ def main_cli() -> int:
         RESULTS.append(("backup 校验通过", bool(meta.get("verified")), f"files={meta.get('files')}"))
         run("restore 预演", ["restore", *common, "--backup-id", backups[-1], "--dry-run"])
 
+    # ---- T08 写前资料包：规划 → 索引 → preflight → 九角色 ----
+    _write_t08_fixtures(project)
     run("rebuild-index", ["rebuild-index", *common])
+    run(
+        "agent list 九角色",
+        ["agent", "list", *common],
+        check=lambda out: _all(
+            ("九份角色卡都在位" in out, "角色卡缺失或权限表没读到"),
+            ("ingestor" in out and "writer" in out, "角色名单不全"),
+        ),
+    )
+    run(
+        "agent prompt 九项公共约束",
+        ["agent", "prompt", *common, "--role", "writer"],
+        check=lambda out: ("九项公共约束齐全" in out, "公共前缀缺项"),
+    )
+    run(
+        "preflight 出资料包",
+        ["preflight", *common, "CH-0001", "--no-write"],
+        check=lambda out: _all(
+            ("gate_result : PASS" in out, "正常输入下 gate 不是 PASS"),
+            ("没有阻断项" in out, "有意外阻断项"),
+            ("调用计量" in out, "资料包没记调用计量"),
+        ),
+    )
+    run(
+        "preflight 预算不够必须 BLOCKED",
+        [
+            "preflight", *common, "CH-0001",
+            "--budget", "1500", "--output-reserve", "200", "--hard-reserve", "100",
+            "--no-write",
+        ],
+        expect=1,
+        check=lambda out: _all(
+            ("BLOCKED" in out, "硬约束装不下却没有阻断"),
+            ("硬约束放不下预算" in out, "阻断理由没写清"),
+        ),
+    )
+    run(
+        "preflight 截断必须可见",
+        [
+            "preflight", *common, "CH-0001",
+            "--budget", "2500", "--output-reserve", "3000", "--hard-reserve", "1000",
+            "--no-write",
+        ],
+        expect=None,
+        check=lambda out: _all(
+            ("处结果被截断" in out, "截断了却没说"),
+            ("别当成「就这么多」" in out, "截断提示没写清"),
+        ),
+    )
+    run(
+        "agent usage 台账有记录",
+        ["agent", "usage", *common, "--json"],
+        check=lambda out: _all(
+            ('"tool_calls": 0' not in out, "台账里没有工具调用，计量没落盘"),
+        ),
+    )
     run("status", ["status", *common])
 
     width = max(len(label) for label, _, _ in RESULTS)
