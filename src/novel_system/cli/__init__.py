@@ -1,4 +1,4 @@
-"""CLI 入口。V4.0 §5.3 的命令集，按 T01–T05 逐步落地。
+"""CLI 入口。V4.0 §5.3 的命令集，按 T01–T08 逐步落地。
 
 设计约束：
 - 不硬编码任何私人路径，一律走 config.load()。
@@ -28,11 +28,13 @@ from . import (
     init,
     maps_cmd,
     read,
+    release_cmd,
     schema_cmd,
     timeline_cmd,
 )
 
-__version__ = "0.8.0"  # 包版本，与 pyproject.toml 同步；V4.0 是规范版本号，两者不是一回事
+from ..version import __version__ as __version__  # noqa: E402  版本只有一处定义
+
 
 HANDLERS = {
     "doctor": read.cmd_doctor,
@@ -55,6 +57,7 @@ HANDLERS = {
     "approve": flow.cmd_approve,
     "adopt": flow.cmd_adopt,
     "publish": flow.cmd_publish,
+    "release": release_cmd.cmd_release,
     "backup": backup_cmd.cmd_backup,
     "restore": backup_cmd.cmd_restore,
     "maps": maps_cmd.cmd_maps,
@@ -209,8 +212,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_approve.add_argument(
         "kind",
         nargs="?",
-        choices=["artifact", "proposal"],
-        help="按对象批准：artifact（本版可用）／proposal（T07 才有）。省略则走 --task",
+        choices=["artifact", "proposal", "release"],
+        help="按对象批准：artifact（staging 产物）／release（发布计划）／proposal（T10 才有）。省略则走 --task",
     )
     p_approve.add_argument("candidate", nargs="?", help="候选 ID：TASK-000001 或 TASK-000001:<目标路径>")
     p_approve.add_argument("--hash", dest="hash", default="", help="当前内容哈希（非交互批准必填）")
@@ -314,7 +317,61 @@ def build_parser() -> argparse.ArgumentParser:
     p_pub.add_argument("--note", default="")
     p_pub.add_argument("--confirm", action="store_true", help="确认发布")
     p_pub.add_argument("--confirm-canon", action="store_true", help="写入 01_Canon 时的二次确认")
+    p_pub.add_argument("--release", default="", help="指定已准备的发布号（默认取该任务最新一份计划）")
     p_pub.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    # ---- release（T06 发布协议）----
+    p_release = sub.add_parser("release", help="发布计划、执行、恢复与回退", parents=[sub_common])
+    release_sub = p_release.add_subparsers(dest="release_command", required=True)
+
+    p_rprep = release_sub.add_parser(
+        "prepare", help="按已批准的 staging 生成 ReleasePlan（不动正式区）", parents=[sub_common]
+    )
+    p_rprep.add_argument("--task", required=True, help="任务 ID")
+    p_rprep.add_argument("--confirm-canon", action="store_true", help="计划里含 Canon 写入时预先确认")
+    p_rprep.add_argument("--as", dest="actor", default=None, help="操作者")
+
+    p_rshow = release_sub.add_parser("show", help="查看计划、批准、事务日志与清单", parents=[sub_common])
+    p_rshow.add_argument("release_id")
+    p_rshow.add_argument("--json", action="store_true")
+
+    p_rexec = release_sub.add_parser(
+        "execute", help="执行发布（22 步；可从中断处续）", parents=[sub_common]
+    )
+    p_rexec.add_argument("release_id")
+    p_rexec.add_argument("--confirm", action="store_true", help="确认写正式区")
+    p_rexec.add_argument("--confirm-canon", action="store_true", help="写入 01_Canon 的二次确认")
+    p_rexec.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_rres = release_sub.add_parser("resume", help="从中断处继续一次发布", parents=[sub_common])
+    p_rres.add_argument("release_id")
+    p_rres.add_argument("--confirm-canon", action="store_true")
+    p_rres.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_rabort = release_sub.add_parser("abort", help="中止未切换的发布（已切换请用 rollback）", parents=[sub_common])
+    p_rabort.add_argument("release_id")
+    p_rabort.add_argument("--note", default="")
+    p_rabort.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_rstat = release_sub.add_parser("status", help="交叉验证指针/清单/索引/日志/回执", parents=[sub_common])
+    p_rstat.add_argument("--deep", action="store_true", help="逐个文件核对候选区与清单")
+    p_rstat.add_argument("--json", action="store_true")
+
+    p_rrep = release_sub.add_parser("repair", help="补写缺失的回执（仅在确实切换成功时）", parents=[sub_common])
+    p_rrep.add_argument("release_id")
+    p_rrep.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_rrb = release_sub.add_parser("rollback", help="生成回退包（新 release_id，复用旧版内容与索引）", parents=[sub_common])
+    p_rrb.add_argument("--to", required=True, help="目标发布号")
+    p_rrb.add_argument("--reason", default="", help="为什么回退（必填项建议写清）")
+    p_rrb.add_argument("--as", dest="actor", default=None, help="只接受 author")
+
+    p_rlist = release_sub.add_parser("list", help="列出发布与状态", parents=[sub_common])
+    p_rlist.add_argument("--json", action="store_true")
+
+    p_runlock = release_sub.add_parser("unlock", help="检查发布锁是否被持有（不按年龄猜）", parents=[sub_common])
+    p_runlock.add_argument("--confirm", action="store_true", help="执行检查（获取并立即释放）")
+    p_runlock.add_argument("--as", dest="actor", default=None, help="只接受 author")
 
     # ---- backup / restore ----
     p_backup = sub.add_parser("backup", help="创建本地备份（含清单与回读校验）", parents=[sub_common])

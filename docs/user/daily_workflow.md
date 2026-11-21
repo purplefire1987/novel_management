@@ -44,11 +44,13 @@ diff 会标出三类东西：
 冲突的含义是「你可能在 Agent 写稿期间自己改了同一个文件」。处理方式二选一：
 要么让 Agent 基于你改后的版本重写，要么 `approve --force` 明确承担覆盖风险。
 
-## 4. 入库：看一眼 → 批准 → 发布
+## 4. 入库：看一眼 → 批准 → 准备 → 批计划 → 发布
 
 ```bash
 novel inspect TASK-000002 --as author        # 批准前看这七项
 novel approve artifact TASK-000002 --hash <inspect 报的 sha256> --as author --note "第 7 章通过"
+novel release prepare --task TASK-000002 --as author    # 生成发布计划（还没动正式区）
+novel approve release REL-000001 --hash <计划哈希> --as author
 novel publish --task TASK-000002 --as author --confirm
 ```
 
@@ -62,6 +64,13 @@ novel publish --task TASK-000002 --as author --confirm
 
 `approve` 记下每个文件的 sha256。`publish` 会重新算一遍再比对——所以「批准的是 A、
 发的是 B」在这条链路上不可能发生。**改一个字节也要重批**，没有「差不多就行」。
+
+`release prepare` 之后那一步看起来多余，其实批的是两份不同的东西：
+`approve artifact` 批「这些字节」，`approve release` 批「这次发哪些文件、按什么顺序」。
+没有第二份，就有了「批的是 A、发的是别的一批文件」的口子（ADR-014/015）。
+
+发布完跑一次 `novel release status`，判词是 `OK` 才算真的落地了；
+不是 `OK` 时它会告诉你是缺回执、索引坏了还是指针读不出来。
 
 写设定（`01_Canon/`）要额外加：
 
@@ -81,7 +90,19 @@ novel approve change CR-000001 --hash <报告的 sha256> --rewrite-chapters --as
 或明确缩小范围（`--narrow-scope`），批准就会被拒绝——PRD §19.3 不允许
 「只改档案就宣称 RETCON 完成」。
 
-旧版本会自动复制到 `90_Archive/publish_archive/<TASK-ID>/<时间戳>/`，不用自己备份。
+旧版本会自动复制到 `90_Archive/publish_archive/<任务或发布号>/<时间戳>/`，不用自己备份。
+
+发布到一半断了（断电、kill、磁盘满）不用慌：
+
+```bash
+novel release status              # 看判词：旧版还是不是正式的、哪一步没做完
+novel release resume REL-000001   # 接着做完
+novel release abort  REL-000001   # 或者停掉，正式版不会被改
+```
+
+发错了要退回去，用 `release rollback --to <上一版> --reason "..."`。
+它是**一次新的发布**（新发布号、你单独批准、回执写明原因），不是把指针偷偷拨回去。
+导致回退的那次发布记录不会消失——「曾经发过什么」必须留得下来。
 
 ## 5. 你自己改了文件：adopt
 

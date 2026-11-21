@@ -38,14 +38,26 @@ CLI 不从代码里取路径，一律走 `novel_system.config.load()`：
 
 ## 写入链路：为什么提案只能落在 staging
 
-一项内容从 Agent 手里到正式区，必须经过五个物理位置：
+一项内容从 Agent 手里到正式区，必须经过六个物理位置：
 
 ```
 Agent 产出            →  07_Staging/<TASK-ID>/<分栏>/...   （stage）
 作者看 diff           →  只在终端显示，不写盘             （diff）
-作者批准              →  <runtime>/approvals/APR-*.json    （approve，绑 sha256）
-发布                  →  01_Canon / 03_Manuscripts/...     （publish，旧版先归档）
-操作留痕              →  <runtime>/logs/ops.jsonl          （全部写命令）
+作者批准字节          →  <runtime>/approvals/APR-*.json    （approve，绑 sha256）
+得到发布计划          →  <runtime>/releases/REL-*/plan.json （release prepare）
+作者批准计划          →  同上，另一笔 APR 记录             （approve release，绑计划哈希）
+发布                  →  01_Canon / 03_Manuscripts/...     （publish / release execute，旧版先归档）
+```
+
+发布本身落四份记录 + 一个指针：
+
+```
+<runtime>/releases/<REL>/plan.json      作者批准的「要发什么」（可变，重准备即换哈希）
+<runtime>/releases/<REL>/snapshot/      隔离工作区：完整候选内容 + 一次提交
+<runtime>/releases/<REL>/manifest.json  构建后的不可变事实（逐文件 sha256）
+<runtime>/releases/<REL>/journal.json   22 步事务日志（崩在哪、还能不能续）
+<runtime>/releases/active.json          正式指针：**只有它决定正式版是哪一版**
+<runtime>/receipts/RCPT-*.json          切换成功的凭证（可补写，带 repaired 标记）
 ```
 
 每道关口拦的是不同的事：
@@ -54,7 +66,8 @@ Agent 产出            →  07_Staging/<TASK-ID>/<分栏>/...   （stage）
 |---|---|---|
 | `stage` | 目标不在正式区、路径越界、无任务 | `staging/` |
 | `approve` | 非作者代办、带着冲突硬批 | `audit/ensure_actor` + `cli/flow.py` |
-| `publish` | 没批准、批准后被换内容、批准范围外的新增、Canon 缺二次确认 | `release/` |
+| `release prepare` | 没有产物批准、有 OPEN BLOCKER、未批准 RETCON 覆盖、计划说不出批什么 | `release/gates.py` |
+| `release execute` | 批准后被换内容、基线变了、有人正在发布、Canon 缺二次确认 | `release/engine.py` + `release/lock.py` |
 | `adopt` | 把作者手改当脏数据回滚 | `baseline/` |
 
 关键设计：**批准绑定内容而不是绑定任务**。批准记录里存每个文件当时的 sha256，发布时逐个重算比对——

@@ -1,126 +1,93 @@
 """发布：把已批准内容转成正式状态。
 
-四道闸，缺一不可：
-1. 有作者批准记录；
-2. staging 内容与批准时登记的哈希逐个一致（批准后调包不算批准）；
-3. staging 里没有未纳入批准的新增文件；
-4. 目标落在正式区，且 Canon 目标要作者二次确认。
+对外只暴露一件事：**一次发布是一次可恢复的受审计操作**，不是「把文件覆盖过去」。
 
-旧版本先归档再覆盖——发布可以重来，被覆盖的内容不能凭空消失。
+```
+prepare  → 生成 ReleasePlan（作者要批的就是它）
+approve  → 作者批准计划哈希（`novel approve release <REL> --hash ...`）
+execute  → 22 步：隔离快照 → 候选提交 → 建索引 → 清单 → 切换指针 → 回执 → 镜像
+```
+
+三条硬线：
+
+1. 批准绑的是**计划哈希**，不是「这个任务我同意」；
+2. 正式版本只由 `releases/active.json` 决定，写入走「临时文件 + fsync + 原子替换」；
+3. 任何一步崩了都能 `release resume` / `release abort` / `release rollback`，
+   恢复依据是指针、清单、日志、哈希的交叉验证。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
-from ..approvals import Approval, ApprovalStore
 from ..audit import now_iso
 from ..baseline import AuthorBaseline
 from ..errors import ApprovalError, ConflictError, SecurityError, UsageError
 from ..paths import ProjectPaths
-from ..staging import StagingArea, artifact_id_of
-from ..storage import copy_verified, sha256_file, write_atomic
-from ..tasks import Task, TaskStore
+from ..staging import StagingArea
+from ..tasks import TaskStore
+from .engine import (
+    ExecutionResult,
+    InjectedFault,
+    abort,
+    execute,
+    prepare_plan,
+    prepare_rollback,
+    repair_receipt,
+    resume,
+    status,
+)
+from .gates import CANON_PREFIX, check_approval, check_gates
+from .lock import PublishLock, read_holder
+from .model import ReleasePlan
+from .store import PlanMeta, ReleaseStore
 
-CANON_PREFIX = "01_Canon"
+__all__ = [
+    "CANON_PREFIX",
+    "ExecutionResult",
+    "InjectedFault",
+    "PlanMeta",
+    "PublishLock",
+    "ReleasePlan",
+    "ReleaseStore",
+    "abort",
+    "check_approval",
+    "check_gates",
+    "execute",
+    "prepare_plan",
+    "prepare_rollback",
+    "publish_task",
+    "read_holder",
+    "repair_receipt",
+    "resume",
+    "status",
+]
 
 
 @dataclass
 class PublishResult:
+    """`publish` 的返回，保留旧字段以兼容调用方与测试。"""
+
     task_id: str
     approval_id: str
+    release_id: str = ""
+    receipt_id: str = ""
+    canon_revision: str = ""
+    index_build_id: str = ""
     written: list[str] = field(default_factory=list)
     archived: list[str] = field(default_factory=list)
     archive_dir: str = ""
     skipped: list[str] = field(default_factory=list)
     canon_touched: bool = False
-
-
-def _archive_target(pp: ProjectPaths, task_id: str, target_rel: str, stamp: str) -> Path:
-    return pp.archive / "publish_archive" / task_id / stamp / target_rel
-
-
-def check_approval(
-    pp: ProjectPaths,
-    task: Task,
-    approval: Approval | None,
-    staging: StagingArea,
-) -> list[str]:
-    """批准与 staging 是否仍然对得上。返回将发布的 target 列表。"""
-    if approval is None:
-        raise ApprovalError(
-            f"任务 {task.task_id} 没有作者批准记录。先运行 `novel diff` 查看，再由作者 `novel approve`"
-        )
-    if approval.decision != "approved":
-        raise ApprovalError(f"任务 {task.task_id} 最近一次批准结论是 {approval.decision}，不能发布")
-
-    staged = {item.target: item for item in staging.files()}
-    if not staged:
-        raise ConflictError(f"任务 {task.task_id} 的 staging 为空，没有可发布内容")
-
-    approved_targets = [f.target for f in approval.files]
-    extra = sorted(set(staged) - set(approved_targets))
-    if extra:
-        raise ApprovalError(
-            f"staging 中有批准范围外的文件：{extra}（批准只覆盖 {len(approved_targets)} 个文件）"
-        )
-
-    for record in approval.files:
-        item = staged.get(record.target)
-        if item is None:
-            raise ApprovalError(f"批准过的文件已不在 staging：{record.target}")
-        staged_path = pp.vault / item.staged
-        if not staged_path.exists():
-            raise ConflictError(f"staging 文件丢失：{item.staged}")
-        if sha256_file(staged_path) != record.sha256:
-            raise ApprovalError(
-                f"{record.target} 在批准后被改动过（哈希不符），批准已失效，需作者重新批准"
-            )
-    return approved_targets
-
-
-def check_gates(
-    pp: ProjectPaths,
-    task: Task,
-    staging: StagingArea,
-    *,
-    issue_store=None,
-    change_store=None,
-) -> None:
-    """发布前的两道内容闸：未解决的 BLOCKER、未批准的 RETCON。
-
-    这两道**不能靠「记得别按那个键」守**：BLOCKER 被豁免一次，正式版就带着
-    已知硬伤出门；RETCON 绕过独立审批一次，「独立」二字就没有意义了。
-    所以它们放进 publish 主路径，而不是做成可选的检查命令。
-    """
-    targets = sorted({item.target for item in staging.files()})
-    upstream = {task.task_id} | {artifact_id_of(t) for t in targets}
-
-    if issue_store is not None:
-        blockers = issue_store.open_blockers(upstream, project_id=pp.project_id)
-        if blockers:
-            raise ApprovalError(
-                "存在未解决的 BLOCKER，拒绝发布："
-                + "、".join(f"{i.issue_id}（{i.target_id}：{i.description}）" for i in blockers)
-                + "。BLOCKER 只能修掉后 resolve，或先走变更审批缩小范围"
-            )
-
-    if change_store is not None:
-        pending = change_store.blocking_scope(targets, project_id=pp.project_id)
-        if pending:
-            raise ApprovalError(
-                "这些路径有未批准的 RETCON："
-                + "、".join(c.change_id for c in pending)
-                + "。先 `novel change approve <CR> --hash <影响报告哈希>`"
-            )
+    warnings: list[str] = field(default_factory=list)
 
 
 def publish_task(
     pp: ProjectPaths,
+    runtime: Path,
     task_store: TaskStore,
-    approval_store: ApprovalStore,
+    approval_store,
     task_id: str,
     *,
     actor: str,
@@ -128,7 +95,15 @@ def publish_task(
     confirm_canon: bool = False,
     issue_store=None,
     change_store=None,
+    release_id: str = "",
+    skip_dirs: tuple[str, ...] | None = None,
+    index_dir=None,
 ) -> PublishResult:
+    """执行一次已批准的发布。
+
+    找不到「已准备且已批准」的计划就拒绝——**不会替作者临时生成一份再当成批过**。
+    那种便利的代价是：作者从没看过那份计划，批准就成了橡皮图章。
+    """
     task = task_store.load(task_id)
     if task.write_mode == "read_only":
         raise SecurityError(f"任务 {task.task_id} 是 read_only，没有可发布内容")
@@ -138,66 +113,83 @@ def publish_task(
         raise ConflictError(
             f"任务 {task.task_id} 已经发布过；内容有更新请新建任务（novel task create）再走一遍 stage/approve"
         )
+    if not StagingArea(pp, task).files():
+        raise ConflictError(f"任务 {task.task_id} 的 staging 为空，没有可发布内容")
 
-    approval = approval_store.latest_for(task_id)
-    staging = StagingArea(pp, task)
-    check_gates(pp, task, staging, issue_store=issue_store, change_store=change_store)
-    targets = check_approval(pp, task, approval, staging)
-    assert approval is not None  # check_approval 已保证
-
-    # 目标合法性
-    canon_targets = []
-    for rel in targets:
-        target = pp.at(rel)
-        if not pp.is_control_path(target):
-            raise SecurityError(f"发布目标不在正式区：{rel}")
-        if rel.startswith(CANON_PREFIX + "/"):
-            canon_targets.append(rel)
-    if canon_targets and not confirm_canon:
-        raise SecurityError(
-            "本次发布包含 Canon 写入："
-            f"{canon_targets}；需要作者额外确认 --confirm-canon"
+    store = ReleaseStore(runtime)
+    candidates = [release_id] if release_id else store.find_plan_for_task(task_id, pp.project_id)
+    if not candidates:
+        raise UsageError(
+            f"任务 {task_id} 还没有准备发布计划。\n"
+            f"  1) novel release prepare --task {task_id}\n"
+            f"  2) novel approve release <REL-ID> --hash <计划哈希> --as author\n"
+            f"  3) novel publish --task {task_id} --as author --confirm"
+        )
+    plan_id = candidates[0]
+    plan = store.load_plan(plan_id)
+    if not approval_store.for_target("release", plan_id):
+        raise ApprovalError(
+            f"发布计划 {plan_id} 尚未获作者批准。"
+            f"运行：novel approve release {plan_id} --hash {plan.hash} --as author"
         )
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
-    result = PublishResult(task_id=task_id, approval_id=approval.approval_id, canon_touched=bool(canon_targets))
+    result = execute(
+        pp,
+        store,
+        plan_id,
+        actor=actor,
+        approval_store=approval_store,
+        issue_store=issue_store,
+        change_store=change_store,
+        confirm_canon=confirm_canon,
+        skip_dirs=skip_dirs,
+        index_dir=index_dir,
+        task=task,
+    )
 
-    staged_map = {item.target: item for item in staging.files()}
-    for rel in targets:
-        item = staged_map[rel]
-        source = pp.vault / item.staged
-        target = pp.at(rel)
-        if target.exists():
-            archived = _archive_target(pp, task_id, rel, stamp)
-            copy_verified(target, archived)
-            result.archived.append(pp.rel_to_project(archived))
-        write_atomic(target, source.read_bytes())
-        result.written.append(rel)
+    if result.state == "ACTIVE":
+        task.output_files = sorted(set(task.output_files) | set(result.written))
+        task.approval_state = "approved"
+        task.status = "done"
+        task.closed_at = now_iso()
+        task_store.save(task)
 
-    if result.archived:
-        result.archive_dir = str(pp.archive / "publish_archive" / task_id / stamp)
-
-    # 任务收尾
-    task.output_files = sorted(set(task.output_files) | set(result.written))
-    task.approval_state = "approved"
-    task.status = "done"
-    task.closed_at = now_iso()
-    task_store.save(task)
-
-    # 基线与历史
-    baseline = AuthorBaseline(task_store.dir.parent, pp.project_id)
+    canon_touched = any(c.path.startswith(CANON_PREFIX + "/") for c in plan.changes)
+    baseline = AuthorBaseline(runtime, pp.project_id)
     baseline.refresh_paths(pp, result.written)
     baseline.record_publish(task_id=task_id, paths=result.written, note=note)
-    return result
+
+    return PublishResult(
+        task_id=task_id,
+        approval_id=plan.text_approvals[0] if plan.text_approvals else "",
+        release_id=result.release_id,
+        receipt_id=result.receipt_id,
+        canon_revision=result.canon_revision,
+        index_build_id=result.index_build_id,
+        written=result.written,
+        archived=result.archived,
+        archive_dir="",
+        canon_touched=canon_touched,
+        warnings=result.warnings,
+    )
 
 
 def describe_result(result: PublishResult) -> list[str]:
-    lines = [f"task      : {result.task_id}", f"approval  : {result.approval_id}"]
+    lines = [f"task      : {result.task_id}"]
+    if result.release_id:
+        lines.append(f"release   : {result.release_id}（{result.canon_revision[:12] or '无提交'}）")
+    if result.index_build_id:
+        lines.append(f"index     : {result.index_build_id}")
+    if result.receipt_id:
+        lines.append(f"receipt   : {result.receipt_id}")
     lines.append(f"写入      : {len(result.written)} 个文件")
     lines.extend(f"  + {rel}" for rel in result.written)
     if result.archived:
-        lines.append(f"旧版归档  : {result.archive_dir}")
+        lines.append(f"旧版归档  : {len(result.archived)} 个")
         lines.extend(f"  ~ {rel}" for rel in result.archived)
+    if result.warnings:
+        lines.append("告警      :")
+        lines.extend(f"  ! {w}" for w in result.warnings)
     if result.canon_touched:
         lines.append("注意      : 本次写入了 01_Canon，请重跑 novel validate 与 novel rebuild-index")
     return lines

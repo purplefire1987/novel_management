@@ -62,12 +62,13 @@ active_project:
 ## 4. 命令
 
 V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务补入地图、契约、索引、
-时间线、审批与变更几组命令，命令行**现为 26 条**：
+时间线、审批与变更、发布几组命令，命令行**现为 27 条**：
 三条地图命令（`maps paths` / `import-admin` / `build`）、四条契约命令
 （`schema list` / `schema check` / `allocate-id` / `package-hash`，T02）、
 两条索引命令（`rebuild-index` / `search`，T03）、三条时间线与认知命令
 （`state` / `knowledge` / `reveal`，T04）、四条审批与变更命令
-（`inspect` / `issue` / `change` / `impact`，T05）。
+（`inspect` / `issue` / `change` / `impact`，T05）、一条发布命令
+（`release`，含 10 个子命令，T06）。
 
 | 命令 | 用途 | 写入 |
 |---|---|---|
@@ -96,7 +97,15 @@ V4.0 §5.3 的 16 项命令全部实现；此外按 PRD §20.2 与后续任务�
 | `novel change` | 变更请求：五类，RETCON 走独立审批 | 是（仅 Runtime） |
 | `novel impact` | 生成影响报告（报告哈希即变更批准的对象） | 是（仅 Runtime） |
 | `novel adopt` | 登记作者手改、推进基线；`--dry-run` 只报告 | 是（仅 Runtime） |
-| `novel publish` | 已批准内容转正式；旧版先归档 | 是（正式区） |
+| `novel release prepare` | 把已批准的 staging 翻译成 ReleasePlan（不动正式区） | 是（仅 Runtime） |
+| `novel release show` | 计划、批准、22 步事务日志、清单、回执 | 否 |
+| `novel release execute` | 执行发布 22 步；可从中断处续 | 是（正式区 + Runtime） |
+| `novel release status` | 交叉验证指针/清单/索引/日志/回执，给出判词 | 否 |
+| `novel release resume` \| `abort` | 接着做 / 停掉未切换的发布 | 是（仅 Runtime） |
+| `novel release repair` | 补写缺失回执（仅当指针确实指向该版） | 是（仅 Runtime） |
+| `novel release rollback` | 生成回退包：新发布号，复用旧版内容与索引 | 是（仅 Runtime） |
+| `novel release list` \| `unlock` | 列出发布 / 检查锁是否被持有 | 否 |
+| `novel publish` | 执行一份已准备且已批准的计划 | 是（正式区） |
 | `novel backup` | 本地备份，含清单与回读校验；`--list` 列备份 | 是（Runtime） |
 | `novel restore --dry-run` | 预演恢复，列出新增/冲突/损坏 | 否 |
 | `novel restore` | 执行恢复；默认不覆盖现存文件 | 是 |
@@ -113,15 +122,21 @@ novel stage  --task TASK-000001 --from 草稿.md \
 novel diff   --task TASK-000001                             # 作者审阅
 novel inspect TASK-000001                                   # 七项：哈希、drift、BLOCKER、风险…
 novel approve artifact TASK-000001 --hash <sha256> --as author   # 绑定当前字节
-novel publish --task TASK-000001 --as author --confirm      # 写正式区
+novel release prepare --task TASK-000001 --as author        # 生成发布计划
+novel approve release REL-000001 --hash <计划哈希> --as author   # 批准这份计划
+novel publish --task TASK-000001 --as author --confirm      # 执行发布（22 步）
+novel release status                                        # 判词应为 OK
 ```
 
-- `approve` / `publish` / `adopt` / `restore` 只接受 `--as author`，Agent 无法代办。
+- `approve` / `publish` / `adopt` / `restore` / `release execute|rollback|abort|repair`
+  只接受 `--as author`，Agent 无法代办。
 - 批准绑定每个文件**此刻**的 sha256。批准后 staging 被改动（哪怕一个字节）→ 发布直接拒绝，需重新批准。
 - 发布前还会拦两道：目标上有 OPEN 的 `BLOCKER`、有未批准的 `RETCON` 覆盖。
 - 同一条任务不能发布两次；内容有更新请新建任务。
 - 写入 `01_Canon/` 时 `publish` 额外要求 `--confirm-canon`。
-- 发布前若目标已存在，旧版本先复制到 `90_Archive/publish_archive/<TASK-ID>/<时间戳>/`。
+- **发布不是覆盖写**：1–13 步全在隔离快照里做，第 18 步才切换正式指针。
+  任何一步崩掉都能 `release status` 查、`resume` 续、`abort` 停，正式版不会被写坏（ADR-015）。
+- 旧版内容先复制到 `90_Archive/publish_archive/<任务或发布号>/<时间戳>/`，再写新内容。
 
 ### 项目怎么解析
 
@@ -154,6 +169,8 @@ novel publish --task TASK-000001 --as author --confirm      # 写正式区
 ## 5. 数据安全约定
 
 - **索引不是事实源。** 索引可随时删除重建；与 Markdown 冲突时以 Markdown 为准。`07_Staging`、`08_Reviews`、`90_Archive` 不进索引。
+- **正式版只由 `<runtime>/releases/active.json` 一个指针决定。** 指针损坏就进恢复模式，**不猜**；`index/active.json` 只是「上次重建的结果」，不是正式版。
+- **发布不就地改。** 22 步里 1–13 全在隔离快照上做，第 18 步才切换指针；任何一步崩掉，正式区仍是上一版（ADR-015）。
 - **写入前检查目标是否被作者改过。** `diff` 会标出「staging 生成后正式文件被改过」的冲突；`approve` 遇到冲突默认拒绝。
 - **越界即拒绝。** 所有路径经规范化校验，必须落在 Vault 根之内；`..` 与符号链接逃逸一律拒绝；`stage` 的目标必须在六个正式区内。
 - **Agent 不写 Canon。** Agent 只能写 staging 与草稿，正式入库需作者批准；Canon 还要二次确认。
@@ -169,9 +186,10 @@ novel publish --task TASK-000001 --as author --confirm      # 写正式区
 
 ```text
 src/novel_system/
-  cli/            命令入口与分发（read / init / index_cmd / flow / backup_cmd / maps_cmd / schema_cmd / id_cmd）
+  cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / backup_cmd / maps_cmd / schema_cmd / id_cmd）
   config/         五级配置解析（含 V4.0 Vault_Config 写法兼容）
   paths.py        项目内目录解析与边界校验
+  version.py      版本号唯一出处（发布清单与 `--version` 都读它）
   frontmatter.py  frontmatter 解析（只顶层 key: value，纯标准库）
   markdown.py     Markdown 解析与块 ID（走 PyYAML，负责嵌套结构）
   canonical.py    字节规范化与规范化 JSON 包哈希
@@ -180,13 +198,15 @@ src/novel_system/
   storage/        哈希、原子写、不覆盖写、可验证复制、YAML 输出
   audit/          操作日志与操作者校验（作者专属动作在此拦截）
   tasks/          任务记录与状态流转
-  approvals/      批准记录（绑定每个文件的 sha256）
+  approvals/      批准记录（绑定对象类型与每个文件的 sha256）
+  changes/        问题单、变更请求、影响分析（存 Runtime，不进索引）
   staging/        staging 落盘与 manifest
-  release/        发布四道闸与旧版归档
+  release/        发布协议：22 步执行、断点恢复、正式指针、发布锁（ADR-015）
   baseline/       作者编辑基线（adopt）
   backup/         备份、校验、恢复
   indexing/       SQLite 索引（17 表；schema/source/builder/search/locate）
-  validation/ workflows/ agents/ adapters/ core/   预留扩展位（T04–T09）
+  timeline/       事件 DAG、状态区间、认知查询
+  validation/ workflows/ agents/ adapters/ core/   预留扩展位（T07–T09）
 config/             默认配置与配置 Schema
 schemas/            22 类数据契约（JSON Schema，additionalProperties 一律 false）
 templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）
@@ -205,8 +225,8 @@ tests/              unit / integration / security / acceptance / fixtures
 ## 7. 测试与检查
 
 ```bash
-pytest                                    # 122 条
-python3 scripts/selfcheck.py              # 21 项端到端冒烟，不依赖 pytest
+pytest                                    # 505 条
+python3 scripts/selfcheck.py              # 26 项端到端冒烟，不依赖 pytest
 python3 scripts/privacy_scan.py --repo .  # 公仓隐私扫描
 ```
 

@@ -230,17 +230,86 @@ def cmd_inspect(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _approve_release(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
+    """批准一份发布计划（PRD §17.2：作者批准的是计划的规范 JSON 哈希）。
+
+    与文件级批准的区别：这里批的是「这份计划」——基线与变更清单绑在一起。
+    计划重新准备过（哪怕内容一样）哈希就会变，旧批准自动作废。
+    """
+    from ..release import ReleaseStore
+
+    actor = ensure_actor(getattr(args, "actor", None), "approve")
+    store = ReleaseStore(cfg.require_runtime())
+    release_id = args.candidate
+    plan = store.load_plan(release_id)
+    meta = store.load_meta(release_id)
+
+    given = (getattr(args, "hash", "") or "").strip()
+    if not given:
+        raise ApprovalError(
+            f"必须显式给出 --hash（当前计划哈希是 {plan.hash}）。"
+            "非交互批准不接受「大致同意」（PRD §20.3）"
+        )
+    if given != plan.hash:
+        raise ApprovalError(
+            f"计划哈希不符：给出 {given[:16]}…，当前 {plan.hash[:16]}…。"
+            f"先 `novel release show {release_id}` 看清在批什么"
+        )
+    pp = project(cfg, args)
+    if meta.project_id and meta.project_id != pp.project_id:
+        raise ApprovalError(f"{release_id} 属于项目 {meta.project_id}，不是 {pp.project_id}")
+
+    blockers_store = IssueStore(cfg.require_runtime())
+    if meta.task_id:
+        upstream = {meta.task_id} | {artifact_id_of(c.path) for c in plan.changes}
+        blockers = blockers_store.open_blockers(upstream, project_id=pp.project_id)
+        if blockers:
+            raise ApprovalError(
+                "存在未解决的 BLOCKER，拒绝批准发布计划："
+                + "、".join(f"{i.issue_id}（{i.description}）" for i in blockers)
+            )
+
+    approval = approval_store(cfg).record(
+        task_id=meta.task_id,
+        project_id=pp.project_id,
+        files=[],
+        note=getattr(args, "note", "") or "",
+        approver=actor,
+        target_type="release",
+        target_id=release_id,
+        target_hash=plan.hash,
+        approved_scope=sorted({scope_of(c.path) for c in plan.changes}),
+    )
+    op = oplog(cfg).record(
+        actor=actor,
+        command="approve",
+        project_id=pp.project_id,
+        outputs=[{"approval_id": approval.approval_id, "release_id": release_id, "hash": plan.hash}],
+        note=approval.note,
+        task_id=meta.task_id,
+    )
+    ok(f"已批准发布计划 {release_id}（{approval.approval_id}）")
+    info(f"计划哈希 {plan.hash}")
+    info(f"变更 {len(plan.changes)} 项，基线 {plan.base_release or '（首次发布）'}")
+    print(f"  op: {op.op_id}")
+    print(f"下一步：novel release execute {release_id} --as author --confirm")
+    return 0
+
+
 def approve_object(cfg: cfg_mod.Config, args: argparse.Namespace, kind: str) -> int:
-    """`approve artifact|proposal` 的实际执行。"""
+    """`approve artifact|proposal|release` 的实际执行。"""
+    if kind == "release":
+        return _approve_release(cfg, args)
+
     actor = ensure_actor(getattr(args, "actor", None), "approve")
     pp = project(cfg, args)
     candidate = args.candidate
     task, files, expected, current = resolve_candidate(cfg, pp, candidate)
 
     if kind == "proposal":
-        # 记忆提案要到 T07 才存在。现在能批的只有 staging 产物；
+        # 记忆提案要到 T10 才存在。现在能批的只有 staging 产物；
         # 硬凑一个「提案」等于让审批范围说得比实际更大。
-        raise UsageError("本版还没有记忆提案（T07 才生成）；当前可批的对象是 artifact")
+        raise UsageError("本版还没有记忆提案（T10 才生成）；当前可批的对象是 artifact 与 release")
 
     given = (getattr(args, "hash", "") or "").strip()
     if not given:

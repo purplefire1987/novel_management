@@ -25,6 +25,7 @@
 | [ADR-012](ADR-012-sqlite-index-and-cjk-search.md) | 索引改用 SQLite；中文检索按长度分派 | 已接受（部分取代 003） |
 | [ADR-013](ADR-013-event-dag-and-state-intervals.md) | 时间线用事件 DAG；状态按区间；认知与事实分表 | 已接受 |
 | [ADR-014](ADR-014-approval-binds-bytes.md) | 批准绑定对象与当前字节；BLOCKER 不可豁免；RETCON 独立审批 | 已接受（细化 006） |
+| [ADR-015](ADR-015-release-protocol-and-recovery.md) | 发布先建完再切指针；恢复靠四点交叉验证；锁由内核判定 | 已接受（细化 009） |
 
 ## 这些 ADR 里最重要的三句话
 
@@ -36,3 +37,5 @@
 
 - **ADR-012 部分取代 ADR-003**：载体从 `index.json` 换成 SQLite + 多 build 指针。
   ADR-003 的结论（索引纯派生、可随时删、不反向写事实源）**依然成立**，被换掉的只有那一个文件格式。
+- **ADR-015 细化 ADR-009**：备份策略不变；发布这一侧多了一份不可变清单与正式指针，
+  回退不再依赖「找一份旧备份」，而是「新建一次发布，复用旧版内容与索引」。

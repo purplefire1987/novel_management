@@ -278,23 +278,116 @@ novel state CHAR-0001 --json
 - `--reject` 记一条驳回，任务 `approval_state` 变为 `rejected`。
 - 重新批准会生成新记录，旧记录保留。
 
-### `novel publish --task <ID> --confirm [--confirm-canon] [--as author]`
+### `novel publish --task <ID> --confirm [--confirm-canon] [--release <REL>] [--as author]`
 
-六道闸：
+**自 0.9.0 起，`publish` 只执行「已准备且已批准」的计划**，不再临时生成一份：
 
-1. 有 `decision=approved` 的批准记录；
+```bash
+novel release prepare --task TASK-000007 --as author        # 1) 生成计划
+novel approve release REL-000001 --hash <计划哈希> --as author   # 2) 批计划
+novel publish --task TASK-000007 --as author --confirm     # 3) 执行
+```
+
+找不到计划时报错并给出这三步（退出码 2）。任务已 `done` 或 `cancelled` 时拒绝。
+
+执行前后共六道闸：
+
+1. 有 `decision=approved` 的产物批准记录；
 2. staging 里每个批准过的文件，当前 sha256 与批准时一致；
 3. staging 里没有批准范围外的新增文件；
 4. 目标上没有 OPEN 的 `BLOCKER`（记在任务 ID 或产物 ID 上都算）；
 5. 目标上没有「未批准的 RETCON」覆盖；
-6. 目标落在正式区；涉及 `01_Canon/` 时还要 `--confirm-canon`。
+6. 目标落在正式区；涉及 `01_Canon/` 时还要 `--confirm-canon`（退出码 3）。
 
 第 4、5 道放在主路径而不是做成可选检查：BLOCKER 被绕过一次，正式版就带着已知硬伤
 出门；RETCON 被绕过一次，「独立审批」就没有意义了。
 
-通过后：目标已存在则先复制到 `90_Archive/publish_archive/<TASK-ID>/<时间戳>/<目标路径>`，再原子写入。任务标 `done`，作者基线推进。
+通过后：在隔离快照里按批准字节落变更 → 提交 → 建索引 → 写清单 → 切指针 → 写回执
+→ 镜像回 Vault（旧内容归档到 `90_Archive/publish_archive/<任务或发布号>/<时间戳>/`）。
+任务标 `done`，作者基线推进。
 
-任务已 `done` 或 `cancelled` 时拒绝发布。
+---
+
+## 6.5 发布协议（`novel release`）
+
+发布不是「把文件覆盖过去」，而是一次**可恢复的受审计操作**。完整取舍见 ADR-015。
+
+### 三阶段与权限
+
+| 阶段 | 命令 | 谁 |
+|---|---|---|
+| 准备 | `release prepare --task` | 任何角色都能跑（只生成计划，不动正式区） |
+| 批准 | `approve release <REL> --hash` | **只能 author** |
+| 执行 | `release execute <REL> --confirm` / `publish` | **只能 author** |
+
+恢复类：`status` 谁都能查；`resume` / `abort` / `repair` / `rollback` 只能 author。
+
+### 22 步走什么
+
+| 阶段 | 步 | 做什么 | 失败/中断的后果 |
+|---|---|---|---|
+| 候选 | 1–3 | 建事务日志、验基线、验计划与批准 | 正式版未动 |
+| 候选 | 4–7 | 建隔离快照、落精确字节、校验、核文件集 | 同上，可续可停 |
+| 候选 | 8–11 | 候选提交、建索引、`integrity_check`、算索引哈希 | 同上 |
+| 候选 | 12–13 | 写不可变清单、切换前校验 | 同上 |
+| 切换 | 14–18 | 取锁、再比对 base、写临时指针、fsync、原子替换 | 18 成功后正式版已变 |
+| 收尾 | 19–22 | 写回执、释放锁、镜像回 Vault、备份提示 | 顺序颠倒会让「已切换」无凭证 |
+
+### `release status` 的判词
+
+| 判词 | 含义 | 怎么办 |
+|---|---|---|
+| `NO_RELEASE` | 从未发布过 | 正常；也会列出待续事务 |
+| `OK` | 五项互相吻合 | —— |
+| `RECEIPT_MISSING` | 指针与清单对得上，但没回执 | `release repair` |
+| `MANIFEST_MISSING` | 指针指着一份不存在的清单 | 恢复模式，人工判断 |
+| `MANIFEST_HASH_MISMATCH` | 清单或指针被改过 | 恢复模式，两边都不能猜 |
+| `INDEX_MISSING` | 索引缺失或哈希不符 | 重建该版索引或回退 |
+| `POINTER_CORRUPT` | 指针读不出来 | 恢复模式，**不自动猜** |
+
+判词非 `OK` / `NO_RELEASE` 时退出码为 1，可直接用于脚本判断。
+
+### 断点与恢复
+
+```bash
+novel release status                       # 先看判词和待续事务
+novel release resume REL-000002            # 接着做（不重新准备计划）
+novel release abort  REL-000002 --note "写错了"   # 或停掉（不动正式版）
+novel release repair REL-000002 --as author       # 已切换但缺回执
+novel release rollback --to REL-000001 --reason "新设定写坏了"
+```
+
+`abort` 对已切换的版本直接拒绝，并指出该用 `rollback`——把指针偷偷拨回去不是中止。
+
+### 锁
+
+`flock` 由内核判定归属。拿不到锁时报错带持有人信息（PID、主机、启动标识、任务、
+发布号、开始时间）。**不按文件年龄、不按 PID 猜死锁**——慢机器上那会放出第二个发布者。
+确认对方进程确实结束后：
+
+```bash
+novel release unlock --confirm   # 真的尝试获取一次，拿不到就拒绝，不删文件
+```
+
+### 回退
+
+回退是一次**新发布**：新 `release_id`、`base_release` 为当前正式版、复用旧版内容与
+索引、作者单独批准、回执写明原因与「对外平台需人工处理」。导致回退的那次发布记录
+不删。
+
+「复用旧版内容」按**逐文件 sha256** 担保（发布前核对本包文件集与目标版完全一致），
+不按 commit sha——每次发布都在自己的快照里新提交一次，sha 必然不同，复用旧 sha
+会让交叉验证指向一个不存在的提交。
+
+### 故障注入（仅测试）
+
+```bash
+NOVEL_RELEASE_FAULT=before:18 novel release execute REL-000002 --as author --confirm
+NOVEL_RELEASE_FAULT=after:18  novel release execute REL-000003 --as author --confirm
+```
+
+在指定步骤前后抛异常，磁盘痕迹与真实崩溃一致。`tests/integration/test_t06_release.py`
+用它覆盖六类断点。
 
 ---
 

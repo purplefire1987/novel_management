@@ -2,7 +2,7 @@
 """端到端冒烟自检：不依赖 pytest / tempfile，只用一个普通目录。
 
 用途：
-- 真机上一键确认 16 条命令的主链仍然通；
+- 真机上一键确认主链（含 T06 的 prepare → approve release → publish）仍然通；
 - 受限环境（临时目录不可用）里替代 pytest 做基本验证。
 
 用法：
@@ -26,8 +26,17 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from novel_system.cli import main  # noqa: E402
+from novel_system.storage import sha256_file  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
+
+
+def _verdict(out: str) -> str:
+    """从 `release status --json` 的输出里取判词。读不出返回空串。"""
+    try:
+        return str(json.loads(out).get("verdict") or "")
+    except (ValueError, AttributeError):
+        return ""
 
 
 def run(label: str, argv: list[str], expect: int | None = 0, check=None) -> None:
@@ -80,9 +89,28 @@ def main_cli() -> int:
         ["stage", *common, "--task", "TASK-000001", "--from", str(draft), "--to", target, "--as", "writer"],
     )
     run("diff", ["diff", *common, "--task", "TASK-000001"])
-    run("publish 未批准必须拒绝", ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"], expect=4)
+    # T06 之后 publish 只执行「已准备且已批准」的计划：两道门都要先关上才算验过
+    run(
+        "release prepare 未批准必须拒绝",
+        ["release", "prepare", *common, "--task", "TASK-000001", "--as", "author"],
+        expect=4,
+    )
     run("approve 非作者必须拒绝", ["approve", *common, "--task", "TASK-000001", "--as", "writer"], expect=3)
     run("approve", ["approve", *common, "--task", "TASK-000001", "--as", "author"])
+    run("publish 无计划必须拒绝", ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"], expect=2)
+    run("release prepare", ["release", "prepare", *common, "--task", "TASK-000001", "--as", "author"])
+
+    release_dir = runtime / "releases" / "REL-000001"
+    plan_hash = sha256_file(release_dir / "plan.json")
+    run(
+        "publish 计划未批准必须拒绝",
+        ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"],
+        expect=4,
+    )
+    run(
+        "approve release",
+        ["approve", "release", "REL-000001", "--hash", plan_hash, "--as", "author", *common],
+    )
     run("publish 缺确认必须拒绝", ["publish", *common, "--task", "TASK-000001", "--as", "author"], expect=2)
     run("publish", ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"])
 
@@ -93,6 +121,11 @@ def main_cli() -> int:
         return path.read_text(encoding="utf-8").startswith("---"), ""
 
     RESULTS.append(("正式文件已写入", *published("")))
+    run(
+        "release status 判词 OK",
+        ["release", "status", *common, "--json"],
+        check=lambda out: (_verdict(out) == "OK", f"判词 {_verdict(out) or '（读不出）'}"),
+    )
 
     run("publish 重复必须拒绝", ["publish", *common, "--task", "TASK-000001", "--as", "author", "--confirm"], expect=1)
     run("adopt", ["adopt", *common, "--as", "author"])

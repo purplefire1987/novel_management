@@ -119,12 +119,21 @@ novel diff --task TASK-000001
 
 ```bash
 novel approve --task TASK-000001 --as author
+novel release prepare --task TASK-000001 --as author      # 生成发布计划
+novel approve release REL-000001 --hash <计划哈希> --as author
 novel publish --task TASK-000001 --as author --confirm
+novel release status                                      # 判词 OK 才算落地
 ```
+
+发布为什么是三步而不是一步：批准对象必须是一份**看得见的计划**。
+少了 `release prepare`，批准就只能绑任务，于是「批的是 A、发的是 B」又开口子了。
+详见 [ADR-014](architecture/adr/ADR-014-approval-binds-bytes.md) 与
+[ADR-015](architecture/adr/ADR-015-release-protocol-and-recovery.md)。
 
 四条硬规则：
 
-- `approve` / `publish` / `adopt` / `restore` 只认 `--as author`，Agent 代办会被拒（退出码 3）；
+- `approve` / `publish` / `adopt` / `restore` / `release execute` 只认 `--as author`，
+  Agent 代办会被拒（退出码 3）；
 - 批准绑定每个文件的 sha256，批准后再改 staging，发布会拒绝；
 - 写 `01_Canon/` 还要加 `--confirm-canon`；
 - 同一任务不能发布两次。

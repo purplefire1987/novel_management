@@ -101,10 +101,12 @@ def test_approval_goes_stale_after_one_byte_change(env, tmp_path, capsys):
     assert after["approval"]["status"] == "STALE"
     assert after["hash"] != digest
 
-    code = _run(
-        vault, runtime, "publish", "--task", task, "--as", "author", "--confirm", "--confirm-canon"
+    # 批准失效 → 连发布计划都准备不出来（4 = 审批失败）
+    assert _run(vault, runtime, "release", "prepare", "--task", task, "--as", "author") == 4, (
+        "批准已失效时发布必须被拒（码 4 = 审批失败）"
     )
-    assert code == 4, "批准已失效时发布必须被拒（码 4 = 审批失败）"
+    # 没有计划时 publish 也不会凭「这个任务我批过」放行
+    assert _run(vault, runtime, "publish", "--task", task, "--as", "author", "--confirm", "--confirm-canon") == 2
 
 
 def test_approval_requires_matching_hash(env, tmp_path, capsys):

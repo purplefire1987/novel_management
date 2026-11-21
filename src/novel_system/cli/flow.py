@@ -11,6 +11,7 @@ from ..approvals import ApprovalFile
 from ..changes import ChangeStore, IssueStore
 from ..audit import ensure_actor, file_stamp
 from ..errors import SecurityError, UsageError
+from ..indexing.source import skip_dirs_from_layout
 from ..release import describe_result, publish_task
 from ..staging import StagingArea
 from ..storage import sha256_file
@@ -312,6 +313,7 @@ def cmd_publish(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
     result = publish_task(
         pp,
+        cfg.require_runtime(),
         task_store(cfg),
         approval_store(cfg),
         args.task,
@@ -320,6 +322,9 @@ def cmd_publish(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         confirm_canon=getattr(args, "confirm_canon", False),
         issue_store=IssueStore(cfg.require_runtime()),
         change_store=ChangeStore(cfg.require_runtime()),
+        release_id=getattr(args, "release", "") or "",
+        skip_dirs=skip_dirs_from_layout(cfg.layout),
+        index_dir=cfg.require_runtime() / "index",
     )
     op = oplog(cfg).record(
         actor=actor,

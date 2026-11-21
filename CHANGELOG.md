@@ -2,6 +2,132 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.9.0 — 2026-11-21
+
+T06「发布与恢复内核」。PRD §23 把它标成安全里程碑：交付 ReleasePlan、
+ReleaseManifest、Git 隔离工作区、索引固定、正式指针、发布锁、幂等、resume/abort、
+rollback 与故障注入。ADR-015 记了取舍。
+
+**兼容性影响（重要）**：`publish` 不再是一步。
+
+```
+1) novel release prepare --task TASK-000007        # 生成计划（不动正式区）
+2) novel approve release REL-000001 --hash <计划哈希> --as author
+3) novel publish --task TASK-000007 --as author --confirm
+```
+
+没有「已准备且已批准」的计划时 `publish` 直接拒绝（码 2），**不会替作者临时生成
+一份再当成批过**——那种便利的代价是作者从没看过那份计划。旧调用方需按上面三步改。
+
+**升级后要做的事**：
+
+- 无数据迁移。旧的 `publish_archive` 归档保留原样；新发布的归档路径多一层时间戳
+  （`publish_archive/<任务或发布号>/<时间戳>/`），避免同任务多次发布互相覆盖。
+- 第一份索引编号会从 `IDX-000001` 起，与旧 `builds/<时间戳>` 编号并存，互不影响。
+
+### 新增命令
+
+命令行 26 → **27 条**（新增 `release`，含 10 个子命令）。
+
+- `release prepare --task <T>`——把已批准的 staging 翻译成 ReleasePlan。
+  含 `01_Canon` 写入时需 `--confirm-canon`；
+- `release show <REL> [--json]`——计划、批准、事务日志（逐步状态）、清单、回执；
+- `release execute <REL> --confirm`——执行 22 步。含 Canon 写入时仍需 `--confirm-canon`；
+- `release resume <REL>`——从中断处继续，不重新准备计划；
+- `release abort <REL>`——中止未切换的发布。已切换的拒绝，并指出该用 rollback；
+- `release status [--deep] [--json]`——交叉验证指针/清单/索引/日志/回执，
+  给出判词；判词非 `OK`/`NO_RELEASE` 时退出码 1；
+- `release repair <REL>`——补写缺失回执（仅在指针确实指向该版时）；
+- `release rollback --to <REL> --reason <原因>`——生成回退包（新 release_id）；
+- `release list [--json]`——所有发布与状态；
+- `release unlock [--confirm]`——检查锁是否被持有（获取一次即释放，不删文件）。
+
+### 一、22 步分两段：1–13 在快照里，第 18 步才动指针
+
+Markdown、Git、SQLite 三者不可能塞进一个事务。所以不在 Vault 里就地改：
+把 Vault 复制成隔离快照，按**批准的精确字节**落变更，在快照里提交、建索引、
+写清单；全部做完才开始切换。
+
+切换是「临时文件 → fsync 文件 → fsync 目录 → `os.replace`」，日志里 16/17/18
+三步各记各的（`storage.write_atomic` 把写临时文件和替换做在一起，日志会写成
+16、18 都完成而 17 根本没发生）。
+
+正式版只由 `<runtime>/releases/active.json` 决定。它和 `index/active.json`
+是两件东西：前者只在切换时变，后者随 `rebuild-index` 变。查询优先读前者，
+否则会出现「新发布 + 旧索引」的混搭；清单钉住的索引库不存在时**报错进恢复模式**，
+不退回另一份。
+
+### 二、计划与清单分开
+
+| | ReleasePlan | ReleaseManifest |
+|---|---|---|
+| 何时 | 执行前 | 构建后 |
+| 可变 | 是（重准备换哈希，批准失效） | **否** |
+| 证明 | 作者批的是这份计划 | 内容长这样，且只长这样 |
+
+清单不写自己的哈希，也不写它引用的 commit 的父提交——写进去就成自引用。
+落盘用规范形式（键排序、紧凑分隔符、中文不转义），于是文件字节哈希 ==
+`package_hash(对象)`，回执里的哈希可以直接 `sha256_file` 复核。
+不可变靠写入方式（`write_new`，已存在且不同就报冲突）+ 每次 `status` 重算比对。
+
+### 三、恢复靠四点交叉验证
+
+指针、清单、事务日志、内容哈希互相印证，**不取最新文件**——崩溃会让时间戳失真，
+而那正是最需要判断的时候。
+
+判词：`OK` / `NO_RELEASE` / `RECEIPT_MISSING` / `MANIFEST_MISSING` /
+`MANIFEST_HASH_MISMATCH` / `INDEX_MISSING` / `POINTER_CORRUPT`。
+最后一种是「读不出来」，此时进入恢复模式，**不自动猜正式版是哪一版**。
+
+`repair` 只在指针确实指向该版、且清单哈希对得上时才补回执。补一张对不上账的
+回执比没有回执更糟。
+
+### 四、锁由内核判定
+
+`flock(LOCK_EX|LOCK_NB)`。拿不到就抛，报错带持有人信息（PID、主机、启动标识、
+任务、发布号、开始时间）。**不按文件年龄、不按 PID 猜死锁**——PRD §18.4 明令禁止，
+那种做法在慢机器上会直接放出第二个发布者。强制处理必须 `release unlock` 显式操作。
+
+平台没有 `fcntl` 时拒绝发布，不退化成「建个文件表示占着」。
+
+### 五、幂等靠编号
+
+`release_id` 在重试中不变，`txn_id` / `index_build_id` 由它派生，续做不会建出
+第二份索引。索引编号显式传入时若已存在同名库，**报错而不是顺延**
+（`IDX-2-2` 这种顺延会让清单指向一个不存在的库）。
+
+已切换的版本重复执行只补回执与镜像，不再切换指针。
+
+### 六、回退是一次新发布
+
+新 `release_id`、`base_release` 为当前正式版、复用旧版内容与索引、作者单独批准、
+回执写明「这是新发布 + 原因 + 对外平台需人工处理」。导致回退的那次发布记录不删。
+
+**「复用旧版 revision」这条按内容实现，不按 commit sha 实现**：每次发布都在自己的
+快照里新提交一次，sha 必然不同；把旧 sha 写进新清单会指向本版快照里不存在的提交，
+四点交叉验证当场失败。替代做法是逐文件核对「本包文件集 == 目标版文件集」，
+多一个少一个不一样都拒绝并列出路径——比比对 sha 更严。
+
+### 七、镜像失败不撤销发布
+
+第 21 步把内容镜像回 Vault 供 Obsidian 阅读。失败只写回执告警，不撤销切换：
+正式查询读的是指针与索引，不读镜像。「已切换但镜像没写」是可接受且已记录的状态；
+「因镜像失败把指针拨回去」会制造第二个不确定状态。
+
+### 八、故障注入让断点变成回归用例
+
+`NOVEL_RELEASE_FAULT=before:18` / `after:18` 在指定步骤前后抛异常，磁盘上留下的
+痕迹与真实崩溃一致（步骤状态 + 指针 + 清单）。`tests/integration/test_t06_release.py`
+用它覆盖六类断点，不需要人手工 kill 进程。
+
+### 测试
+
+456 → **505 passed / 1 skipped**。新增 `test_release_model.py`（22 条，哈希稳定性
+与规范形式）、`test_release_lock.py`（10 条）、`test_t06_release.py`（17 条断点与验收）。
+
+同时把 `test_workflow_flow.py`、`test_spec_checklist.py`、`test_t05_cli.py` 里
+依赖一步发布的断言改成三步流程——不是放宽断言，是把「谁批了什么」按新流程重新钉住。
+
 ## 0.8.0 — 2026-11-21
 
 T05「审批、变更请求、影响分析」。四个新命令、五类变更、一道发布闸门。

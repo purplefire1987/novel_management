@@ -36,6 +36,34 @@ def run(*argv: str) -> int:
     return main(list(argv))
 
 
+def publish_task(vault: Path, runtime: Path, task: str, *extra: str) -> int:
+    """走完整发布：prepare → approve release → publish。
+
+    T06 之后 `publish` 只能执行「已准备且作者已批准」的计划——它不再替作者
+    临时生成一份再当成批过。这个 helper 就是那条正路。
+    """
+    assert (
+        run(
+            "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
+            "--task", task, "--as", "author",
+        )
+        == 0
+    )
+    release_id = sorted(p.name for p in (runtime / "releases").glob("REL-*"))[-1]
+    digest = sha(runtime / "releases" / release_id / "plan.json")
+    assert (
+        run(
+            "approve", "release", release_id, "--hash", digest, "--as", "author",
+            "--vault", str(vault), "--runtime", str(runtime),
+        )
+        == 0
+    )
+    return run(
+        "publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task,
+        "--as", "author", "--confirm", *extra,
+    )
+
+
 # --------------------------------------------------------------------------
 # 14.1 路径与隔离
 # --------------------------------------------------------------------------
@@ -206,10 +234,7 @@ def test_14_2_logs_do_not_leak_body(vault_env, draft_md: Path, task_factory) -> 
         "--as", "writer",
     ) == 0
     assert run("approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author") == 0
-    assert run(
-        "publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task,
-        "--as", "author", "--confirm",
-    ) == 0
+    assert publish_task(vault, runtime, task) == 0
 
     log = runtime / "logs" / "ops.jsonl"
     assert log.exists()
@@ -381,11 +406,25 @@ def test_14_4_draft_and_revision_are_separate(vault_env) -> None:
 
 
 def test_14_4_publish_requires_author_approval(vault_env, draft_md: Path, task_factory) -> None:
+    """两道门都要关着：产物没批过 → 准备不出计划；计划没批过 → 发布不了。"""
     vault, runtime = vault_env
     task = task_factory("--type", "draft", "--assignee", "writer")
     assert run(
         "stage", "--vault", str(vault), "--runtime", str(runtime), "--task", task,
         "--from", str(draft_md), "--to", "03_Manuscripts/Drafts/CH-0001.md", "--as", "writer",
+    ) == 0
+
+    # 产物未批准：计划准备即被拒
+    assert run(
+        "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
+        "--task", task, "--as", "author",
+    ) == 4
+
+    # 产物批了，但计划没批：publish 仍被拒
+    assert run("approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author") == 0
+    assert run(
+        "release", "prepare", "--vault", str(vault), "--runtime", str(runtime),
+        "--task", task, "--as", "author",
     ) == 0
     assert run(
         "publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task,

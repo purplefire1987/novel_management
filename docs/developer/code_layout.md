@@ -12,6 +12,7 @@ cli/          只做参数解析与输出格式化，不写业务判断
   ├── approval_cmd.py inspect / approve <object>
   ├── change_cmd.py issue / change / impact
   ├── flow.py       task / stage / diff / approve / adopt / publish
+  ├── release_cmd.py release prepare / show / execute / resume / abort / status / repair / rollback / list / unlock
   ├── backup_cmd.py backup / restore
   ├── maps_cmd.py   maps paths / import-admin / build
   ├── schema_cmd.py schema list / check、package-hash
@@ -19,6 +20,7 @@ cli/          只做参数解析与输出格式化，不写业务判断
 config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
 logs.py       运行日志：写 <runtime>/logs/novel.log，与 audit 的审计日志是两件事
+version.py    版本号唯一出处（__version__ 与 SPEC_VERSION），发布清单记的就是它
 frontmatter.py frontmatter 的唯一解析实现（只顶层 key: value）
 markdown.py    Markdown 解析与块 ID：frontmatter（走 PyYAML）+ 按空行切块 + 行号回指
 canonical.py  字节规范化（去 BOM、LF）与规范化 JSON 包哈希
@@ -30,13 +32,19 @@ tasks/        任务记录与状态流转
 approvals/    批准记录（绑定对象类型 + 内容 sha256，按当前字节复核）
 changes/      问题单（ISSUE）、变更请求（CR）、影响分析；存 runtime，不进索引
 staging/      staging 落盘与 manifest
-release/      发布六道闸与旧版归档（含 BLOCKER / 未批准 RETCON 两道内容闸）
+release/      发布协议（ADR-015）
+  ├── model.py     ReleasePlan / ReleaseManifest / Journal / Receipt / ActivePointer 与 22 步名表
+  ├── store.py     目录约定与读写：releases/<REL>/、receipts/、locks/；指针损坏即抛
+  ├── engine.py    22 步执行、断点恢复、状态判词、故障注入
+  ├── workspace.py 隔离快照：复制树 / 落精确字节 / 扫描 / 提交
+  ├── gates.py     六道闸（产物批准、BLOCKER、RETCON、正式区、Canon 二次确认）
+  └── lock.py      flock 发布锁；不按年龄或 PID 猜死锁
 baseline/     作者编辑基线（adopt）
 backup/       备份、校验、恢复
 adapters/     模型适配层；当前只有 MockLLM（确定性、不联网、不需密钥）
 indexing/     SQLite 索引：schema 建表 / source 取文件 / builder 建库 / search 查询 / locate 定位
 timeline/     事件 DAG（graph）/ 状态区间与认知查询（query）/ 前言提取（model）
-validation/ workflows/ agents/ core/   预留扩展位（T06 之后）
+validation/ workflows/ agents/ core/   预留扩展位（T07 之后）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
@@ -104,8 +112,35 @@ cli → release / backup / staging / tasks / approvals / changes / baseline
 主命令用真实默认值、子命令一律 `argparse.SUPPRESS`。**危害不是报错而是静默错库**，
 回归测试在 `tests/unit/test_cli_arg_order.py`。
 
-**隐藏目录判定用 Vault 内相对路径。** 用绝对路径判会把 `.tmp/vault` 这种临时目录整树误判，
+**隐藏目录判定用 Vault 内相对路径。** 用绝对路径判会把 `.tmp/vault` 这种临时树整树误判，
 导致索引 0 条——这个 bug 真实发生过一次。
+
+**发布时不要在 Vault 里就地改。** 22 步里 1–13 全在隔离快照上做，第 18 步才动指针。
+就地改写到一半崩掉，正式区就是「混合版本」——这正是 PRD §17.1 的底线。
+快照复制整棵树的代价见 `known_risks` R-27。
+
+**恢复不要「取最新文件」。** 指针、清单、日志都带时间戳，取最新看着合理，
+但崩溃恰恰会让时间戳失真（写了日志没换指针，或换了指针没写日志）。
+必须四点交叉验证，判词见 `release/engine.py::status` 的文档表。
+
+**正式版指针只有一个。** `releases/active.json` 决定正式版，`index/active.json`
+只是「上次重建的结果」。查询优先读前者；清单钉住的索引库不存在时**报错进恢复模式**，
+不退回另一份——退回去就是「新发布 + 旧索引」的混搭。
+
+**日志的 16/17/18 三步要各记各的。** `storage.write_atomic` 把「写临时文件」和
+「替换」做在一起，用它日志会写成 16、18 都完成而 17（fsync）根本没发生。
+`_write_pointer_atomic` 因此手写了这三步。
+
+**执行阶段不能依赖任务记录还在。** 计划自带 `staged_paths`，按它取字节。
+任务 yaml 是运行态、可能被清理；把它当唯一依据，清理过一次就再也续不了发布。
+
+**锁的归属由内核判，不看文件年龄也不看 PID。** 锁文件里写持有人只是给人看的。
+「超过 N 分钟就当残留删掉」在慢机器上会直接放出第二个发布者（PRD §18.4 明令禁止）。
+没有 `fcntl` 时拒绝发布，**不退化成锁文件**——假锁比没锁更危险。
+
+**规范化 JSON 让「文件字节哈希 == package_hash(对象)」。** 所以回执里的清单哈希
+可以直接 `sha256_file` 复核，不必再解析一遍。四类发布记录都走这条，
+并有两条测试盯着它们与 `schemas/*.schema.json` 的契约。
 
 ## 加一个新命令的步骤
 

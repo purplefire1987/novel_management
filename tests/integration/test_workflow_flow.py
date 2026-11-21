@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from novel_system.cli import main
+from novel_system.storage import sha256_file
 
 TARGET = "03_Manuscripts/Drafts/CH-0001.md"
 
@@ -80,6 +81,60 @@ def _stage(vault: Path, runtime: Path, tmp_path: Path, task: str, target: str, t
     )
 
 
+def _release_ids(runtime: Path) -> list[str]:
+    return sorted(p.name for p in (runtime / "releases").glob("REL-*"))
+
+
+def _prepare(vault: Path, runtime: Path, task: str, *, expect: int = 0) -> str:
+    """准备发布计划。T06 之后 publish 必须基于「已准备且已批准」的计划。"""
+    code = main(
+        ["release", "prepare", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"]
+    )
+    assert code == expect
+    return _release_ids(runtime)[-1] if code == 0 else ""
+
+
+def _approve_plan(vault: Path, runtime: Path, release_id: str) -> None:
+    # plan.json 就是规范形式落盘的，文件哈希 == 计划哈希，不必再解析一遍
+    digest = sha256_file(runtime / "releases" / release_id / "plan.json")
+    code = main(
+        [
+            "approve",
+            "release",
+            release_id,
+            "--hash",
+            digest,
+            "--as",
+            "author",
+            "--vault",
+            str(vault),
+            "--runtime",
+            str(runtime),
+        ]
+    )
+    assert code == 0
+
+
+def _publish(vault: Path, runtime: Path, task: str, *extra: str) -> int:
+    release_id = _prepare(vault, runtime, task)
+    _approve_plan(vault, runtime, release_id)
+    return main(
+        [
+            "publish",
+            "--vault",
+            str(vault),
+            "--runtime",
+            str(runtime),
+            "--task",
+            task,
+            "--as",
+            "author",
+            "--confirm",
+            *extra,
+        ]
+    )
+
+
 def test_stage_writes_into_task_area(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     vault, runtime = _env(tmp_path)
     task = _new_task(vault, runtime)
@@ -114,13 +169,18 @@ def test_stage_rejects_path_escape(tmp_path: Path, capsys: pytest.CaptureFixture
 
 
 def test_publish_requires_approval(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """没有产物批准就准备不了计划；没有计划就发布不了。两道门都必须关着。"""
     vault, runtime = _env(tmp_path)
     task = _new_task(vault, runtime)
     _stage(vault, runtime, tmp_path, task, TARGET)
+    # 产物未批准 → 准备计划被拒（4 = 审批失败）
+    _prepare(vault, runtime, task, expect=4)
+    # 没有计划 → publish 拒绝，并给出该走的三步
     code = main(
         ["publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author", "--confirm"]
     )
-    assert code == 4
+    assert code == 2
+    assert "release prepare" in capsys.readouterr().out
     capsys.readouterr()
 
 
@@ -130,23 +190,22 @@ def test_full_chain_publishes_content(tmp_path: Path, capsys: pytest.CaptureFixt
     assert _stage(vault, runtime, tmp_path, task, TARGET, "第一章 正文\n") == 0
     assert main(["diff", "--vault", str(vault), "--runtime", str(runtime), "--task", task]) == 0
     assert main(["approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"]) == 0
-    code = main(
-        ["publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author", "--confirm"]
-    )
-    assert code == 0
+    assert _publish(vault, runtime, task) == 0
     published = vault / "10_Projects" / "novel-001_test-novel" / TARGET
     assert published.read_text(encoding="utf-8") == "第一章 正文\n"
     capsys.readouterr()
 
 
 def test_publish_twice_is_refused(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """任务已发布过 → 拒绝。发布本身可以幂等重试，但「再发一次新内容」必须走新任务。"""
     vault, runtime = _env(tmp_path)
     task = _new_task(vault, runtime)
     _stage(vault, runtime, tmp_path, task, TARGET)
     main(["approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"])
+    assert _publish(vault, runtime, task) == 0
     args = ["publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author", "--confirm"]
-    assert main(args) == 0
     assert main(args) == 1
+    assert "已经发布过" in capsys.readouterr().out
     capsys.readouterr()
 
 
@@ -160,11 +219,13 @@ def test_publish_archives_previous_version(tmp_path: Path, capsys: pytest.Captur
     task = _new_task(vault, runtime)
     _stage(vault, runtime, tmp_path, task, TARGET, "新版本\n")
     main(["approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"])
-    main(["publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author", "--confirm"])
+    assert _publish(vault, runtime, task) == 0
 
-    archived = list((project / "90_Archive" / "publish_archive" / task).rglob("CH-0001.md"))
-    assert archived and archived[0].read_text(encoding="utf-8") == "旧版本\n"
     assert formal.read_text(encoding="utf-8") == "新版本\n"
+    # 归档位置从布局配置取，不写死目录名
+    archived = list((project / "90_Archive" / "publish_archive").rglob("CH-0001.md"))
+    assert archived, "旧版没有归档，回退就无据可依"
+    assert any(path.read_text(encoding="utf-8") == "旧版本\n" for path in archived)
     capsys.readouterr()
 
 
@@ -174,6 +235,8 @@ def test_canon_publish_needs_second_confirmation(tmp_path: Path, capsys: pytest.
     canon = "01_Canon/Characters/CHAR-0001.md"
     assert _stage(vault, runtime, tmp_path, task, canon, "---\nid: CHAR-0001\n---\n档案\n") == 0
     main(["approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"])
+    release_id = _prepare(vault, runtime, task)
+    _approve_plan(vault, runtime, release_id)
     base = ["publish", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author", "--confirm"]
     assert main(base) == 3
     assert main(base + ["--confirm-canon"]) == 0
@@ -185,6 +248,8 @@ def test_tampered_staging_invalidates_approval(tmp_path: Path, capsys: pytest.Ca
     task = _new_task(vault, runtime)
     _stage(vault, runtime, tmp_path, task, TARGET)
     main(["approve", "--vault", str(vault), "--runtime", str(runtime), "--task", task, "--as", "author"])
+    release_id = _prepare(vault, runtime, task)
+    _approve_plan(vault, runtime, release_id)
     staged = vault / "10_Projects" / "novel-001_test-novel" / "07_Staging" / task / "drafts" / TARGET
     staged.write_text("批准后被换了\n", encoding="utf-8")
     code = main(

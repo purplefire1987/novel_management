@@ -143,21 +143,32 @@ def build_index(
     built_at: str | None = None,
     manifest_path: Path | None = None,
     pointer_path: Path | None = None,
+    build_id: str = "",
 ) -> BuildResult:
     """从 source 建一份新索引到 `index_dir/builds/`，并（可选）切换指针。
 
     返回统计。**不覆盖任何已存在的库文件**；旧 build 原样留着，
     要清理是另一件事（见 known_risks R-18）。
+
+    `build_id` 给定时用它，否则按时间戳自动编号。发布流程必须显式给号：
+    ReleaseManifest 里写的是 `IDX-000021` 这种稳定编号，发布清单要能指着它说
+    「这次发布对应的就是这份索引」，而不是一个带 PID 的时间戳。
     """
     index_dir = Path(index_dir)
     builds = index_dir / "builds"
     builds.mkdir(parents=True, exist_ok=True)
     stamp = built_at or _now()
-    build_id = f"IDX-{stamp.replace('-', '').replace(':', '')}-{os.getpid()}"
+    explicit_id = bool(build_id)
+    if not build_id:
+        build_id = f"IDX-{stamp.replace('-', '').replace(':', '')}-{os.getpid()}"
     target = builds / f"{build_id}.sqlite"
+    if target.exists() and explicit_id:
+        # 显式编号是发布清单钉住的号，**不能顺延**：悄悄改成 `-2` 会让清单
+        # 永远指向一份不存在的库。重复建同一个号由调用方决定复用还是报错。
+        raise ParseError(f"索引编号已存在，拒绝覆盖：{target}")
     if target.exists():
-        # 同一秒同一进程连建两次时不能覆盖：编号往后顺延，build_id 跟着改，
-        # 否则指针说 build 是 A、文件名却是 A-2，两边对不上。
+        # 自动编号时不能覆盖：同一秒同一进程连建两次，编号往后顺延，
+        # build_id 跟着改，否则指针说 A、文件名却是 A-2，两边对不上。
         suffix = 2
         while (builds / f"{build_id}-{suffix}.sqlite").exists():
             suffix += 1

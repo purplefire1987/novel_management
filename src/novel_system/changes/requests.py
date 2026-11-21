@@ -30,6 +30,7 @@ from pathlib import Path
 from ..audit import now_iso
 from ..canonical import package_hash
 from ..errors import ApprovalError, UsageError
+from ..staging import artifact_id_of
 from ..storage import write_atomic
 
 PLAN_CHANGE = "PLAN_CHANGE"
@@ -76,6 +77,26 @@ class ChangeRequest:
     @property
     def independent(self) -> bool:
         return self.type in INDEPENDENT_APPROVAL
+
+    def scope_hits(self, targets: list[str]) -> bool:
+        """这笔变更是否覆盖给定路径。
+
+        两种写法都要认：`scope` 里写路径前缀（`01_Canon/Characters`），
+        `targets` 里写对象 ID（`CHAR-0001`）。作者两种都会用，只认一种就会漏。
+        """
+        for raw in self.scope:
+            scope = str(raw).strip().rstrip("/")
+            if not scope:
+                continue
+            for target in targets:
+                if target == scope or target.startswith(scope + "/"):
+                    return True
+        wanted = {str(x) for x in self.targets if str(x).strip()}
+        if wanted:
+            for target in targets:
+                if artifact_id_of(target) in wanted:
+                    return True
+        return False
 
     def as_dict(self) -> dict:
         return {
@@ -273,6 +294,11 @@ class ChangeStore:
 
         用于拦「先改档案、后补变更」：只要有一笔未批准的 RETCON 覆盖这个路径，
         普通文件审批就得停下——否则 RETCON 的独立审批就成为可选装饰。
+
+        **scope 按前缀匹配**。用集合精确相交看着更严谨，实际是空的：
+        `--scope 01_Canon/Characters` 是作者写目录的常态，永远不等于
+        `01_Canon/Characters/CHAR-0001.md`，于是这道闸一次都不会触发——
+        「有检查」和「检查生效」是两件事。
         """
         blocking: list[ChangeRequest] = []
         for change in self.all(project_id=project_id):
@@ -280,6 +306,6 @@ class ChangeStore:
                 continue
             if change.status == REJECTED:
                 continue
-            if set(change.scope) & set(targets):
+            if change.scope_hits(targets):
                 blocking.append(change)
         return blocking
