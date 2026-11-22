@@ -15,8 +15,8 @@ PRD §20.3 要求 `inspect` 显示七样东西，少一样作者就没法判断�
 本版没有单独的候选 ID 命名空间（PRD §8.1 也没给候选留前缀），候选就是
 **任务 staging 里的一份或一包产物**：
 
-- `TASK-000001` —— 该任务 staging 的全部文件，批准绑「包哈希」；
-- `TASK-000001:01_Canon/Characters/CHAR-0001.md` —— 只批这一份，绑文件哈希。
+- `task_000001` —— 该任务 staging 的全部文件，批准绑「包哈希」；
+- `task_000001:02_世界知识库/人物与角色/ent_000001_某某.md` —— 只批这一份，绑文件哈希。
 
 包哈希用 `canonical.package_hash` 算 `[{target, sha256}]`，跨进程稳定。
 
@@ -41,16 +41,20 @@ from ..changes import IssueStore, ChangeStore
 from ..errors import ApprovalError, UsageError
 from ..staging import StagedFile, StagingArea, artifact_id_of
 from ..storage import sha256_file
+from ..tasks import is_task_id, normalize_task_id
 from ._common import approval_store, heading, info, ok, oplog, project, task_store, warn
+
+# 帮助文案里举的例子。写成常量是因为 `TASK-000001` 这种旧形态散落在十几条
+# 提示语里，改一次号段要全改——散着写的时候，一定会漏掉一条。
+TASK_ID_EXAMPLE = "task_000001"
 
 # 路径前缀 → 批准范围（PRD §14.4 的 approved_scope）
 SCOPES = (
-    ("03_Manuscripts", "CHAPTER_TEXT"),
-    ("01_Canon", "CANON_FILE"),
-    ("02_Planning", "PLANNING"),
-    ("06_Memory", "MEMORY"),
-    ("04_Story_Assets", "STORY_ASSET"),
-    ("05_Ledgers", "LEDGER"),
+    ("04_正文", "CHAPTER_TEXT"),
+    ("02_世界知识库", "CANON_FILE"),
+    ("03_故事规划", "PLANNING"),
+    ("05_记忆与连续性", "MEMORY"),
+    ("06_素材与研究", "STORY_ASSET"),
 )
 # 风险：正文与 Canon 是高危，规划次之，其余低。
 RISK = {
@@ -72,9 +76,12 @@ def scope_of(target: str) -> str:
 
 def _split_candidate(candidate: str) -> tuple[str, str]:
     task_id, _, target = candidate.partition(":")
-    if not task_id.startswith("TASK-"):
-        raise UsageError(f"候选 ID 形如 TASK-000001 或 TASK-000001:<目标相对路径>，收到：{candidate}")
-    return task_id, target
+    if not is_task_id(task_id):
+        raise UsageError(
+            f"候选 ID 形如 {TASK_ID_EXAMPLE} 或 {TASK_ID_EXAMPLE}:<目标相对路径>，收到：{candidate}"
+        )
+    # 旧号 `TASK-000001` 归一成 `task_000001` 再往下走：认得出，但不再往文件名里写旧形态。
+    return normalize_task_id(task_id), target
 
 
 def resolve_candidate(cfg: cfg_mod.Config, pp, candidate: str) -> tuple:
@@ -399,7 +406,7 @@ def _approve_text(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     task_id = (getattr(args, "task", "") or "").strip()
     chapter = (getattr(args, "chapter", "") or getattr(args, "candidate", "") or "").strip()
     if not task_id or not chapter:
-        raise UsageError("approve text 需要 --task TASK-000001 与 --chapter CH-0001")
+        raise UsageError("approve text 需要 --task task_000001 与 --chapter plan_000001")
 
     runtime = cfg.require_runtime()
     result = text_approval.approve_text(
