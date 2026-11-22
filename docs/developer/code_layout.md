@@ -1,5 +1,31 @@
 # 代码结构
 
+## Vault 目录（V1.0 §8）
+
+```
+00_作者工作台/        系统级：Policies、Dashboards、Schemas、Vault_Config.yaml
+01_小说项目/<项目>/
+  ├── 00_项目管理/      进度、决策记录
+  ├── 01_灵感与创意/
+  ├── 02_世界知识库/    17 类，按 frontmatter 的 type 归位
+  ├── 03_故事规划/      故事总纲 / 卷级粗纲 / 章节细纲 / 场景节拍 / 故事线 / 伏笔与悬念
+  ├── 04_正文/          初稿 / 修订稿 / 正式定稿
+  ├── 05_记忆与连续性/
+  ├── 06_素材与研究/
+  ├── 07_审核与报告/
+  ├── 08_工作流与任务视图/
+  ├── 09_版本与变更记录/
+  ├── 10_项目配置/      project.yaml（目录名与路径的唯一来源）
+  ├── _staging/        Agent 提案落点，不得被查询当成正式 Canon
+  └── 90_Archive/      旧稿与原始素材（V1.0 无归档位，保留）
+02_作者级通用资料/    跨项目模板
+99_Archive/           旧系统全量（不在 V1.0 规范内，删不得）
+```
+
+**代码里一个目录字面量都不该有。** 需要目录名就从 `ProjectPaths` 取，
+它读 `10_项目配置/project.yaml`，读不到才退回 `paths.DEFAULT_DIRS`。
+`config/defaults.yaml` 的 `layout` 段是布局的唯一配置源。
+
 ## 分层
 
 ```
@@ -24,8 +50,8 @@ config/       五级配置解析 + Vault_Config 兼容折算
 paths.py      ProjectPaths：项目内目录解析与边界校验
 logs.py       运行日志：写 <runtime>/logs/novel.log，与 audit 的审计日志是两件事
 version.py    版本号唯一出处（__version__ 与 SPEC_VERSION），发布清单记的就是它
-frontmatter.py frontmatter 的唯一解析实现（只顶层 key: value）
-markdown.py    Markdown 解析与块 ID：frontmatter（走 PyYAML）+ 按空行切块 + 行号回指
+frontmatter.py 顶层键值的**轻量**解析（只认 `key: value`，缩进行跳过）
+markdown.py    Markdown 解析与块 ID：frontmatter（走 PyYAML，**嵌套结构只有这条路能解**）+ 按空行切块 + 行号回指
 canonical.py  字节规范化（去 BOM、LF）与规范化 JSON 包哈希
 schema.py     JSON Schema 校验器（draft 2020-12 实用子集，零依赖）
 ids.py        稳定 ID 分配：前缀表、分级查重（正式区/待发布/归档）、加锁、审计
@@ -79,7 +105,6 @@ workflows/  创作链路（ADR-018）
   ├── review.py         风险路由（只能升不能降）、按风险配角色、自审拒绝、返修预算、
   │                     规则检查只判形状；ReviewStore 在 <runtime>/reviews/
   └── text_approval.py  正文批准：审过 + 角色齐 + 无 BLOCKER 才批，绑整份字节 sha256
-core/       预留扩展位（T11 之后）
 ```
 
 依赖方向严格单向，越往下越不知道上层：
@@ -265,6 +290,13 @@ docstring。写了不支持的 keyword 不会报错，只是**不生效**——�
 
 ## 加一个新目录
 
-目录名不写进代码，写进 `templates/project/project.yaml` 与 `init-project` 的骨架定义。
+**项目元数据**的键写在 `templates/project/project.yaml`，`init-project` 会读它
+（2026-11-23 起；在此之前该模板从未被读取，改它不会有任何效果）。
+
+**目录骨架**由 `init-project` 按 `layout.project_subdirs` / `canon_subdirs`
+（`config/defaults.yaml`）建，另有几组代码常量（`PLANNING_DIRS` / `MANUSCRIPT_DIRS` /
+`MEMORY_DIRS` / `STAGING_AREAS`）。**改一处不够**：模板、配置、常量三者必须对齐，
+否则「配置说的」和「代码建的」会分叉。
+
 若某个目录需要特殊语义（例如「不得进索引」），改 `paths.py` 的常量并补测试，
 不要在各处散落字符串判断。

@@ -1,0 +1,20 @@
+project_id: "sample-001"
+project_name: "示例小说"
+project_slug: "sample-novel"
+author_id: "author-local"
+created_at: '2026-01-01T00:00:00+08:00'
+project_status: "draft"
+# 目录规范：V1.0 §8
+project_meta_root: "10_项目配置"
+canon_root: "02_世界知识库"
+planning_root: "03_故事规划"
+manuscript_root: "04_正文"
+assets_root: "06_素材与研究"
+# ledger 不再是独立目录：事件/关系/时间线都在知识库里（2026-11-22 解散 05_Ledgers）
+ledger_root: "02_世界知识库"
+memory_root: "05_记忆与连续性"
+staging_root: "_staging"
+review_root: "07_审核与报告"
+archive_root: "90_Archive"
+timezone: "Asia/Shanghai"
+schema_version: 1

@@ -8,7 +8,7 @@
   "properties": {
     "chapter_id": {
       "type": "string",
-      "pattern": "^CH-[0-9]{4}$",
+      "pattern": "^(ch_[0-9]{6}|CH-[0-9]{3,4})$",
       "description": "全局唯一；与卷、序号解耦，避免卷内重编号引发连锁改动"
     },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },

@@ -266,12 +266,12 @@ src/novel_system/
   agents/         九角色注册与权限矩阵、预算、类型化工具、提示词装配、计量、Preflight（T08）
   workflows/      创作与审核：规划契约 / 写稿（只落 staging）/ 审核与风险路由 / 正文批准（T09）
   validation/     写后闭环：记忆提案 / 依赖失效 / 共同发布（T10）；发布闸的契约校验（ID/契约/来源/引用）
-  adapters/ core/  模型适配层（当前只有 Mock）／预留
+  adapters/       模型适配层（当前只有 Mock）
 config/             默认配置与配置 Schema
-schemas/            25 类数据契约（JSON Schema，additionalProperties 一律 false）
-templates/          Markdown/YAML 模板（author / project / entity / planning / manuscript / memory / reports）
+schemas/            26 类数据契约 + 1 份公共定义（JSON Schema，additionalProperties 一律 false）
+templates/          Markdown/YAML 模板；其中 project/project.yaml 由 `init-project` 真读
 agents/             九 Agent 角色卡与权限矩阵（人读版 permissions.md 与代码逐格比对）
-workflows/          六个工作流定义
+workflows/          catalog.yaml（20 条工作流）+ 6 份分步细则（detail_ref 指向）
 quality_gates/      质量门规则
 scripts/            selfcheck.py（端到端冒烟）、privacy_scan.py（隐私扫描）
 docs/               架构（含 ADR）、用户、开发、运维、WorkBuddy 文档

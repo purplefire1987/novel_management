@@ -88,6 +88,24 @@ def _fm_blocks(fm: list[str]) -> list[list[str]]:
     return blocks
 
 
+#: 行政区划表的 ID 由**文件名**决定（`naming.admin_table` → `ent_000963_行政区划表`）。
+#:
+#: 旧版写死 `id: WORLD-0040`。0.14.0 全库重排后正式档案是 `ent_000963`，
+#: 重跑一次 `import-admin` 就会把 ID 从 `ent_000963` 改回 `WORLD-0040`——
+#: 一条命令把一份正式档案变成旧形态，且 `validate` 要等到下次扫描才报。
+ID_RE = re.compile(r"^(ent_\d{6})")
+
+
+def target_id() -> str:
+    """行政区划表的 ID：从 `OUT` 的文件名取。取不到就报错，不编一个。"""
+    m = ID_RE.match(OUT.stem)
+    if not m:
+        raise SystemExit(
+            f"✗ 行政区划表文件名里没有合法 ID：{OUT.name}（应为 ent_XXXXXX_<名>.md）"
+        )
+    return m.group(1)
+
+
 def keep_meta(new_lines: list[str], path: Path) -> list[str]:
     """把既有档案里的 PRESERVE_KEYS 拼回新生成的 frontmatter。"""
     if not path.exists():
@@ -118,7 +136,7 @@ def keep_meta(new_lines: list[str], path: Path) -> list[str]:
     return out
 
 # 州（大区）的排列顺序、界外大区、界外条目的形态、原表已知的口径问题，
-# 全部来自项目的版式配置（`<project>/00_Project/jiuzhou_layout.yaml`）。
+# 全部来自项目的版式配置（`<project>/10_项目配置/jiuzhou_layout.yaml`）。
 #
 # 这些原先写死在代码里，等于把「这部作品有哪些州、哪个洞天算奇地、哪一行是跨州复制残留」
 # 一并搬进了公仓。公仓以 GPL-3.0 公开、按 ADR-005 不含任何作品设定，
@@ -270,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
 
     lines: list[str] = [
         "---",
-        "id: WORLD-0040",
+        f"id: {target_id()}",
         "type: world",
         f"name: {ADMIN_ALIAS}",
         f"title: {ADMIN_ALIAS}",
@@ -278,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         *(f"- {alias}" for alias in ADMIN_ALIASES),
         "subtype: 总表",
         f"world: {WORLD_NAME}",
-        "canon_status: confirmed",
+        "canon_status: canon",
         "created_at: '2026-11-05'",
         f"updated_at: '{TODAY}'",
         "source_refs:",

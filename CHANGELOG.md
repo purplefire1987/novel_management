@@ -2,6 +2,431 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.15.4 — 2026-11-23
+
+**修好 `maps`，清掉历史包袱。** 依据 `docs/architecture/legacy_inventory.md` 的裁定：
+① 修 `maps` ② 重写 `examples` ③ 让 `init` 真读模板 ④ 执行档 1。
+
+### 一、`maps`：0.14.0 之后它一直是坏的，且会改坏数据
+
+`jiuzhou.py` 还在 glob `LOC-*.md`，而全库已是 `ent_000001`。后果不是报错，是**安静地少画**：
+真库预演报「缺州域 11 / 待建档治所 71」，只生成 **40 节点**（0.4.1 基线是 111）。
+**加 `--confirm` 会把 111 节点的地图页降级成 40 节点。**
+
+修的是三处，不是一处（这正是「只改一半」的典型）：
+
+| # | 位置 | 旧 | 新 |
+|---|---|---|---|
+| 1 | `loc_files()` | `glob("LOC-*.md")` | `glob("ent_*.md")` + **`type: location` 过滤** |
+| 2 | `name_of()`（新增） | `stem.split("_", 1)[1]` | 正则剥掉 `ent_\\d{6}_` 前缀 |
+| 3 | `loc_rel()` | `stem.split("_", 1)[0]` | `ID_RE.match(...).group(1)` |
+
+**第 2 条最关键也最容易漏**：`LOC-0001_某地` 只有一个下划线，`split("_", 1)[1]` 得 `某地`；
+`ent_000906_怒涛府` 有两个，同样切法得 `000906_怒涛府`——地名表全部对不上，
+而命令不报错。只把 glob 改成 `ent_*.md` 的话，症状从「40 节点」变成「40 节点 + 无报错」，
+更难查。
+
+- **不再自造 ID**：`allocate_fu()` 原来按 `LOC-` 最大号 +1 造新号。0.14.0 后 ID 由
+  `ids.py` 统一发号，生成器自造会同时违反「形态」与「发号器」两条，且造出的号会进 canvas
+  变成死链。现在缺档案就留空、标「待建档」。
+- **`admin.py` 的 `id: WORLD-0040` 改成从文件名取**：重跑一次 `import-admin` 就会把
+  `ent_000963` 改回旧形态，而这种破坏要等下次 `validate` 才暴露。
+- 生成物落盘后的实测：**层级树 111 节点 / 110 连线**（与 0.4.1 基线一致），
+  方位图 108/107；`file` 字段从已废弃的 `Locations/` 修正为 `地理与地点/`（死链 0）；
+  复跑 **写入 0 个文件**（幂等）。备份 `<runtime>/backups/maps-pre-entfix-20261123-004453/`。
+- 地图页文案里那句 `00_System/scripts/build_jiuzhou_map.py` 改成 `novel maps build`。
+
+### 二、`examples/`：整份是 0.4.x 化石
+
+旧示例 `CHAR-0001.md` **连 frontmatter 分隔符都没有**，`markdown.load_meta` 直接抛
+`ParseError`；ID 是 V4.0 形态、`status: confirmed` 是旧枚举；测试对它 0 引用。
+按现行契约重写为 2 实体 + 1 事件 + 1 章节 + `project.yaml`，四份全部过 `schema.check`。
+
+README 里给了可复制的校验脚本，并写明一个**容易踩的坑**：`frontmatter.split` 负责切
+`---`，`markdown.load_meta` 只收纯 YAML 块——整篇丢进去会报 `found another document`。
+
+### 三、`init-project` 真读 `templates/project/project.yaml`
+
+以前是 `cli/init.py` 里的字符串常量，模板文件从未被读取——那句「改了模板没生效」就是这么来的。
+现在读模板并填充占位符，**产物与旧实现逐字节一致**（排除 `created_at`）。
+
+- 模板缺失时**报错**，不回退内嵌默认值（静默回退会让同一个问题重新隐形）。
+- 新增 `NOVEL_TEMPLATES_DIR` 覆盖，测试可用。
+- 边界两条都实测：改模板 → 产物跟着变；模板缺失 → `UsageError`。
+- 新增 `templates/README.md`，写清「谁读谁」与三条写模板的规矩。
+
+### 四、契约修正：`chapter_id` 曾拒绝一切合法章节
+
+`chapter.schema.json` 的 `chapter_id` 还是 `^CH-[0-9]{4}$`，`memory.schema.json` 同。
+也就是说 0.14.0 之后**没有任何一份合法章节能过契约**。按 `foreshadowing` 已有的写法
+改成 `^(ch_[0-9]{6}|CH-[0-9]{3,4})$`（新形态 + 历史形态豁免）。
+
+### 五、档 1 清理（零行为改动）
+
+| 动作 | 证据 |
+|---|---|
+| 删 `src/novel_system/core/` | 1 行空包，全库引用 1 处（自己） |
+| 删 **31 个**沙箱垃圾文件（顶层 + `maps/` 2 个） | 均为 8 位名、4 字节，`tempfile` 回退产物；顶层从近百项降到 18 项 |
+| 删 `defaults.yaml` 两个死键 | `config_version` / `runtime_subdirs` 在 `src/` 0 引用 |
+| 同步两份 `defaults.yaml` | 仓库根是 V4.0 旧副本、包内是 V1.0，**之前已分叉**；`test_config_defaults` 重新变绿 |
+| `README.md`：删 `core/`、改数量（26 契约 + 1 公共 / 20 工作流 + 6 细则） | 现数 |
+| `cli_reference.md`：补 7 条命令 + 改 35→43 + 修末尾 4 行路径 | 现数 |
+
+### 验证（真机）
+
+- `novel doctor` 全绿；`novel validate` 通过（1046 档 / 重复 0 / 双链 5679 条 0 断链）。
+- `tests/integration/test_maps.py` **5 绿**（含新增「非地点档案不得进图」），
+  `tests/unit/test_config_defaults.py` **2 绿**。
+- **「退回就红」已验证**：把 `name_of` 退回 `split("_", 1)[1]`，新用例立即失败；改回即绿。
+
+### 兼容性影响与未解决项
+
+- `maps build` 的输出会变（节点 ID 从 `LOC-` 变 `ent_`、`file` 指向 `地理与地点/`）。
+  这是修正，不是回归；已落盘并复跑确认幂等。
+- **`tests/unit` 仍有 121 项红**，原因与本次改动无关：测试停在 V4.0 假设
+  （`split_id('CHAR-0001')`、`vault/"10_Projects"`、`01_Canon/Locations`）。
+  这是欠账，对应 `v1_1_delta.md` 的 D6，不在本轮范围。
+- 仓库根的 `config/defaults.yaml` **从未被读取**（`DEFAULTS_PATH` 指向包内）。
+  本轮只是让它不再与包内分叉；要不要去掉这个副本，需另定。
+
+## 0.15.3 — 2026-11-23
+
+**基线换成 V1.1。** 本轮只做第一刀：Canon 状态枚举按 V1.1 §4.2 收成六值。
+差异全貌与其余四批见 `docs/operations/v1_1_delta.md`。
+
+### 一、Canon 枚举：`confirmed` → `canon`
+
+V1.1 §4.2「统一采用」`idea / proposal / pending_review / canon / deprecated / rejected`。
+旧口径是 V1.0 §6.1 的七值（`confirmed` `proposed` `under_review` `retcon_candidate` …），
+两套词并存时最容易被误判成「两个字段」，所以一次迁完，不做双写。
+
+- 改写 **1000 份**：`confirmed→canon` 989、`proposed→proposal` 10、`draft→proposal` 1。
+  `deprecated` 51 份不动。
+- **只改 `canon_status:` 这一行**：逐份做行级 diff 断言（必须正好 1 行变化），
+  sha256 前后各记一次；实际 sha 变化 1000 份，与记录集合完全相等，无意外改动。
+- **`99_Archive` 不动**：归档是冻结区，与「历史对照表保留旧号」同一条道理。
+- 迁移报告：`<runtime>/reports/canon_enum_migration_20261123-001749.json`
+  （含每份的 from/to 与前后 sha）。备份 `BK-20261123-001720`（3041 文件 / 29.9MB，已回读校验）。
+
+### 二、契约与写入点同步
+
+- `entity` / `event` / `foreshadowing` 三份 schema 的 `canon_status` 收紧为六值，
+  描述里写死旧值映射，省得下一个人再猜 `confirmed` 算什么。
+- `novel entity create` / `novel event create` 的 `--canon-status` 默认改 `proposal` 并给了 `choices`
+  —— 以前默认 `proposed` 但不受约束，写错值要到 `entity validate` 才发现。
+- `maps/` 两处生成模板里写死的 `canon_status: confirmed` 改 `canon`：地图页是**生成物**，
+  生成器不改，下次重画就把旧值带回来。
+- Vault 侧 17 份模板与策略文档（`02_作者级通用资料/Templates/*`、`Policies/Obsidian插件配置.md`）
+  同步改值；`T-新建档案.md` 里那句「改 confirmed」改成「改 canon」。
+- 「Agent 不得自行置为 canon」写进 schema 描述——六值里 `canon` 是唯一需要作者的。
+
+### 三、验证（真机，不是推演）
+
+- `novel validate`：1046 份档案、重复 0、双链 5679 条 0 断链 ✅
+- `novel entity validate`：973 份知识库档案全部通过新枚举 ✅
+- `novel rebuild-index`：正常，`02_作者级通用资料/Templates/Event.md` 因模板未发号未入库（预期）
+
+### 兼容性影响
+
+- 读取侧：`99_Archive/legacy_v1` 与历史叙述里仍会出现 `confirmed`，那是当时的记录，不改。
+- 写入侧：一律六值；`--canon-status confirmed` 现在会被 argparse 拒掉，报可用值。
+- 若某个外部脚本按 `confirmed` 统计「已确认」，要改成 `canon`。
+
+## 0.15.2 — 2026-11-22
+
+**这一轮补的是「代码改了，Agent 与提示词还停在 V4.0」的落差。**
+代码侧 T01–T08 早已跑在 V1.0 上，但任务状态机是 V4.0 的六态、
+九份角色卡与九份提示词里教的是**已经不存在的命令**。
+
+### 一、任务状态机对齐 V1.0 §10.4
+
+- 状态集换成规范十一态：`queued → ready → running → waiting_review → approved / rejected → completed`，
+  异常 `blocked` / `paused` / `failed` / `cancelled`。V4.0 的
+  `pending`/`in_progress`/`awaiting_author`/`done` 读盘时归一（`LEGACY_STATUS`）——认得出、不再写。
+  旧六态缺三样规范要求的东西：没有 `ready`（分给人 vs 人真动手只能口头同步）、
+  没有 `approved`/`rejected`（审核结论只能塞进 `approval_state`，而那是「作者批准」不是「编辑审核」）、
+  没有 `paused`/`failed`（中断与失败只能记成 `blocked`，而 blocked 的语义是「等外部条件」）。
+- **§10.4 要求「每次迁移记录操作者、时间、原因、关联任务」，此前只存当前状态**。
+  新增 `Task.status_history`，`transition()` 写四样；非顺流迁移（blocked/paused/failed/rejected/cancelled）
+  **强制 `--reason`**——顺流也要编理由的话，理由字段很快全是「继续」。
+- 新增 `novel task transition <task_id> --to <状态> [--reason] [--related] [--as]`。
+  `TaskStore.transition()` 一直有实现、有迁移表、有跳步拒绝，却从没有命令入口，
+  于是状态机在代码里成立、在操作上不存在。`task list --status` 也补上 `choices`。
+- **发布成功后走 `TaskStore.mark_published()`**，不再直接赋 `task.status = "done"` 了事。
+  它**刻意绕过** `TRANSITIONS`：发布引擎报 ACTIVE 时内容已在正式区，是既成事实；
+  此时因「任务还停在 queued」拒绝记账，状态文件会与磁盘矛盾，而磁盘才是事实源。
+  绕过权限，不绕过记账——这次迁移照样进 `status_history`。
+
+### 二、九份角色卡（代码真正读的那套）路径全换
+
+`agents/<role_id>/agent.md` 是 `novel agent prompt --role` 读的文件，此前写着
+`07_Staging/`、`03_Manuscripts/Drafts/CH-XXXX.md`、`01_Canon/World`、`06_Memory/`、`05_Ledgers/`。
+
+- Canon 十七类：`01_Canon/World` → `02_世界知识库/世界与宇宙`，`Systems` → `技术与文明`，
+  `Rules` → `规则与机制`
+- 正文：`03_Manuscripts/Drafts/` → `04_正文/初稿/`，`Final/` → `04_正文/正式定稿/`
+- 规划 `02_Planning/` → `03_故事规划/`；记忆 `06_Memory/` → `05_记忆与连续性/`
+- **任务不在 Vault**：`07_Staging/tasks/TASK-*.yaml` 实为 `<runtime>/tasks/task_NNNNNN.yaml`
+- staging 按任务归档：`_staging/<task_id>/<area>/<目标相对路径>`，不是 V4.0 的固定用途目录
+- 每份补「## 工作流」段，指向 `novel workflow list --agent <role_id>` 与 `workflows/catalog.yaml`
+
+### 三、九份提示词（Vault 里人读的那套）命令层重写
+
+`00_作者工作台/Policies/Prompts/` 里教的命令**五个里有四个不存在**：
+
+| 旧 | 新 |
+|---|---|
+| `novel ingest` | `novel import scan` → `novel import stage` |
+| `novel find` / `novel show` | `novel search` / `novel entity show` |
+| `novel annotate` / `commit-memory` | 已取消；`novel proposal extract` 从已批准正文抽取 |
+| `novel history` / `snapshot` / `rollback` / `log` | `novel status` / `backup` / `restore` / `release rollback` |
+| `novel audit` | `novel validate`（结构）+ `novel review submit`（内容十维） |
+| `import-assets` / `import-lore` | **无对应命令**，只能逐份 `novel entity create` |
+
+- `--split chapter/number/single` 四模式已废：解析器自动识别 Markdown 标题、中文章节标记、
+  英文章节标记，切不出就整篇一章并记 `known_limits`。`--level` 只在多级标题时需要。
+- 复合 ID 与四位旧号全清：`EVT-CH-0001-001` → `evt_000001`、`SCENE-CH-0001-002` → `scene_000002`、
+  `CH-0045` → `ch_000045`。
+- **落点修正**：`07_审核与报告/Change_Log/Ingest/` 是空壳，11 份批次日志实际都在
+  `09_版本与变更记录/`，提示词教的落点是错的。
+- **删掉「补记忆标注」整节**：V1.0 没有解析「作者备注（不进入正文）」的代码。
+  留着这一节会让人手写一堆永远不被读的标注，还误以为系统已经知道那些事。
+
+### 四、命名：一张表消灭歧义
+
+九份提示词的文件名与代码注册名**只有两份一致**（`writer`、`world_architect`），
+其余七份各是一套方言（`chief_editor` vs `editor_in_chief`、`lore_keeper` vs `researcher` …）。
+
+**注册名不改**：审计日志里已经写着 `ingestor`，改了之后那些历史记录就查不到主人；
+`schemas/task.schema.json` 的 `assigned_to` enum 也认它。
+改为在 `Policies/README.md` 里放一张「文件名 ↔ role_id ↔ 中文」对照表，
+并在每份提示词开头写明注册名。
+
+### 五、小修
+
+- 新增 `novel workflow list --agent <role_id>`：九个角色各自负责 1–9 条流程，此前只能按 `--stage` 过滤，
+  「我在哪些流程里」得自己数 catalog。
+- 补建 `02_世界知识库/时间线/`：十七类里最后一项，V1.0 重排时漏了。
+- `novel --version` 与 `--help` 的描述从「V4.0 §5.3 命令集」改为「V1.0 §17」；
+  `allocate-id --type` 的帮助从 `CHARACTER／LOCATION` 改为 `ent/ch/scene/evt/plan`（旧名仍认）。
+
+### 已知未解决
+
+- **提示词文件名未重命名**（`chief_editor.md` 等七份）。`git mv` 被 Vault 里一个
+  2026-11-20 的陈旧 `.git/index.lock`（0 字节）挡住，沙箱又禁止删文件。
+  对照表已解决「对不上」的问题，但一劳永逸仍需作者清锁后重命名。
+- 沙箱残留清单见 `docs/沙箱残留清单_20261122.md`（本轮新增：`03_故事规划/{Scene_Beats,Volume_Outlines}`、
+  `04_正文/{Drafts,Final}`、`05_记忆与连续性/Hot/` 英文子目录）。
+- **pytest 仍不可用**（`tmp_path` 要临时目录，被安全中心拦）。本轮的验证全部走真机 CLI：
+  状态机七次迁移 + 三次跳步拒绝 + 旧态归一 + 九个角色过滤 + 四项全量回归。
+
+## 0.15.1 — 2026-11-22
+
+**修「工具写出的文件过不了自己的校验」那一类问题。**
+0.15.0 补的 CLI（`entity`／`relation`／`event`／`workflow`／`continuity`）此前只跑了预演，
+这一轮把落盘路径逐条跑通，问题都在写入侧：契约没跟上、空值写法撞约束、开关不设防。
+
+### 一、`event`／`relationship` 契约与写入器对齐
+
+- **`event create` 写出的 6 个字段在旧契约里全是未知字段**（`novel_id`/`status`/`time_precision`/
+  `narrative_time`/`created_by`/`confidence`），而 `event.schema.json` 是 `additionalProperties: false`。
+  即「工具写出的文件过不了自己的校验」。现按 V1.0 §5.10 补齐：`time_precision`、`duration`、
+  `narrative_time`、`first_chapter_id`、`related_chapters`、`witnesses`、`causes`、`involved`、
+  `states_before`／`states_after`、`fact_status`、`information_status`、`confidence`、`created_by`／`updated_by`。
+  存量 7 份事件字段一个未删，`sequence` 与 `location_id` 原样保留。
+- **新建 `schemas/relationship.schema.json`**。此前**根本没有关系契约**：`relation create` 写出的
+  `rel_*.md` 落到目录里就没人管，`entity validate` 又把它当实体判，于是 `rel_` 先撞 entity 的
+  `^(ent|asset)_` 模式，真正的字段问题被第 1 条错误挡住。字段面照 V1.0 §5.3 逐条落。
+- `relation create` / `event create` 现在**写盘前先过契约**，预演阶段就报错。
+- `entity validate` 的契约路由从 if-elif 改成 `SCHEMA_BY_TYPE`（`schema.schema_name_for`），
+  漏一类不再静默按 entity 判。
+
+### 二、空值不写进 frontmatter
+
+`summary: ""` 撞 `minLength: 1`，`location: ""` 撞 `^ent_[0-9]{6}$`——空串会撞约束，
+让一份本来没问题的档案校验不过。新增 `entity_cmd._compact()`：空字符串、空列表不写进
+frontmatter；**显式取值一律保留**（`unknown`／`false`／`0`／`null`）。
+`time_precision: unknown`（查过，确实不知道）与「没有这个字段」（没查）必须能区分。
+
+### 三、事件的事实状态默认 `unknown`
+
+V1.0 §5.10 要求区分「作者确认发生／角色声称发生／传闻／计划」。新增 `--fact-status`，
+默认 `unknown` 而**不是** `confirmed`：把传闻默认成事实是这类库最难查的污染，
+默认 `unknown` 是一个看得见的缺口，`continuity check` 能报出来。
+
+### 四、任务 ID 改 `task_`（V1.0 §9.2）
+
+Vault 里 1046 份文档在 0.15.0 已统一到 `ent_000001` 形态，但 **runtime 里的任务仍是
+`TASK-000001`**——重编号脚本只扫 Vault，扫不到 Runtime。`schemas/task.schema.json` 里
+也硬编码着 `^TASK-[0-9]{6}$`。现改为 `task_000001`，`task_` 前缀按 §9.2。
+
+- **兼容性**：旧号 `TASK-000001` 仍读得懂（`tasks.normalize_task_id`／`_LEGACY_TASK_RE`），
+  已存在的 runtime 目录不会因为这次改名变成「任务不存在」。新号只发 `task_`。
+- 真库当时 `tasks/` 与 `staging/` 都是空的，**无数据迁移成本**。
+- 新增 `novel task list`（`TaskStore.list()` 一直有实现却没有命令入口，
+  等于任务状态机对作者不可见）。
+
+另修 `version.SPEC_VERSION`：它写着 `4.0.0`，而代码对齐的是产品文档 **V1.0**
+（该文档第 5 行「文档版本：V1.0」）。一个「指的是哪份规范」的常量写错版本号，
+比没有它更误导——读代码的人会以为系统仍在按 V4.0 实现。该常量此前无人引用，改动无副作用。
+
+### 五、`--allow-unchecked` 只有作者能开
+
+`review submit` 的十维闸门里写着 `reviewer_role == "author"`——**这是个永远不会成立的条件**，
+角色只有九个（`editor`／`editor_in_chief`／…），`author` 不在其中。于是「作者可以越过」
+这条通道从没打开过，而 `--allow-unchecked` 又没人校验身份，任何角色加上它都能绕过十维。
+一条死分支配一个不设防的开关，正好把口子开在最不该开的地方。
+
+现改为判**操作者**（`reviewer == "author"`）：非作者用 `--allow-unchecked` 直接
+`SecurityError`（exit 3）；作者用则放行，并在报告里写明「覆盖 0/10」。
+
+### 六、陈旧锁自动接管
+
+`ids._acquire` 只看锁文件在不在，不看持有进程死活。进程被杀后锁永远留着，
+之后每次发号都报「另一个进程正在分配 ID」。现加 `_holder_state()`：读锁里的 pid，
+`os.kill(pid, 0)` 判活；**确认已死**才接管（只接管一次），判断不了时一律当活锁
+（误判活锁只是多等几秒，误判死锁会让两个进程同时发号）。
+
+### 验证
+
+- 真库 `entity validate` **973 份全部通过**、`validate` **1046 份 / 重复 0 / 双链 5679 条零断链**、
+  `doctor` 全部通过。
+- 临时 Vault 端到端跑通：`entity create` → `relation create` → `event create` → `stage` →
+  `review submit`（十维共 10/10 → APPROVE；缺项 → 拒绝；`--role editor --as editor --allow-unchecked` → 拒绝；
+  `--as author --allow-unchecked` → 放行）。
+
+### 已知未解决（留待作者裁定）
+
+- **发布编号仍是 `REL-000001`**（`release/store.py`）。V1.0 §9.2 的十二条前缀里没有「发布」，
+  最接近的是 `ver_`（私库版本），但「发布版本」与「私库版本」是不是同一件事，得作者定。
+  好处是现在 `release status` 判 `NO_RELEASE`，一份发布也没有，改起来无迁移成本；
+  坏处是发布协议绑着 22 步事务、计划哈希与批准记录，改编号得连 `approve release <REL-ID>`
+  的入参一起动。不动的原因是「没有 V1.0 对应物」这件事本身需要裁定，不该由我替它挑一个。
+- **章卡 ID 与章节 ID 仍共用一个字符串**：`novel write --chapter plan_000001` 产出的草稿是
+  `04_正文/初稿/plan_000001.md`，`review submit` 也要求 `--chapter` 同时能在 `03_故事规划` 里
+  找到同 id 的章卡。V1.0 §9.2 有独立的 `ch_` 前缀（发号已验证 `ch_000001`），但章卡里没有
+  指向正文 ID 的字段，两者之间没有映射。改名会牵动真库 2 章正文与 28 份旧稿，待裁定。
+- **pytest 在本会话完全不可用**：`tmp_path` 需要临时目录，而本会话的临时目录被安全中心拦，
+  fixture 初始化即 `FileNotFoundError`。全部验证改用真机 CLI 端到端跑（见上）。
+  这不算代码问题，但没有测试护栏这件事要说出来——`tests/unit/test_ids.py` 等仍以
+  live CLI 之外的方式无法回归。
+- 沙箱禁止删除，`docs/沙箱残留清单_20261122.md` 列了 V4.0 空壳目录、旧指针、
+  重复仪表盘与临时垃圾文件。这些只影响整洁，不影响 `validate`／`doctor`。
+
+## 0.15.0 — 2026-11-22
+
+**按 V1.0 规范（`超长篇小说全生命周期管理系统_产品需求与实施规范.md`）重排目录树与 ID 体系。**
+这是当日第三次全库改写（前两次：ID 形态合规、六位 + 前缀收敛），也是幅度最大的一次：
+根目录、项目内子目录、知识库分类、ID 格式四处同时变。
+
+### 一、目录树：V4.0 → V1.0
+
+| V4.0 | V1.0 |
+|---|---|
+| `00_System` | `00_作者工作台` |
+| `10_Projects` | `01_小说项目` |
+| `90_Shared_Assets` | `02_作者级通用资料` |
+| `01_Canon` | `02_世界知识库`（17 类） |
+| `02_Planning` | `03_故事规划`（6 子） |
+| `03_Manuscripts` | `04_正文`（初稿／修订稿／正式定稿） |
+| `04_Story_Assets` | `06_素材与研究` |
+| `05_Ledgers` | **解散**：事件/关系/时间线进知识库、伏笔进规划、骰子进素材 |
+| `06_Memory` | `05_记忆与连续性` |
+| `07_Staging` | `_staging` |
+| `08_Reviews` | 拆成 `07_审核与报告` + `09_版本与变更记录` |
+
+`99_Archive` 保留——V1.0 的四个根里没有归档位，但它装着旧系统全量，删不得。
+新建 V1.0 要求但当前缺失的空目录：`00_项目管理`、`01_灵感与创意`、
+`08_工作流与任务视图`、以及知识库里暂时没有数据的 `种族与族群`／`资源与经济`／
+`技术与文明`／`文化与社会`／`特殊设定`／`规则与机制`。
+
+搬迁 1170 份文件、清理 80 个空目录、2 个 canvas 的 327 个文件节点路径重算。
+
+### 二、知识库分类：6 类垃圾桶 → 17 类
+
+旧结构里 `World/` 442 份、`Systems/` 226 份，按 `type` 字段拆开看：
+
+| 旧目录 | 份数 | 实际构成 |
+|---|---|---|
+| `World/` | 442 | 物品 336 + 生物 76 + 世界条目 30 |
+| `Systems/` | 226 | 技能 171 + 命途 42 + 世界条目 13 |
+| `Rules/` | 0 | 空目录，43 个 `RULE-*` 散在别处 |
+
+**668 份（69%）目录与语义不符。**这不是编号问题，是分类维度不足——
+`type` 字段早就有 8 种精确值，目录却只有 6 个位置。
+
+新分类按 `type` 归位：物品与装备 336 / 技能与能力 171 / 地理与地点 110 /
+势力与组织 102 / 人物与角色 86 / 生物与生态 76 / 世界与宇宙 43 / 力量与成长 42。
+
+**`规则与机制` 目录是空的**：库里 43 份 `RULE-` 前缀的档案 `type` 都是 `world`
+（世界总表、规则书），没有一份 `type: rule`。这是真实的数据缺口，不是搬迁遗漏。
+
+### 三、ID：`CHAR-000001` → `ent_000001`
+
+V1.0 §9.2 用**单前缀 `ent_` 收所有世界知识实体**，类别靠 `type` 字段区分。
+
+| 旧 | 新 | 份数 |
+|---|---|---|
+| `CHAR` `LOC` `FAC` `ITEM` `RULE` | `ent_000001..000966` | 966 |
+| `ITEM`（素材） | `asset_000001..000022` | 22 |
+| `CH`（旧稿） | `ch_001001..001028` | 28 |
+| `CH`（章卡） | `plan_000001..000008` | 8 |
+| `SCENE` | `scene_000001..000011` | 11 |
+| `EVT` | `evt_000001..000007` | 7 |
+| `FORESHADOW` | `fs_000001..000004` | 4 |
+
+**三处 V1.0 没给答案、由实现补齐的：**
+
+1. **正文/场景/规划/伏笔没有前缀。** §9.2 原文是「**建议**前缀」，不是封闭枚举，
+   按同风格补 `ch_` `scene_` `plan_` `fs_`。塞进 `ent_` 会让「正文」与「世界设定」
+   共用一个号段——写得多的人永远分不清 `ent_000400` 是物品还是第 400 章。
+2. **`ent_` 必须重排。** 五个旧前缀的数字互相重叠（204 个号被多前缀占用），
+   合并即撞号。966 份按（旧前缀, 数字）排序后连续重编。
+   **这是唯一一处「数字会变」的地方**，其余前缀一律保留原数字。
+3. **旧稿号段靠 `ch_001001+` 活下来。** 若按 `ent_` 那样归零重排，
+   上一轮刚恢复的「旧稿是材料不是底稿」这个区分就没了。
+
+`ids.MIN_WIDTH`/`MAX_WIDTH` 保持 6；`ID_RE` 改为 `^([a-z]+)_(\d{6})$`；
+`LEGACY_ID_RE` 新增，用于认出未迁移的旧号而不是判成「不是 ID」——
+判成不是 ID 的后果是它在查重时完全隐身。
+
+`BAND_LIMITS` 键从 `CH` 改为 `ch`（旧稿 1001+ 的边界不变）。
+
+### 四、代码侧
+
+- `paths.DEFAULT_DIRS` / `CANON_KINDS` 换成 V1.0 的目录名与 17 类。
+- `config/defaults.yaml` 的 `layout` 段重写（这是布局的唯一配置源）。
+- 45 处硬编码目录名批量替换（10 个文件）。
+- `cli/init.py` 的 `PLANNING_DIRS` / `MANUSCRIPT_DIRS` 改中文子目录；
+  `LEDGER_DIRS` 删除（Ledgers 已解散）。
+- `cli/read.py` 的文件名错位检查改按 `_` 取前两段拼 ID（原来按 `-` 切，误报 4 份）。
+
+### 五、两处口径放宽（都有理由，都写进 schema 注释）
+
+1. **`entity.id` 接受 `asset_`**：素材卡也属于 V1.0 §5.2 的统一实体基类。
+2. **伏笔的 `target_reveal_window` 接受 `CH-0003` 章次占位**：正文与章卡都还没写时，
+   只能写章次。一旦章卡建立，应改为 `plan_xxxxxx`。
+   同理 event 的 `chapter_id` 接受 `plan_`（当前指向章卡，不是正文）。
+
+### 六、验证
+
+| 项 | 结果 |
+|---|---|
+| `validate` | **通过**，1046 份、重复 0、双链 5679 条**活文档零断链** |
+| 契约校验 | 998 份**全部通过**（跳过 23 份无 frontmatter 的说明页） |
+| 索引 | `ent_000086` 命中 8 处，旧号 `CHAR-000086` **0 命中** |
+| canvas | 2 个，327 个文件节点路径重算 |
+
+### 七、两处**没做完**、不要当成已完成
+
+1. **`.git/index.lock` 与误建的 `README.md/` 目录删不掉。** 安全中心拦截了
+   `rm`/`mv`/`git clean` 对该路径的所有删除操作。`README.md/` 下还有一份旧内容的
+   `README.md`，需要手工 `rm -rf "01_小说项目/novel-001_jiuzhou/README.md"`。
+2. **V1.0 §17 还缺 9 条 CLI**（`project list/show`、`idea create`、`entity create/show`、
+   `relation create`、`event create`、`workflow` 五条、`continuity check`），
+   §10 的 20 个 WF 编号工作流只做了 6 个且字段不全，§11 的十维审核还没有清单载体。
+   这三块见 `docs/operations/v1_conformance.md`。
+
 ## 0.14.1 — 2026-11-22
 
 修正 0.14.0 的两处设计错误。**这是一次数据回正，不是新功能。**

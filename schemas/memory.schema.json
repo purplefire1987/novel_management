@@ -18,7 +18,7 @@
         "volume": { "type": "integer" },
         "chapter_range": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^CH-[0-9]{4}$" }
+          "items": { "type": "string", "pattern": "^(ch_[0-9]{6}|CH-[0-9]{3,4})$" }
         },
         "entities": {
           "type": "array",
@@ -34,7 +34,7 @@
         "required": ["statement", "source_chapter"],
         "properties": {
           "statement": { "type": "string" },
-          "source_chapter": { "type": "string", "pattern": "^CH-[0-9]{4}$" },
+          "source_chapter": { "type": "string", "pattern": "^(ch_[0-9]{6}|CH-[0-9]{3,4})$" },
           "confidence": { "type": "string", "enum": ["explicit", "inferred"] },
           "note": { "type": "string" }
         }

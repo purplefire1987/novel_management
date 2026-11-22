@@ -11,19 +11,23 @@
 
 本脚本做五件事，全部幂等：
 
-1. 州域档案（LOC-0073~0083）：改成「府 → 郡 → 治所」三层表；
-2. 府级档案（新建）：一府一页，上下双链；
-3. 城邑档案（LOC-0001~0071）：补「层级」行，州属／府属改为双链；
+1. 州域档案（`subtype: 州域`，11 份）：改成「府 → 郡 → 治所」三层表；
+2. 府级档案（`subtype: 府`，28 份）：一府一页，上下双链；
+3. 治所档案（`subtype: 地点`，71 份）：补「层级」行，州属／府属改为双链；
 4. `Maps/<地图页>.md`：按州 → 府 → 郡三级铺开；
 5. `Maps/<地图页>.canvas`（方位图）+ `Maps/<层级树>.canvas`（层级树）。
 
-数据源：州的地貌/口语/简介取 WORLD-0029，府郡归属取 WORLD-0040。
+三类档案一律按 `type: location` + `subtype` 识别，不按 ID 号段猜——
+0.14.0 起 `ent_` 下所有实体共用一个号段，号段不再携带类型信息。
+
+数据源：州的地貌/口语/简介取 `九州表`，府郡归属取 `行政区划表`（两张表的
+文件名在版式配置的 `naming` 段里，不写死）。
 两页都是生成的，不要手改；改源头再重跑。
 
 用法：
 
-    python3 00_System/scripts/build_jiuzhou_map.py              # 全量
-    python3 00_System/scripts/build_jiuzhou_map.py --maps-only  # 只重画三张图，不碰档案
+    novel maps build              # 全量
+    novel maps build --maps-only  # 只重画三张图，不碰档案
 
 **重跑前先读这段（2026-11-20 实测）：**
 
@@ -348,14 +352,46 @@ def apply_fixups(regions: dict[str, Region]) -> None:
                     region.direct.append(jun)
 
 
+#: 地点档案的 ID 形态（0.14.0 起：`ent_` + 六位）。旧形态 `LOC-0001` 已全库重排。
+ID_RE = re.compile(r"^(ent_\d{6})")
+
+
+def type_of(path: Path) -> str:
+    m = re.search(r"^type:\s*(\S+)", path.read_text(encoding="utf-8"), re.M)
+    return m.group(1).strip() if m else ""
+
+
 def loc_files() -> dict[str, Path]:
-    return {p.stem: p for p in LOC_DIR.glob("LOC-*.md")}
+    """地点档案：`ent_*.md` 且 frontmatter `type: location`。
+
+    0.14.0 把 `LOC-0001` 全库重排成 `ent_000001` 后，这里还在 glob `LOC-*.md`：
+    结果是空字典，71 个治所全判「待建档」，地图从 111 节点掉到 40。
+    不能只把 glob 改成 `ent_*.md`——同目录里还有世界表、行政区划表等
+    **同前缀**档案，按 `type` 过滤才是「哪些是地点」的权威判据
+    （ID 只说明「唯一」，不说明「是什么」）。
+    """
+    out: dict[str, Path] = {}
+    for p in LOC_DIR.glob("ent_*.md"):
+        if type_of(p) == "location":
+            out[p.stem] = p
+    return out
+
+
+def name_of(stem: str) -> str:
+    """档案文件名 → 地名：`ent_000906_怒涛府` → `怒涛府`；旧形态 `LOC-0001_某地` 也认。
+
+    **不能写 `stem.split("_", 1)[1]`**：那只对旧形态成立（`LOC-0001` 里没有下划线）。
+    新形态是 `ent_000906_怒涛府`，按首个下划线切会得到 `000906_怒涛府`，
+    于是地名表全部对不上、71 个治所全判「待建档」——而命令不报错，只生成一张缺角的图。
+    """
+    m = re.match(r"^(?:ent_\d{6}|LOC-\d{4})_(.+)$", stem)
+    return m.group(1) if m else stem
 
 
 def name_to_stem(stems: dict[str, Path]) -> dict[str, str]:
     out: dict[str, str] = {}
     for stem in stems:
-        out[stem.split("_", 1)[1] if "_" in stem else stem] = stem
+        out[name_of(stem)] = stem
     return out
 
 
@@ -365,23 +401,24 @@ def subtype_of(path: Path) -> str:
 
 
 def allocate_fu(wanted: list[str], stems: dict[str, Path]) -> dict[str, str]:
-    """给府分配编号：已有府档案复用编号，其余按现有最大号往后排。"""
-    existing: dict[str, str] = {}
-    serials: list[int] = []
-    for stem, path in stems.items():
-        m = re.match(r"LOC-(\d{4})", stem)
-        if m:
-            serials.append(int(m.group(1)))
-        if sub := subtype_of(path):
-            name = path.stem.split("_", 1)[1]
-            if sub == "府" or (sub == "地点" and name.endswith("府")):
-                existing[name] = m.group(0) if m else ""
+    """把府名映到**已有**档案 ID；没有档案的留空，由调用方标「待建档」。
 
-    next_id = (max(serials) if serials else 0) + 1
+    旧版在这里按 `LOC-` 最大号 +1 造新 ID。0.14.0 之后 ID 由 `ids.py` 统一发号，
+    生成器自造 ID 同时违反两条：形态是旧的，且绕过发号器（可能撞号）。
+    缺档案是数据缺口，该报出来，不该由画图的脚本补一个看起来像真的号——
+    那种号会进 canvas，成为指向不存在文件的死链。
+    """
+    existing: dict[str, str] = {}
+    for stem, path in stems.items():
+        m = ID_RE.match(stem)
+        if not m:
+            continue
+        name = name_of(path.stem)
+        if sub := subtype_of(path):
+            if sub == "府" or (sub == "地点" and name.endswith("府")):
+                existing[name] = m.group(1)
     for name in wanted:
-        if name not in existing:
-            existing[name] = f"LOC-{next_id:04d}"
-            next_id += 1
+        existing.setdefault(name, "")
     return existing
 
 
@@ -389,17 +426,18 @@ _LOC_INDEX: dict[str, str] | None = None
 
 
 def loc_rel(loc_id: str) -> str:
-    """地点编号 → 档案相对库根的路径（`LOC-0045` → `…/LOC-0045_<地名>.md`）。
+    """地点编号 → 档案相对库根的路径（`ent_000045` → `…/ent_000045_<地名>.md`）。
 
-    为什么不能直接拼 `{loc_id}.md`：档案名带后缀，形如 `LOC-0045_<地名>.md`。
+    为什么不能直接拼 `{loc_id}.md`：档案名带后缀，形如 `ent_000045_<地名>.md`。
     旧版对着不存在的 `LOC-0045.md` 拼路径，一张画布里 69 个城邑卡片全是死链，
     而且不报错——卡片在 Obsidian 里显示成空白，看着像「地图是空的」。
     """
     global _LOC_INDEX
     if _LOC_INDEX is None:
         _LOC_INDEX = {
-            p.stem.split("_", 1)[0]: p.relative_to(VAULT).as_posix()
-            for p in LOC_DIR.glob("LOC-*.md")
+            m.group(1): p.relative_to(VAULT).as_posix()
+            for p in LOC_DIR.glob("ent_*.md")
+            if type_of(p) == "location" and (m := ID_RE.match(p.stem))
         }
     return _LOC_INDEX.get(loc_id, "")
 
@@ -555,7 +593,7 @@ title: {region.name}
 aliases: []
 subtype: 州域
 world: {WORLD_NAME}
-canon_status: confirmed
+canon_status: canon
 created_at: '{TODAY}'
 updated_at: '{TODAY}'
 source_refs:
@@ -636,7 +674,7 @@ aliases:
 - {region.name}·{fu.name}
 subtype: 府
 world: {WORLD_NAME}
-canon_status: confirmed
+canon_status: canon
 created_at: '{TODAY}'
 updated_at: '{TODAY}'
 source_refs:
@@ -868,7 +906,7 @@ type: map
 name: {MAP_PAGE}
 title: {MAP_PAGE}
 generated_by: novel maps build
-canon_status: confirmed
+canon_status: canon
 created_at: '{TODAY}'
 updated_at: '{TODAY}'
 tags:
@@ -879,7 +917,7 @@ tags:
 
 # {MAP_PAGE}
 
-> 本页由 `00_System/scripts/build_jiuzhou_map.py` 从 [[{WORLD_TABLE_LABEL}|{WORLD_ALIAS}]] 与
+> 本页由 `novel maps build` 从 [[{WORLD_TABLE_LABEL}|{WORLD_ALIAS}]] 与
 > [[{ADMIN_TABLE_LABEL}|{ADMIN_ALIAS}]] 生成，**请勿手改**。改设定改两张表，再重跑脚本。
 > 方位图见 [[{MAP_PAGE}.canvas|{MAP_PAGE}.canvas]]，层级树见 [[{TREE_PAGE}.canvas|{TREE_PAGE}.canvas]]。
 
@@ -1108,9 +1146,13 @@ def build_tree_canvas(regions: list[Region]) -> dict:
 
 # ------------------------------------------------------------------ main
 def normalize_aliases() -> int:
-    """修掉早期生成留下的 `aliases: ` 尾空格，保证 frontmatter 干净。"""
+    """修掉早期生成留下的 `aliases: ` 尾空格，保证 frontmatter 干净。
+
+    只走 `loc_files()`：它已经按 `type: location` 过滤，不会顺手改世界表、
+    行政区划表这些同前缀但不同类型的档案。
+    """
     fixed = 0
-    for path in LOC_DIR.glob("LOC-*.md"):
+    for path in loc_files().values():
         text = path.read_text(encoding="utf-8")
         new = re.sub(r"^aliases:[ \t]+$", "aliases:", text, flags=re.M)
         if new != text:
@@ -1143,9 +1185,9 @@ def main(argv: list[str] | None = None) -> int:
     state_ids: dict[str, str] = {}
     for stem, path in stems.items():
         if subtype_of(path) == "州域":
-            m = re.match(r"LOC-(\d{4})", stem)
+            m = ID_RE.match(stem)
             if m:
-                state_ids[path.stem.split("_", 1)[1]] = m.group(0)
+                state_ids[name_of(path.stem)] = m.group(1)
 
     fu_names: list[str] = []
     for r in admin.values():
@@ -1166,8 +1208,8 @@ def main(argv: list[str] | None = None) -> int:
                 jun.loc_id, jun.missing = "", False
                 return
             stem = by_name.get(jun.seat, "")
-            m = re.match(r"(LOC-\d{4})", stem)
-            jun.loc_id = m.group(0) if m else ""
+            m = ID_RE.match(stem)
+            jun.loc_id = m.group(1) if m else ""
             jun.missing = not jun.loc_id
 
         for fu in r.fu:

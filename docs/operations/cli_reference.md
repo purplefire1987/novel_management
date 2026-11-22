@@ -2,9 +2,12 @@
 
 对应 V4.0 §5.3 的命令集，另加 3 条地图命令（§10）、T03 的 `rebuild-index`/`search`、
 T06 的 `release`、T07 的 `import`、T08 的 `preflight`/`agent`，以及 T09/T10 的
-`plan` / `write` / `review` / `proposal` / `deps`。顶层命令共 **35** 条
+`plan` / `write` / `review` / `proposal` / `deps`，以及 V1.0 对齐时补的
+`idea` / `entity` / `relation` / `event` / `continuity` / `workflow` / `project`。
+顶层命令共 **43** 条
 （`task` / `maps` / `schema` / `release` / `import` / `agent` / `plan` / `review` /
-`proposal` / `deps` 是命令组，各自还有子命令）。
+`proposal` / `deps` / `entity` / `relation` / `event` / `workflow` / `project` / `idea` /
+`continuity` 是命令组，各自还有子命令）。
 全部命令支持 `--vault` / `--runtime` / `--project` / `--log-level`，位置可放在子命令之前或之后。
 
 ```bash
@@ -1060,6 +1063,70 @@ $ novel note add --kind review --title "CH-0001 场景卡一致性" \
   op: OP-20261122-011158-F612
 ```
 
+## 8.14 实体、关系、事件、灵感
+
+这四条都是**默认预演**，加 `--confirm` 才落盘。全走 `write_atomic`，写后回读校验。
+
+### `novel entity create --name <名> --type <类型> [--subtype] [--alias] [--summary] [--canon-status] [--source] --confirm`
+
+新建一份世界知识档案。**`--type` 决定目录**（`paths.TYPE_TO_CANON_KIND`），
+认不出的类型直接报错并列出可用值——不兜底到「特殊设定」。
+
+`--canon-status` 只收六值：`idea` / `proposal` / `pending_review` / `canon` /
+`deprecated` / `rejected`（默认 `proposal`）。**`canon` 的准入判据是「已落在正文里」**，
+不是「作者点过头」。
+
+### `novel entity show <实体ID> [--json]`
+
+按 ID 看一份档案：frontmatter、双链、出处。ID 必须带前缀（`ent_000001`），
+只写号会报错——`ent_` 是公共号段，光有号说明不了类型。
+
+### `novel entity validate [<实体ID>]`
+
+校验契约。给 ID 校验单份；不给则扫整个知识库。用的是 `schemas/entity.schema.json`，
+`additionalProperties: false`，多写一个键就判错。
+
+### `novel relation create --from <ID> --to <ID> --relation-type <类型> [--valid-from] [--valid-to] --confirm`
+
+登记一条关系。**追加，不覆盖历史**：同一对实体可以有多次登记，
+按 `valid_from` / `valid_to` 区间读「某时点是什么关系」。
+`from` / `to` 必须是已存在的实体 ID，写错不会静默新建。
+
+### `novel event create --name <名> [--world-time] [--precision] [--narrative] [--participant] [--location] --confirm`
+
+登记一条事件。`--precision` 收 `exact/day/month/season/year/era/unknown`；
+**时间不确定就写不确定**，不要为了填满而猜一个精确时刻（ADR-013）。
+`--narrative` 是叙述位置，与 `world_time` 是两回事。
+
+### `novel idea create [--text <文本>|--text-file <文件>] [--title] [--tag] [--source] --confirm`
+
+登记一条灵感。**原文照录，不做取舍**（WF-01）：这一步的价值是「先留住」，
+筛选是后面的事。落点在 `01_灵感与创意`。
+
+### `novel continuity check [--scope all|chapter|volume] [--json]`
+
+跑一遍连续性检查（WF-17）。输出是**账面缺口**：哪些项没查、哪些查了没结论。
+「没查」不等于「没问题」——空结果必须读成「不知道」，不是「通过」。
+
+---
+
+## 8.15 工作流与项目
+
+### `novel workflow list|show|validate|run|pause|resume`
+
+`catalog.yaml` 的 20 条工作流（`WF-00`…`WF-19`，另有旁支 `simulation`）。
+
+- `list` 列全部；`show <WF-ID>` 看完整定义（含 `detail_ref` 指向的细则）。
+- `validate` 逐字段校验目录：编号连不连续、必填缺不缺、`detail_ref` 指没指空。
+- `run` **只开实例、只记账，不执行步骤**。实例落 `<runtime>/workflows/`，不进 Vault。
+
+### `novel project list|show`
+
+`list` 列 Vault 里所有项目；`show <项目ID>` 看结构与知识库分布（各分类多少份）。
+两项目同名不算错——以 `project_id` 为准，目录名只是给人看的。
+
+---
+
 ## 9. 备份与恢复
 
 ### `novel backup [--out <目录>] [--label <标签>] [--no-git] [--list]`
@@ -1219,7 +1286,7 @@ novel package-hash tmp/release_plan.json --canonical   # 同时看规范化后�
 | 索引指针 | `<runtime>/index/active.json` | 是（指向哪一份 build） |
 | 作者基线 | `<runtime>/authorship/<project_id>.json` | 是（重新 adopt） |
 | 备份 | `<runtime>/backups/<BK-ID>/` | 否 |
-| staging 产物 | `<vault>/10_Projects/<PROJECT>/07_Staging/<TASK-ID>/` | 否（发布后仍保留作证据） |
-| 发布旧版归档 | `<vault>/10_Projects/<PROJECT>/90_Archive/publish_archive/` | 否 |
-| 地图页与 canvas | `<vault>/00_System/Dashboards/Maps/` | 是（`maps build --confirm`） |
-| 版式配置 | `<project>/00_Project/jiuzhou_layout.yaml` | 否（手写；属排版不属设定） |
+| staging 产物 | `<vault>/01_小说项目/<PROJECT>/_staging/<TASK-ID>/` | 否（发布后仍保留作证据） |
+| 发布旧版归档 | `<vault>/01_小说项目/<PROJECT>/90_Archive/publish_archive/` | 否 |
+| 地图页与 canvas | `<vault>/00_作者工作台/全局仪表盘/Maps/` | 是（`maps build --confirm`） |
+| 版式配置 | `<project>/10_项目配置/jiuzhou_layout.yaml` | 否（手写；属排版不属设定） |

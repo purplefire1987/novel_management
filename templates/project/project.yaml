@@ -1,13 +1,20 @@
-project_id: ""
-project_name: ""
-project_slug: ""
-author_id: ""
-created_at: ""
-project_status: draft
-canon_root: "01_Canon"
-planning_root: "02_Planning"
-manuscript_root: "03_Manuscripts"
-staging_root: "07_Staging"
+project_id: "{project_id}"
+project_name: "{project_name}"
+project_slug: "{slug}"
+author_id: "{author_id}"
+created_at: '{created_at}'
+project_status: "draft"
+# 目录规范：V1.0 §8
+project_meta_root: "10_项目配置"
+canon_root: "02_世界知识库"
+planning_root: "03_故事规划"
+manuscript_root: "04_正文"
+assets_root: "06_素材与研究"
+# ledger 不再是独立目录：事件/关系/时间线都在知识库里（2026-11-22 解散 05_Ledgers）
+ledger_root: "02_世界知识库"
+memory_root: "05_记忆与连续性"
+staging_root: "_staging"
+review_root: "07_审核与报告"
 archive_root: "90_Archive"
 timezone: "Asia/Shanghai"
 schema_version: 1

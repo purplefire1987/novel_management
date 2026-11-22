@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from ..storage import write_atomic
 from ._common import fail, heading, info, ok, read_frontmatter, slugify, warn
 
 VAULT_CONFIG = """\
-# Vault 级配置（V4.0 §4.2）。路径均相对 Vault 根，禁止 `..`。
+# Vault 级配置（V1.0 §8）。路径均相对 Vault 根，禁止 `..`。
 schema_version: '4.0.0'
 vault_name: "{vault_name}"
 created_at: '{created_at}'
@@ -51,39 +52,48 @@ privacy:
   agent_canon_write: false
 """
 
-PROJECT_META = """\
-project_id: "{project_id}"
-project_name: "{project_name}"
-project_slug: "{slug}"
-author_id: "{author_id}"
-created_at: '{created_at}'
-project_status: "draft"
-canon_root: "01_Canon"
-planning_root: "02_Planning"
-manuscript_root: "03_Manuscripts"
-assets_root: "04_Story_Assets"
-ledger_root: "05_Ledgers"
-memory_root: "06_Memory"
-staging_root: "07_Staging"
-review_root: "08_Reviews"
-archive_root: "90_Archive"
-timezone: "Asia/Shanghai"
-schema_version: 1
-"""
+PROJECT_META_TEMPLATE = "project/project.yaml"
+
+
+def template_root() -> Path:
+    """模板目录：仓库根的 `templates/`，可用 `NOVEL_TEMPLATES_DIR` 覆盖。
+
+    为什么不再把 `project.yaml` 写成模块里的字符串常量：常量形式的模板与
+    `templates/project/project.yaml` 会各活一份，改哪个都只生效一半——
+    这正是 `templates/` 长期「存在但没人读」的成因。
+    """
+    override = os.environ.get("NOVEL_TEMPLATES_DIR")
+    if override:
+        return Path(override).expanduser()
+    return Path(__file__).resolve().parents[3] / "templates"
+
+
+def render_project_meta(**values: str) -> str:
+    """读 `templates/project/project.yaml` 并填充占位符。
+
+    找不到模板就报错，不回退到内嵌默认值：静默回退会让人以为「改了模板没生效」，
+    而那种问题要到下一次新建项目才暴露。
+    """
+    path = template_root() / PROJECT_META_TEMPLATE
+    if not path.is_file():
+        raise UsageError(f"缺少项目模板：{path}（可用 NOVEL_TEMPLATES_DIR 指定模板目录）")
+    try:
+        return path.read_text(encoding="utf-8").format(**values)
+    except KeyError as exc:
+        raise UsageError(f"项目模板里有未提供的占位符 {exc}：{path}") from exc
 
 STAGING_AREAS = ("proposals", "plans", "preflight", "reviews", "memory", "drafts", "ingest", "simulation", "release")
-PLANNING_DIRS = ("Story_Bible", "Series_Outline", "Volume_Outlines", "Chapter_Outlines", "Scene_Beats")
-MANUSCRIPT_DIRS = ("Drafts", "Revisions", "Final")
-LEDGER_DIRS = ("Timeline", "Events", "Relationships", "Foreshadowing")
+PLANNING_DIRS = ("故事总纲", "卷级粗纲", "章节细纲", "场景节拍", "故事线", "伏笔与悬念")
+MANUSCRIPT_DIRS = ("初稿", "修订稿", "正式定稿")
 MEMORY_DIRS = ("Hot", "Short_Term", "Long_Term")
 RUNTIME_DIRS = ("cache", "index", "logs", "staging", "temp", "tasks", "approvals", "backups", "authorship")
 
 
 def _layout(cfg: cfg_mod.Config) -> dict:
     return {
-        "system_dir": cfg.layout.get("vault_system_dir", "00_System"),
-        "projects_dir": cfg.layout.get("projects_dir", "10_Projects"),
-        "shared_dir": cfg.layout.get("shared_assets_dir", "90_Shared_Assets"),
+        "system_dir": cfg.layout.get("vault_system_dir", "00_作者工作台"),
+        "projects_dir": cfg.layout.get("projects_dir", "01_小说项目"),
+        "shared_dir": cfg.layout.get("shared_assets_dir", "02_作者级通用资料"),
         "archive_dir": cfg.layout.get("vault_archive_dir", "99_Archive"),
     }
 
@@ -101,9 +111,17 @@ def cmd_init_author(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
     layout = _layout(cfg)
     system_dir = vault / layout["system_dir"]
+    # 00_作者工作台 的四个子目录是 V1.0 §8 明写的，不是可选装饰：
+    # 灵感收集 / 待处理事项 / 全局仪表盘 / 作者级公共资料。
+    # Policies 与 Schemas 是 V1.0 §7／§19 需要的机器配置落点，规范没给位置，
+    # 放在工作台下面（不放进 02_作者级通用资料——那里是「素材」，不是「制度」）。
     dirs = [
-        system_dir / "Dashboards",
+        system_dir / "灵感收集",
+        system_dir / "待处理事项",
+        system_dir / "全局仪表盘",
+        system_dir / "作者级公共资料",
         system_dir / "Policies",
+        system_dir / "Schemas",
         vault / layout["projects_dir"],
         vault / layout["shared_dir"],
         vault / layout["archive_dir"],
@@ -161,7 +179,7 @@ def cmd_init_project(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
     project_name = args.name or project_id
     slug = slugify(project_name)
-    root = vault / cfg.layout.get("projects_dir", "10_Projects") / f"{project_id}_{slug}"
+    root = vault / cfg.layout.get("projects_dir", "01_小说项目") / f"{project_id}_{slug}"
     cfg_mod.ensure_inside(root, vault)
 
     if root.exists() and any(root.iterdir()):
@@ -175,23 +193,21 @@ def cmd_init_project(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     for sub in cfg.layout.get("project_subdirs", []):
         (root / sub).mkdir(parents=True, exist_ok=True)
     for sub in cfg.layout.get("canon_subdirs", []):
-        (root / "01_Canon" / sub).mkdir(parents=True, exist_ok=True)
+        (root / "02_世界知识库" / sub).mkdir(parents=True, exist_ok=True)
     for sub in PLANNING_DIRS:
-        (root / "02_Planning" / sub).mkdir(parents=True, exist_ok=True)
+        (root / "03_故事规划" / sub).mkdir(parents=True, exist_ok=True)
     for sub in MANUSCRIPT_DIRS:
-        (root / "03_Manuscripts" / sub).mkdir(parents=True, exist_ok=True)
-    for sub in LEDGER_DIRS:
-        (root / "05_Ledgers" / sub).mkdir(parents=True, exist_ok=True)
+        (root / "04_正文" / sub).mkdir(parents=True, exist_ok=True)
     for sub in MEMORY_DIRS:
-        (root / "06_Memory" / sub).mkdir(parents=True, exist_ok=True)
+        (root / "05_记忆与连续性" / sub).mkdir(parents=True, exist_ok=True)
     for sub in STAGING_AREAS:
-        (root / "07_Staging" / sub).mkdir(parents=True, exist_ok=True)
-    (root / "08_Reviews" / "editorial").mkdir(parents=True, exist_ok=True)
-    (root / "08_Reviews" / "author").mkdir(parents=True, exist_ok=True)
+        (root / "_staging" / sub).mkdir(parents=True, exist_ok=True)
+    (root / "07_审核与报告" / "editorial").mkdir(parents=True, exist_ok=True)
+    (root / "07_审核与报告" / "author").mkdir(parents=True, exist_ok=True)
 
     write_atomic(
-        root / "00_Project" / "project.yaml",
-        PROJECT_META.format(
+        root / "10_项目配置" / "project.yaml",
+        render_project_meta(
             project_id=project_id,
             project_name=project_name,
             slug=slug,
@@ -204,12 +220,12 @@ def cmd_init_project(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         f"# {project_name}\n\n- project_id: `{project_id}`\n- 建立时间: {now_iso()}\n".encode("utf-8"),
     )
 
-    registry = vault / cfg.layout.get("vault_system_dir", "00_System") / "Project_Registry.md"
+    registry = vault / cfg.layout.get("vault_system_dir", "00_作者工作台") / "Project_Registry.md"
     if registry.exists():
         with registry.open("a", encoding="utf-8") as fh:
             fh.write(f"| {project_id} | {project_name} | draft | {root.name} |\n")
 
-    seeded = _seed_active_project(vault, cfg.layout.get("vault_system_dir", "00_System"), project_id)
+    seeded = _seed_active_project(vault, cfg.layout.get("vault_system_dir", "00_作者工作台"), project_id)
     if seeded:
         info(f"已把 active_project 设为 {project_id}（后续命令可省略 --project）")
     else:
