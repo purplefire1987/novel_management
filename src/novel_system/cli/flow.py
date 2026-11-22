@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from ..tasks import TASK_TYPES, WRITE_MODES, Task
 from ._common import (
     approval_store,
     baseline,
+    heading,
     info,
     ok,
     oplog,
@@ -95,7 +97,62 @@ def cmd_task(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
             print(task_json(task))
         return 0
 
-    raise UsageError("用法：novel task create | novel task inspect <TASK-ID>")
+    if action == "list":
+        # `TaskStore.list()` 一直有实现却没有命令入口，于是「我手上有哪些任务、
+        # 卡在哪个状态」只能靠翻 `<runtime>/tasks/*.yaml`。任务状态机没有查询
+        # 命令，等于状态机对作者不可见。
+        items = store.list(
+            project_id=getattr(args, "project", "") or "",
+            status=getattr(args, "status", "") or "",
+        )
+        if getattr(args, "json", False):
+            from ..tasks import task_json
+
+            print(json.dumps([json.loads(task_json(t)) for t in items], ensure_ascii=False, indent=2))
+            return 0
+        if not items:
+            print("  没有任务。novel task create --type <类型> 可以建一个。")
+            return 0
+        heading(f"{len(items)} 个任务")
+        for task in items:
+            print(
+                f"  {task.task_id}  {task.status:<16s} {task.task_type:<12s} "
+                f"{task.write_mode:<9s} {task.assigned_to or '—'}"
+            )
+        return 0
+
+    if action == "transition":
+        # `TaskStore.transition()` 一直有实现、有迁移表、有跳步拒绝，却从没有命令入口。
+        # 于是 §10.4 的状态机在代码里成立、在操作上不存在——作者只能手改 yaml。
+        from ..tasks import TRANSITIONS, normalize_status
+
+        task = store.load(args.task_id)
+        before = task.status
+        target = normalize_status(getattr(args, "to", "") or "")
+        actor = ensure_actor(getattr(args, "actor", None), "task")
+        task = store.transition(
+            task,
+            target,
+            actor=actor,
+            reason=getattr(args, "reason", "") or "",
+            related_task_ids=getattr(args, "related", None) or [],
+        )
+        op = oplog(cfg).record(
+            actor=actor,
+            command="task transition",
+            project_id=task.project_id,
+            outputs=[{"task_id": task.task_id, "from": before, "to": task.status}],
+            note=getattr(args, "reason", "") or "",
+        )
+        ok(f"{task.task_id}  {before} → {task.status}（op={op.op_id}）")
+        nxt = sorted(TRANSITIONS.get(task.status, set()))
+        if nxt:
+            info("可以继续转到：" + "、".join(nxt))
+        else:
+            info("这是终态，不能再转。")
+        return 0
+
+    raise UsageError("用法：novel task create | list | inspect <task_id> | transition <task_id> --to <状态>")
 
 
 # --------------------------------------------------------------------------
@@ -162,11 +219,11 @@ def cmd_approve(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     if kind:
         # `approve text` 指对象的方式是 `--task` + `--chapter`，没有候选 ID 这个说法。
         if kind != "text" and not getattr(args, "candidate", None):
-            raise UsageError(f"approve {kind} 需要候选 ID：novel approve {kind} TASK-000001 --hash <sha256>")
+            raise UsageError(f"approve {kind} 需要候选 ID：novel approve {kind} task_000001 --hash <sha256>")
         return approve_object(cfg, args, kind)
 
     if not getattr(args, "task", None):
-        raise UsageError("approve 需要 --task TASK-000001，或用 approve artifact <candidate> --hash <sha256>")
+        raise UsageError("approve 需要 --task task_000001，或用 approve artifact <candidate> --hash <sha256>")
 
     actor = ensure_actor(getattr(args, "actor", None), "approve")
     pp = project(cfg, args)

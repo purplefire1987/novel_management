@@ -9,7 +9,7 @@
 - 各 Agent 的交接包
 
 ## 输出
-- 任务计划：`07_Staging/tasks/TASK-*.yaml`
+- 任务计划：`<runtime>/tasks/task_NNNNNN.yaml`（任务在 Runtime，不在 Vault）
 - 阶段门审核结论
 - 冲突清单与协调建议
 
@@ -20,3 +20,9 @@
 
 ## 完成判据
 每个子任务有 `task_id`、明确的输入输出清单、验收结论；未解决项单独列出。
+
+## 工作流
+
+你在 V1.0 §10 二十条流程里担哪一段，以 `novel workflow list --agent editor_in_chief` 为准。
+**不要凭这份卡推断流程**：步骤、关卡、允许/禁止的工具都写在 `workflows/catalog.yaml`，
+那份是机器可校验的，这份卡只是职责说明。两处冲突时以 catalog 为准。

@@ -76,7 +76,7 @@ def test_extract_json_handles_fences_and_noise() -> None:
 
 def _envelope(role: str = "researcher") -> dict:
     return {
-        "task_id": "TASK-000001",
+        "task_id": "task_000001",
         "role": role,
         "result": {"key_constraints": []},
     }
