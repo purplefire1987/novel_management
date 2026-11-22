@@ -178,6 +178,33 @@ def cmd_review(cfg, args: argparse.Namespace) -> int:
     pp = project(cfg, args)
     runtime = need_runtime(cfg)
 
+    if args.review_command == "dimensions":
+        from ..workflows import dimensions as dim_mod
+
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "dimensions": [dim.as_dict() for dim in dim_mod.REVIEW_DIMENSIONS],
+                        "verdicts": list(dim_mod.VERDICT_IDS),
+                        "severities": dict(dim_mod.SEVERITIES),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+
+        heading("十维审核清单（V1.0 §11）")
+        for index, dim in enumerate(dim_mod.REVIEW_DIMENSIONS, start=1):
+            mark = "机器可判形状" if dim.machine_checkable else "机器判不了"
+            print(f"  {index:2d}. {dim.id:<18s} {dim.name:<8s} {dim.primary_owner:<18s} {mark}")
+            info(dim.question)
+            info(f"  机器能做的：{dim.machine_scope}")
+        info("取值：PASS / ISSUE / NOT_APPLICABLE / NOT_CHECKED")
+        info("NOT_APPLICABLE（本章不涉及）与 NOT_CHECKED（没查）是两件事，报告里分开写。")
+        return 0
+
     if args.review_command == "status":
         state = review_mod.status(runtime, task_id=args.task, chapter_id=args.chapter)
         if args.json:
@@ -187,6 +214,10 @@ def cmd_review(cfg, args: argparse.Namespace) -> int:
             info(f"结论：{state.verdict}   风险：{state.risk_level or '未定'}")
             info(f"返修轮次：{state.rounds_used}/{state.max_rounds}")
             info(f"已通过角色：{'、'.join(state.approved_by) or '（无）'}")
+            done, total = state.dimension_coverage
+            info(f"十维覆盖：{done}/{total}")
+            if state.unchecked_dimensions:
+                warn("还没查的维度：" + "、".join(state.unchecked_dimensions))
             if state.missing_reviewers:
                 warn("还缺角色：" + "、".join(state.missing_reviewers))
             for item in state.blockers:
@@ -215,6 +246,8 @@ def cmd_review(cfg, args: argparse.Namespace) -> int:
         note=args.note or "",
         must_not=must_not,
         max_rounds=args.max_rounds,
+        dimensions=_parse_dimensions(getattr(args, "dimension", None) or []),
+        allow_unchecked=bool(getattr(args, "allow_unchecked", False)),
     )
 
     review = result.review
@@ -229,6 +262,17 @@ def cmd_review(cfg, args: argparse.Namespace) -> int:
         (warn if item.severity == "BLOCKER" else info)(line)
     for item in result.warnings:
         warn(item)
+
+    from ..workflows import dimensions as dim_mod
+
+    print()
+    print("十维清单（V1.0 §11）")
+    print(dim_mod.render_markdown(review.dimensions))
+    done, total = dim_mod.coverage(review.dimensions)
+    info(f"覆盖 {done}/{total}")
+    if done < total:
+        warn("没查的项不会自动算通过——报告里写成「未审」，也不会凑成 APPROVE。")
+
     print()
     print(f"下一步：{result.next_action}")
     return 0 if review.verdict == "APPROVE" else 1
@@ -458,6 +502,28 @@ def _strings(value: object) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [str(item) for item in value if str(item).strip()]
     return []
+
+
+def _parse_dimensions(raw: list[str]) -> dict[str, dict]:
+    """把 `--dimension 维度=结论[:说明]` 解析成十维表。
+
+    只写 `structure=pass` 也行——说明留空。写 `structure=issue:开场没立住目标`
+    就把说明一起记下来。**不给结论的维度不会被默认成通过**：
+    没写就是没查，处理在 `dimensions.normalise()` 里。
+    """
+    from ..workflows import dimensions as dim_mod
+
+    table: dict[str, dict] = {}
+    for item in raw:
+        text = str(item).strip()
+        if not text:
+            continue
+        key, _, rest = text.partition("=")
+        rest = rest.strip()
+        verdict, _, note = rest.partition(":")
+        dim = dim_mod.get(key.strip())
+        table[dim.id] = {"verdict": verdict.strip().upper() or "NOT_CHECKED", "note": note.strip()}
+    return table
 
 
 __all__ = ["cmd_deps", "cmd_plan", "cmd_proposal", "cmd_review", "cmd_write"]

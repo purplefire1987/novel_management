@@ -376,3 +376,31 @@ def check_many(name: str, items: Iterable[Any], root: Path | None = None) -> dic
         if errors:
             bad[index] = errors
     return bad
+
+
+# frontmatter 的 `type` 值 → 该用哪份契约判。
+#
+# 存在的理由：知识库里的 .md 都长一个样（frontmatter + 正文），只有 `type` 能说明
+# 它是哪类对象。以前这里是一串 if-elif 写在 `entity validate` 里，漏掉一类就静默
+# 按 entity 判——`rel_*.md` 就是这么被拿去比 `^(ent|asset)_` 模式、在第 1 条错误上
+# 就撞墙的，后面真正缺的字段一条都没报出来。
+#
+# 只列**已经有独立契约**的类型。刻意不收进来的：素材卡（asset）与各类普通设定
+# 共用 entity 契约——V1.0 把世界知识收进单一 `ent_` 号段、类别由 type 承载，
+# 契约同理，除非字段面确实不同（事件有时序、关系有两端），否则不该再分家。
+SCHEMA_BY_TYPE: dict[str, str] = {
+    "event": "event",
+    "relationship": "relationship",
+    "state_change": "state_change",
+    "knowledge": "knowledge",
+    "foreshadowing": "foreshadowing",
+    "scene_beat": "artifact",
+    "chapter_plan": "artifact",
+    "chapter": "chapter",
+}
+
+
+def schema_name_for(type_name: str | None, default: str = "entity") -> str:
+    """按 frontmatter 的 `type` 选契约；认不出就用 default。"""
+    key = str(type_name or "").strip().lower()
+    return SCHEMA_BY_TYPE.get(key, default)

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/novel-system/relationship.schema.json",
+  "title": "关系（两个实体之间的、带有效期的联系）",
+  "$comment": "2026-11-22 新建。此前 `relation create` 写出的 rel_*.md 只落在目录里，没有任何契约约束——`entity validate` 会把它当实体校验，于是 `rel_` 先撞上 entity 的 ^(ent|asset)_ 模式就报错，真正的字段问题被第 1 条错误挡住了。字段面直接照 V1.0 §5.3 的「至少包含」逐条落：id／novel_id／from_entity_id／to_entity_id／relationship_type／valid_from／valid_to／status／source_refs／confidence／created_at／updated_at。**valid_to 的三种状态要分清**：缺省表示未记录，null 表示无从得知，具体时间表示那时结束。写入器统一不写空串（见 entity_cmd._compact），所以「至今仍有效」不能用空串表达——那种情况应写 status: active 且不记 valid_to。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "from_entity_id", "to_entity_id", "relationship_type"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^rel_[0-9]{6}$",
+      "description": "V1.0 §9.2 的关系前缀，六位序号"
+    },
+    "type": { "const": "relationship" },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "便于阅读的标签，通常是「甲 → 乙」。**不是**权威字段，关系由两端 ID 确定"
+    },
+    "novel_id": { "type": "string" },
+    "from_entity_id": {
+      "type": "string",
+      "pattern": "^ent_[0-9]{6}$",
+      "description": "关系的起点。有方向：师徒与「师承自」在这一侧相反"
+    },
+    "to_entity_id": {
+      "type": "string",
+      "pattern": "^ent_[0-9]{6}$",
+      "description": "关系的终点"
+    },
+    "relationship_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "关系类型。开放词表——类型耦合进 schema 会让「加一种关系」变成改契约，而关系本来就是随写作长出来的"
+    },
+    "valid_from": {
+      "type": ["string", "null"],
+      "description": "关系生效的世界时间。允许模糊（「第三年春」）。缺省＝未记录，null＝无从得知"
+    },
+    "valid_to": {
+      "type": ["string", "null"],
+      "description": "关系失效的世界时间。缺省＝未记录（现行关系不写），null＝无从得知，有时间＝那时结束"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "ended", "disputed", "unknown"],
+      "description": "关系记录本身的状态。ended 指关系已结束但记录保留（历史关系不得覆盖）"
+    },
+    "source_refs": { "$ref": "_common.schema.json#/$defs/sourceRefList" },
+    "confidence": {
+      "type": ["number", "string", "null"],
+      "description": "证据强度。传闻里的「师徒」与正文写明的「师徒」可信度不同"
+    },
+    "created_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "updated_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "created_by": { "type": "string" },
+    "updated_by": { "type": "string" },
+    "extensions": { "type": "object" }
+  }
+}

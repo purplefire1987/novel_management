@@ -33,13 +33,14 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..audit import now_iso
+from ..audit import AUTHOR, now_iso
 from ..config import read_yaml
 from ..errors import ConflictError, SecurityError, UsageError
 from ..paths import ProjectPaths
 from ..staging import StagingArea
 from ..storage import dump_yaml, sha256_text, write_text_atomic
 from ..tasks import TaskStore
+from . import dimensions as dim_mod
 
 REVIEW_DIR = "reviews"
 DEFAULT_MAX_ROUNDS = 3
@@ -102,6 +103,9 @@ class Review:
     max_rounds: int = DEFAULT_MAX_ROUNDS
     findings: list[Finding] = field(default_factory=list)
     risk_basis: list[dict] = field(default_factory=list)
+    # 十维审核的结论。默认十项全 NOT_CHECKED——**不是「全部通过」**。
+    # 这个默认值是整套清单的性格：什么都没填的时候，它必须显示为「没查」。
+    dimensions: dict = field(default_factory=dim_mod.blank)
     note: str = ""
     created_at: str = ""
 
@@ -119,6 +123,8 @@ class Review:
             "max_rounds": self.max_rounds,
             "findings": [item.as_dict() for item in self.findings],
             "risk_basis": list(self.risk_basis),
+            "dimensions": dict(self.dimensions),
+            "dimension_coverage": list(dim_mod.coverage(self.dimensions)),
             "note": self.note,
             "created_at": self.created_at,
         }
@@ -148,6 +154,7 @@ class Review:
             max_rounds=int(data.get("max_rounds") or DEFAULT_MAX_ROUNDS),
             findings=findings,
             risk_basis=[item for item in data.get("risk_basis") or [] if isinstance(item, dict)],
+            dimensions=dim_mod.normalise(data.get("dimensions")),
             note=str(data.get("note") or ""),
             created_at=str(data.get("created_at") or ""),
         )
@@ -401,6 +408,8 @@ def submit(
     max_rounds: int = DEFAULT_MAX_ROUNDS,
     author_role: str = "writer",
     extra_reviewers: tuple[str, ...] = (),
+    dimensions: dict | None = None,
+    allow_unchecked: bool = False,
 ) -> SubmitResult:
     """登记一次审核。
 
@@ -459,6 +468,38 @@ def submit(
 
     # ---- 结论 ----
     findings = evaluate(body, chapter_id=chapter_id, must_not=list(must_not or []))
+
+    # ---- 十维清单（V1.0 §11）----
+    # 缺项**不拦 REVISE**（没查完也可能已经看出问题），但拦 APPROVE：
+    # 「十项里六项没查」然后下通过结论，等于把清单变成了装饰。
+    # 唯一的例外是作者本人 —— 优先级里作者决定高于一切，
+    # 而且作者完全可能只看语言就说「这章可以了」，那是他的权利。
+    #
+    # 这里判的是**操作者**（`reviewer == "author"`），不是角色。
+    # 曾经写成 `reviewer_role == "author"`，那是个永远不会成立的条件：
+    # 角色只有九个（editor/editor_in_chief/…），`author` 不在其中，
+    # 于是「作者可以越过」这条通道从没打开过；而 `--allow-unchecked`
+    # 又没人校验身份，任何角色加上它都能绕过十维闸门——
+    # 一条死分支配一个不设防的开关，正好把口子开在最不该开的地方。
+    table = dim_mod.normalise(dimensions)
+    missing_dims = dim_mod.unchecked(table)
+    if verdict == "APPROVE" and missing_dims:
+        if allow_unchecked and reviewer != AUTHOR:
+            raise SecurityError(
+                f"--allow-unchecked 只有作者能开（当前操作者 {reviewer}）。\n"
+                "它跳过的正是「十维还有几项没查」——这个口子只能由对稿件负责的人开。"
+                "其他角色请把没查的项补上，或标 NOT_APPLICABLE。"
+            )
+        if not (allow_unchecked and reviewer == AUTHOR):
+            raise ConflictError(
+                f"{chapter_id} 的十维审核还有 {len(missing_dims)} 项没查："
+                + "、".join(missing_dims)
+                + "。\nV1.0 §11 要求每章至少过这十项。"
+                "确实查不了（比如本章没有伏笔）请标 NOT_APPLICABLE 而不是留空——"
+                "「不涉及」和「没查」是两件事，报告里也是分开写的。\n"
+                "  作者本人（--as author）下通过结论可加 --allow-unchecked；其他角色请先补齐。"
+            )
+
     round_no = max([item.round for item in history], default=0) + 1
 
     review = Review(
@@ -474,6 +515,7 @@ def submit(
         max_rounds=max_rounds,
         findings=findings,
         risk_basis=basis,
+        dimensions=table,
         note=note,
     )
     saved = store.save(review)
@@ -504,6 +546,8 @@ class ReviewStatus:
     missing_reviewers: list[str]
     blockers: list[Finding]
     verdict: str
+    unchecked_dimensions: list[str] = field(default_factory=list)
+    dimension_coverage: tuple[int, int] = (0, 0)
 
     @property
     def passed(self) -> bool:
@@ -520,6 +564,8 @@ class ReviewStatus:
             "approved_by": list(self.approved_by),
             "missing_reviewers": list(self.missing_reviewers),
             "blockers": [item.as_dict() for item in self.blockers],
+            "unchecked_dimensions": list(self.unchecked_dimensions),
+            "dimension_coverage": list(self.dimension_coverage),
         }
 
 
@@ -539,6 +585,8 @@ def status(runtime: Path, *, task_id: str, chapter_id: str) -> ReviewStatus:
             missing_reviewers=list(required_reviewers("LOW")),
             blockers=[],
             verdict="NOT_REVIEWED",
+            unchecked_dimensions=list(dim_mod.DIMENSION_NAMES.values()),
+            dimension_coverage=(0, len(dim_mod.DIMENSION_IDS)),
         )
 
     latest = history[-1]
@@ -569,6 +617,8 @@ def status(runtime: Path, *, task_id: str, chapter_id: str) -> ReviewStatus:
         missing_reviewers=missing,
         blockers=blockers,
         verdict=verdict,
+        unchecked_dimensions=dim_mod.unchecked(latest.dimensions),
+        dimension_coverage=dim_mod.coverage(latest.dimensions),
     )
 
 

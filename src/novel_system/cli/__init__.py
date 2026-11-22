@@ -1,4 +1,4 @@
-"""CLI 入口。V4.0 §5.3 的命令集，按 T01–T10 逐步落地。
+"""CLI 入口。V1.0 §17 的命令集。
 
 设计约束：
 - 不硬编码任何私人路径，一律走 config.load()。
@@ -23,11 +23,14 @@ from ..agents.budget import (
     DEFAULT_OUTPUT_RESERVE,
 )
 from ..errors import NovelError
+from ..tasks import TASK_STATUSES, TASK_TYPES
 from . import (
     agent_cmd,
     approval_cmd,
     backup_cmd,
     change_cmd,
+    continuity_cmd,
+    entity_cmd,
     flow,
     id_cmd,
     import_cmd,
@@ -35,11 +38,13 @@ from . import (
     init,
     maps_cmd,
     note_cmd,
+    project_cmd,
     read,
     release_cmd,
     schema_cmd,
     timeline_cmd,
     work_cmd,
+    workflow_cmd,
 )
 
 from ..version import __version__ as __version__  # noqa: E402  版本只有一处定义
@@ -82,6 +87,13 @@ HANDLERS = {
     "review": work_cmd.cmd_review,
     "proposal": work_cmd.cmd_proposal,
     "deps": work_cmd.cmd_deps,
+    "workflow": workflow_cmd.cmd_workflow,
+    "project": project_cmd.cmd_project,
+    "idea": project_cmd.cmd_idea,
+    "entity": entity_cmd.cmd_entity,
+    "relation": entity_cmd.cmd_relation,
+    "event": entity_cmd.cmd_event,
+    "continuity": continuity_cmd.cmd_continuity,
 }
 
 
@@ -121,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="novel",
-        description="长篇小说管理系统 CLI（V4.0 §5.3 命令集）",
+        description="长篇小说管理系统 CLI（V1.0 §17 命令集）",
         parents=[common],
     )
     parser.add_argument("--version", action="version", version=f"novel {__version__}")
@@ -198,7 +210,12 @@ def build_parser() -> argparse.ArgumentParser:
     task_sub = p_task.add_subparsers(dest="task_command", required=True)
 
     p_tc = task_sub.add_parser("create", help="创建任务", parents=[sub_common])
-    p_tc.add_argument("--type", required=True, help="任务类型（outline/preflight/draft/revision/review/memory_update/ingest/simulation/release）")
+    p_tc.add_argument(
+        "--type",
+        required=True,
+        choices=TASK_TYPES,
+        help="任务类型：" + "/".join(TASK_TYPES),
+    )
     p_tc.add_argument("--assignee", default="", help="责任 Agent")
     p_tc.add_argument("--mode", default="staging", help="read_only / staging / draft / proposal")
     p_tc.add_argument("--scope", default="", help="允许写入的目录前缀（项目内相对路径）")
@@ -207,8 +224,41 @@ def build_parser() -> argparse.ArgumentParser:
     p_tc.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
 
     p_ti = task_sub.add_parser("inspect", help="查看任务详情", parents=[sub_common])
-    p_ti.add_argument("task_id", help="形如 TASK-000001")
+    p_ti.add_argument("task_id", help="形如 task_000001")
     p_ti.add_argument("--json", action="store_true", help="附带 JSON 输出")
+
+    p_tl = task_sub.add_parser("list", help="列出任务及其状态（任务落在 Runtime）", parents=[sub_common])
+    p_tl.add_argument(
+        "--status",
+        default="",
+        choices=("",) + TASK_STATUSES,
+        help="只看某个状态：" + "/".join(TASK_STATUSES),
+    )
+    p_tl.add_argument("--json", action="store_true")
+
+    p_tt = task_sub.add_parser(
+        "transition",
+        help="推进任务状态（§10.4 状态机）",
+        description=(
+            "V1.0 §10.4 的状态机：queued → ready → running → waiting_review → "
+            "approved / rejected → completed，异常态 blocked/paused/failed/cancelled。\n"
+            "非顺流迁移（blocked/paused/failed/rejected/cancelled）必须写 --reason，"
+            "否则三天后只有状态、没有「为什么」。"
+        ),
+        parents=[sub_common],
+    )
+    p_tt.add_argument("task_id", help="形如 task_000001")
+    p_tt.add_argument("--to", required=True, choices=TASK_STATUSES, help="目标状态")
+    p_tt.add_argument("--reason", default="", help="迁移原因（非顺流迁移必填）")
+    p_tt.add_argument(
+        "--related",
+        action="append",
+        default=[],
+        metavar="TASK_ID",
+        help="关联任务，可重复（§10.4 要求记录关联任务）",
+    )
+    p_tt.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
+
 
     # ---- stage ----
     p_stage = sub.add_parser("stage", help="把 Agent 产出写入 staging（唯一允许的提案落点）", parents=[sub_common])
@@ -234,7 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="按对象批准：artifact（staging 产物）／text（正文，要求先过审核）／"
         "release（发布计划）／proposal（记忆提案）。省略则走 --task",
     )
-    p_approve.add_argument("candidate", nargs="?", help="候选 ID：TASK-000001 或 TASK-000001:<目标路径>")
+    p_approve.add_argument("candidate", nargs="?", help="候选 ID：task_000001 或 task_000001:<目标路径>")
     p_approve.add_argument("--hash", dest="hash", default="", help="当前内容哈希（非交互批准必填）")
     p_approve.add_argument("--task", default=None, help="任务 ID（旧用法：一次批准该任务全部 staging）")
     p_approve.add_argument("--chapter", default=None, help="章节 ID（approve text 用）")
@@ -249,7 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="看清一个候选：内容哈希、与正式版差异、风险、阻断问题、批准范围",
         parents=[sub_common],
     )
-    p_inspect.add_argument("candidate", help="TASK-000001 或 TASK-000001:<目标相对路径>")
+    p_inspect.add_argument("candidate", help="task_000001 或 task_000001:<目标相对路径>")
     p_inspect.add_argument("--json", action="store_true", help="输出 JSON")
 
     # ---- issue（T05 问题等级）----
@@ -486,7 +536,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- allocate-id ----
     p_alloc = sub.add_parser("allocate-id", help="分配稳定 ID（默认预演，--confirm 落盘）", parents=[sub_common])
-    p_alloc.add_argument("--type", required=True, help="CHARACTER／LOCATION／EVENT……或直接给前缀 CHAR")
+    p_alloc.add_argument(
+        "--type",
+        required=True,
+        help="V1.0 §9.2 的类别名或前缀：ent（实体）/ ch（正文）/ scene / evt / plan / idea / prop / fs …"
+        "；旧形态 CHARACTER／LOCATION 仍认，但新号只发小写下划线形态",
+    )
     p_alloc.add_argument("--count", type=int, default=1, help="一次分配几个（默认 1）")
     p_alloc.add_argument("--reason", default="", help="分配原因，写进审计")
     p_alloc.add_argument("--confirm", action="store_true", help="真正发号并写审计；缺省只预演")
@@ -606,7 +661,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_rv.add_argument("--risk", default="", help="人工调整风险：LOW/MEDIUM/HIGH（只能升不能降）")
     p_rv.add_argument("--max-rounds", type=int, default=3, help="返修预算（默认 3 轮）")
     p_rv.add_argument("--note", default="")
+    p_rv.add_argument(
+        "--dimension",
+        action="append",
+        default=[],
+        metavar="维度=结论[:说明]",
+        help="十维审核结论，可重复。结论取 pass/issue/not_applicable/not_checked；"
+        "如 --dimension structure=pass --dimension causality=issue:动机缺失",
+    )
+    p_rv.add_argument(
+        "--allow-unchecked",
+        action="store_true",
+        help="十维有未查项也下 APPROVE（作者专用；其他角色会被拒）",
+    )
     p_rv.add_argument("--as", dest="actor", default=None, help="审核人")
+
+    p_rd = review_sub.add_parser(
+        "dimensions", help="列出 V1.0 §11 的十项检查与机器能判的范围", parents=[sub_common]
+    )
+    p_rd.add_argument("--json", action="store_true")
 
     p_rs = review_sub.add_parser("status", help="看这一章现在能不能过", parents=[sub_common])
     p_rs.add_argument("--task", required=True)
@@ -689,7 +762,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_na.add_argument("--body", default="", help="正文；不给则读 --body-file 或 stdin")
     p_na.add_argument("--body-file", default="", help="从文件读正文")
     p_na.add_argument("--scope", default="", help="这份意见管到哪里；默认同标题")
-    p_na.add_argument("--task-id", default="", help="关联任务，如 TASK-0001")
+    p_na.add_argument("--task-id", default="", help="关联任务，如 task_000001")
     p_na.add_argument("--chapter-id", default="", help="关联章节，如 CH-0001")
     p_na.add_argument("--verdict", default="", help="pass / revise / reject / partial（只是意见，不是批准）")
     p_na.add_argument("--source-sha256", default="", help="被审对象的内容指纹，正文一改即视为过期")
@@ -700,6 +773,172 @@ def build_parser() -> argparse.ArgumentParser:
     p_nl = note_sub.add_parser("list", help="列出已有审阅记录", parents=[sub_common])
     p_nl.add_argument("--kind", default="", help="只看某一类")
     p_nl.add_argument("--json", action="store_true")
+
+    # ---- workflow（V1.0 §10 声明式工作流）----
+    p_wf = sub.add_parser(
+        "workflow",
+        help="工作流目录：列出、校验、开实例、暂停与恢复（V1.0 §10）",
+        parents=[sub_common],
+    )
+    wf_sub = p_wf.add_subparsers(dest="workflow_command", required=True)
+
+    p_wl = wf_sub.add_parser("list", help="列出 20 条工作流", parents=[sub_common])
+    p_wl.add_argument("--stage", default="", help="只看某个阶段，如 planning / review")
+    p_wl.add_argument(
+        "--agent",
+        default="",
+        help="只看某个角色的工作流（editor_in_chief/world_architect/editor/dice_mistress/researcher/writer/memory_manager/intake_clerk/version_steward）",
+    )
+    p_wl.add_argument("--json", action="store_true")
+
+    p_ws = wf_sub.add_parser("show", help="看一条工作流的完整定义", parents=[sub_common])
+    p_ws.add_argument("id", help="工作流编号，如 WF-14")
+    p_ws.add_argument("--json", action="store_true")
+
+    wf_sub.add_parser(
+        "validate", help="逐字段校验目录：编号齐不齐、必填缺不缺、引用指没指空", parents=[sub_common]
+    )
+
+    p_wr = wf_sub.add_parser("run", help="开一个实例（只记账，不执行步骤）", parents=[sub_common])
+    p_wr.add_argument("id", help="工作流编号，如 WF-13")
+    p_wr.add_argument("--note", default="", help="这次开跑的原因")
+    p_wr.add_argument("--force", action="store_true", help="已有运行中实例时先取消它")
+    p_wr.add_argument("--as", dest="actor", default=None, help="操作者（九角色之一或 author）")
+    p_wr.add_argument("--json", action="store_true")
+
+    p_wp = wf_sub.add_parser("pause", help="暂停一个实例", parents=[sub_common])
+    p_wp.add_argument("instance", help="实例 ID，如 WF-13-20261122-173000-01")
+    p_wp.add_argument("--reason", default="", help="为什么停")
+    p_wp.add_argument("--as", dest="actor", default=None)
+
+    p_wres = wf_sub.add_parser("resume", help="恢复一个实例", parents=[sub_common])
+    p_wres.add_argument("instance")
+    p_wres.add_argument("--reason", default="")
+    p_wres.add_argument("--as", dest="actor", default=None)
+
+    # ---- project（V1.0 §17）----
+    p_proj2 = sub.add_parser("project", help="项目列表与档案（V1.0 §17）", parents=[sub_common])
+    proj_sub = p_proj2.add_subparsers(dest="project_command", required=True)
+    p_pl = proj_sub.add_parser("list", help="列出 Vault 里所有项目", parents=[sub_common])
+    p_pl.add_argument("--json", action="store_true")
+    p_ps = proj_sub.add_parser("show", help="看一个项目的结构与知识库分布", parents=[sub_common])
+    p_ps.add_argument("--json", action="store_true")
+
+    # ---- idea（WF-01 灵感录入）----
+    p_idea = sub.add_parser("idea", help="灵感录入：原文照录，不做取舍（WF-01）", parents=[sub_common])
+    idea_sub = p_idea.add_subparsers(dest="idea_command", required=True)
+    p_ic = idea_sub.add_parser("create", help="登记一条灵感（默认预演）", parents=[sub_common])
+    p_ic.add_argument("--text", default="", help="灵感原文；与 --text-file 二选一")
+    p_ic.add_argument("--text-file", default="", help="从文件读原文")
+    p_ic.add_argument("--title", default="", help="短标题，决定文件名；省略取原文首行")
+    p_ic.add_argument("--tag", action="append", default=[], help="初始标签，可重复")
+    p_ic.add_argument("--source", action="append", default=[], help="来源，可重复")
+    p_ic.add_argument("--note", default="", help="发号审计里的原因")
+    p_ic.add_argument("--as", dest="actor", default=None)
+    p_ic.add_argument("--confirm", action="store_true", help="确认写盘")
+    p_ic.add_argument("--dry-run", action="store_true", help="强制预演（默认即预演）")
+    p_ic.add_argument("--json", action="store_true")
+
+    # ---- entity（V1.0 §5.2、WF-05）----
+    p_ent = sub.add_parser("entity", help="实体建档、查看与契约校验（V1.0 §5.2）", parents=[sub_common])
+    ent_sub = p_ent.add_subparsers(dest="entity_command", required=True)
+
+    p_ec = ent_sub.add_parser("create", help="新建实体（默认预演）", parents=[sub_common])
+    p_ec.add_argument("--name", required=True, help="实体名称")
+    p_ec.add_argument("--type", required=True, help="类型，如 character/location/item/skill/rule/world")
+    p_ec.add_argument("--subtype", default="", help="中文子类，如 主角／府／神器")
+    p_ec.add_argument("--alias", action="append", default=[], help="别名，可重复")
+    p_ec.add_argument("--summary", default="", help="一句话摘要")
+    p_ec.add_argument("--tag", action="append", default=[], help="标签，可重复")
+    p_ec.add_argument("--status", default="active", help="生命周期状态（默认 active）")
+    p_ec.add_argument(
+        "--canon-status",
+        default="proposal",
+        choices=["idea", "proposal", "pending_review", "canon", "deprecated", "rejected"],
+        help="Canon 状态（V1.1 §4.2 六值，默认 proposal；Agent 不得自置 canon）",
+    )
+    p_ec.add_argument("--source", action="append", default=[], help="来源引用，可重复")
+    p_ec.add_argument("--confidence", type=float, default=None, help="可信度 0..1（与 canon_status 不是一回事）")
+    p_ec.add_argument("--prefix", default="ent", choices=["ent", "asset"], help="ID 前缀，素材用 asset")
+    p_ec.add_argument("--allow-duplicate", action="store_true", help="允许同名（同名不同人／物时用）")
+    p_ec.add_argument("--note", default="", help="发号审计里的原因")
+    p_ec.add_argument("--as", dest="actor", default=None)
+    p_ec.add_argument("--confirm", action="store_true", help="确认写盘")
+    p_ec.add_argument("--dry-run", action="store_true")
+    p_ec.add_argument("--json", action="store_true")
+
+    p_es = ent_sub.add_parser("show", help="按 ID 看一份档案", parents=[sub_common])
+    p_es.add_argument("id", help="实体 ID，如 ent_000086")
+    p_es.add_argument("--json", action="store_true")
+
+    p_ev = ent_sub.add_parser("validate", help="校验契约（单份或全库知识库）", parents=[sub_common])
+    p_ev.add_argument("--id", default="", help="只校验这一份；省略则校验全部带 id 的档案")
+
+    # ---- relation（V1.0 §5.3、WF-06）----
+    p_rel = sub.add_parser("relation", help="登记关系（追加，不覆盖历史，V1.0 §5.3）", parents=[sub_common])
+    rel_sub = p_rel.add_subparsers(dest="relation_command", required=True)
+    p_rc = rel_sub.add_parser("create", help="登记一条关系（默认预演）", parents=[sub_common])
+    p_rc.add_argument("--from", dest="from_id", required=True, help="起点实体 ID")
+    p_rc.add_argument("--to", dest="to_id", required=True, help="终点实体 ID")
+    p_rc.add_argument("--relation-type", required=True, help="关系类型，如 师徒／敌对／效忠")
+    p_rc.add_argument("--valid-from", default="", help="生效时间（世界时间）")
+    p_rc.add_argument("--valid-to", default="", help="失效时间；给了就把状态记成 ended")
+    p_rc.add_argument("--summary", default="")
+    p_rc.add_argument("--source", action="append", default=[])
+    p_rc.add_argument("--confidence", type=float, default=None)
+    p_rc.add_argument("--note", default="")
+    p_rc.add_argument("--as", dest="actor", default=None)
+    p_rc.add_argument("--confirm", action="store_true")
+    p_rc.add_argument("--dry-run", action="store_true")
+
+    # ---- event（V1.0 §5.10、WF-06）----
+    p_evt = sub.add_parser("event", help="登记事件（时间不确定就写不确定，V1.0 §5.10）", parents=[sub_common])
+    evt_sub = p_evt.add_subparsers(dest="event_command", required=True)
+    p_etc = evt_sub.add_parser("create", help="登记一条事件（默认预演）", parents=[sub_common])
+    p_etc.add_argument("--name", required=True)
+    p_etc.add_argument("--summary", default="")
+    p_etc.add_argument("--world-time", default="", help="世界时间；不知道就留空，别猜")
+    p_etc.add_argument(
+        "--precision",
+        default="unknown",
+        choices=["exact", "day", "month", "season", "year", "era", "unknown"],
+        help="时间精度（默认 unknown：宁可承认不知道）。season 是「那年冬天」这一档，长篇里最常用",
+    )
+    p_etc.add_argument("--narrative", default="", help="叙事位置，如「第 3 章前」")
+    p_etc.add_argument("--participant", action="append", default=[], help="参与者实体 ID，可重复")
+    p_etc.add_argument("--location", default="", help="地点实体 ID")
+    p_etc.add_argument("--source", action="append", default=[])
+    p_etc.add_argument("--status", default="active")
+    p_etc.add_argument(
+        "--canon-status",
+        default="proposal",
+        choices=["idea", "proposal", "pending_review", "canon", "deprecated", "rejected"],
+    )
+    p_etc.add_argument(
+        "--fact-status",
+        default="unknown",
+        choices=["confirmed", "claimed", "rumored", "planned", "unknown"],
+        help="V1.0 §5.10 要求区分「作者确认／角色声称／传闻／计划」。默认 unknown，不替作者认账",
+    )
+    p_etc.add_argument("--confidence", type=float, default=None)
+    p_etc.add_argument("--note", default="")
+    p_etc.add_argument("--as", dest="actor", default=None)
+    p_etc.add_argument("--confirm", action="store_true")
+    p_etc.add_argument("--dry-run", action="store_true")
+
+    # ---- continuity（V1.0 §11 时间／信息／伏笔、WF-17）----
+    p_cont = sub.add_parser(
+        "continuity", help="连续性检查：账面缺口，以及这次没查什么（WF-17）", parents=[sub_common]
+    )
+    cont_sub = p_cont.add_subparsers(dest="continuity_command", required=True)
+    p_cc = cont_sub.add_parser("check", help="跑一遍连续性检查", parents=[sub_common])
+    p_cc.add_argument(
+        "--scope",
+        default="all",
+        choices=["all", "chapter", "volume"],
+        help="检查范围；chapter/volume 目前只影响「未查项」的说明，不影响已实现的三项",
+    )
+    p_cc.add_argument("--json", action="store_true")
 
     return parser
 

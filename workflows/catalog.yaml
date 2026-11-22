@@ -1,0 +1,880 @@
+# 工作流目录（V1.0 §10）
+#
+# 为什么是**声明式**而不是写在 Prompt 里：Prompt 是「怎么说」，工作流是「必须发生什么」。
+# 写进 Prompt 的流程，改一次要改九个角色的九份文件，而且没有任何东西能检查它是否完整；
+# 写在这里，`novel workflow validate` 能逐字段查，`novel workflow list` 能一眼看到缺哪个。
+#
+# 字段面按 V1.0 §10 原文：工作流 ID、名称、版本、说明、触发条件、前置条件、
+# 输入 Schema、步骤和依赖、Agent 角色、工具权限、输出 Schema、质量门和审批点、
+# 失败处理、暂停/恢复规则、重试和幂等策略、审计事件、验收标准。
+#
+# 编号是**生命周期顺序**，不是执行顺序：WF-08…WF-15 才是一条正文从总纲走到定稿的链，
+# WF-00/01/02 在项目开头跑一次，WF-16…WF-19 在每一章定稿后反复跑。
+# 一张图（`00_作者工作台/Policies/Workflow_Map.md`）画的是依赖，不是编号。
+#
+# `tool_permissions` 里的命令名对应 `novel --help` 的子命令。三道恒为 deny：
+# 写 Canon、发布、删档——它们不是「高风险工具」，是**只有作者能做的事**，
+# 所以列在 deny 里而不是 allow 里加一行注释。
+#
+# `detail_ref` 指向 `workflows/<slug>/workflow.yaml`：那里是这条流程的分步细则
+# （每一步的判据、产出格式、常见失败）。目录里只声明「有哪些步」，
+# 细则不重复——两份都写迟早对不上。
+
+version: 1
+spec: V1.0 §10
+
+workflows:
+  # ── 项目生命周期的开头 ────────────────────────────────────────────
+  - id: WF-00
+    name: 系统与项目初始化
+    version: 1
+    stage: bootstrap
+    description: 检查环境、建立作者空间和小说项目。
+    trigger:
+      - 作者要开一部新书
+      - '`novel doctor` 报路径或依赖不齐'
+    preconditions:
+      - Runtime 在 Vault 之外（V1.0 §8.1）
+      - 目标 Vault 目录为空，或已有 Vault 且明确要加项目
+    input_schema:
+      required: [project_id, project_name, author_id]
+      optional: [timezone, slug]
+    output_schema:
+      required: [Vault_Config.yaml, project.yaml, 17 个知识库目录, _staging]
+    agents: [version_manager]
+    tool_permissions:
+      allow: [novel doctor, novel init-author, novel init-project, novel validate]
+      propose: []
+      deny: [novel publish, novel release, novel approve, 写 Canon]
+    steps:
+      - {id: doctor, owner: version_manager, action: 检查 Python/PyYAML/SQLite/路径隔离, gate: 全部 OK 才继续}
+      - {id: init_author, owner: version_manager, action: 建 00_作者工作台 与四个子目录, depends_on: [doctor]}
+      - {id: init_project, owner: version_manager, action: 建项目骨架与 17 类知识库, depends_on: [init_author]}
+      - {id: validate, owner: version_manager, action: 跑结构校验, depends_on: [init_project], gate: 退出码 0}
+    quality_gates:
+      - '`novel doctor` 全部通过'
+      - '`novel validate` 退出码 0'
+    failure_handling:
+      - 目标目录非空：拒绝初始化，不覆盖（退出码 2）
+      - 路径越界：立即中止，不建任何目录
+    pause_resume:
+      pause: [目录已建但 validate 未过]
+      resume: [修完结构后重跑 validate]
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 交作者处理}
+    idempotency:
+      key: project_id
+      duplicate_guard: 目录非空即拒绝，不重复建
+    audit_events: [init-author, init-project, validate]
+    acceptance:
+      - 新项目有 00_项目管理…10_项目配置 十一个目录加 _staging
+      - 知识库 17 类齐全（空目录也要在）
+
+  - id: WF-01
+    name: 灵感录入
+    version: 1
+    stage: ideation
+    description: 记录灵感、来源和初始标签。此阶段不做取舍，只做不丢失。
+    trigger:
+      - 作者想到一个点子
+      - 读资料时撞到一个可用的意象
+    preconditions:
+      - 项目已初始化
+    input_schema:
+      required: [raw_text]
+      optional: [source, tags, mood]
+    output_schema:
+      required: [idea_id, 灵感原文, 记录时间]
+    agents: [editor]
+    tool_permissions:
+      allow: [novel idea create, novel allocate-id --type idea]
+      propose: []
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: capture, owner: editor, action: 原文照录，不润色不改写, gate: 一字不改}
+      - {id: tag, owner: editor, action: 打初始标签, depends_on: [capture]}
+      - {id: file, owner: editor, action: 落到 01_灵感与创意, depends_on: [tag]}
+    quality_gates:
+      - 灵感原文与作者给的一字不差
+    failure_handling:
+      - 灵感跨项目：先问归哪部，不默认当前项目
+    pause_resume:
+      pause: []
+      resume: []
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 丢弃并告知}
+    idempotency:
+      key: idea_id
+      duplicate_guard: 同一天同一原文不重复建卡
+    audit_events: [idea-create]
+    acceptance:
+      - 灵感的原文可逐字回溯到作者的原话
+
+  - id: WF-02
+    name: 灵感评估与立项
+    version: 1
+    stage: ideation
+    description: 评估、合并、拆分并决定是否立项。
+    trigger:
+      - 灵感积累到作者想看看能长成什么
+    preconditions:
+      - 至少有一条灵感记录
+    input_schema:
+      required: [idea_ids]
+      optional: [目标体量, 题材约束]
+    output_schema:
+      required: [评估结论（立项／合并／搁置／弃用）, 理由]
+    agents: [editor_in_chief, editor]
+    tool_permissions:
+      allow: [novel idea show, novel search, novel project show]
+      propose: []
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: read, owner: editor, action: 读全部候选灵感, gate: 不遗漏}
+      - {id: cluster, owner: editor, action: 合并同源、拆分过大的, depends_on: [read]}
+      - {id: assess, owner: editor_in_chief, action: 给出结论与理由, depends_on: [cluster], gate: 结论必须带理由}
+      - {id: decide, owner: author, action: 决定是否立项, depends_on: [assess], gate: 作者明说}
+    quality_gates:
+      - 「不立项」也是一个合法结论，不得为了推进而模糊
+    failure_handling:
+      - 结论摇摆：保留全部灵感，不删不改
+    pause_resume:
+      pause: [等作者决定]
+      resume: [作者给出结论]
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 搁置}
+    idempotency:
+      key: idea_ids 集合
+      duplicate_guard: 同一批灵感不重复评估
+    audit_events: [idea-assess]
+    acceptance:
+      - 每条灵感都有归宿（立项／合并进哪条／搁置／弃用）
+
+  # ── 原稿与研究 ────────────────────────────────────────────────────
+  - id: WF-03
+    name: 原稿首次录入
+    version: 1
+    stage: ingest
+    description: 只读解析作者提供的原稿副本。
+    trigger:
+      - 作者给了旧稿、设定集或表格
+    preconditions:
+      - 原稿副本在 90_Archive/Raw_Sources 下
+      - 原件不动
+    input_schema:
+      required: [raw_file 或 raw_dir]
+      optional: [import_profile, batch_size]
+    output_schema:
+      required: [import_manifest, 分批 staging 产物, 导入台账]
+    agents: [ingestor, version_manager]
+    tool_permissions:
+      allow: [novel import scan, novel import report, novel import stage, novel import where, novel import list]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish, 修改原件]
+    steps:
+      - {id: scan, owner: ingestor, action: 只读扫描并编码, gate: 原件 sha256 记下}
+      - {id: report, owner: ingestor, action: 十一维度记账，各自报缺口, depends_on: [scan]}
+      - {id: stage, owner: ingestor, action: 分批写 staging, depends_on: [report], gate: 每批可回退}
+      - {id: ledger, owner: version_manager, action: 记导入台账, depends_on: [stage]}
+    quality_gates:
+      - 原件 sha256 前后一致
+      - 十一维度无「假装查过」
+    failure_handling:
+      - 编码识别失败：报错并停，不猜编码
+      - 某维度读不到：记 BLOCKER，不记 0 条
+    pause_resume:
+      pause: [某批出错]
+      resume: [修完从该批继续，不从头重来]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 停在该批}
+    idempotency:
+      key: import_id + batch
+      duplicate_guard: 同一 import_id 的同一批不重复 stage
+    audit_events: [import-scan, import-stage]
+    acceptance:
+      - 台账覆盖整个导入，每一章都能追到原件位置
+    detail_ref: legacy_ingestion
+
+  - id: WF-04
+    name: 世界基础设定
+    version: 1
+    stage: worldbuilding
+    description: 建立世界、规则、时间和核心设定。
+    trigger:
+      - 立项后作者要先把世界的底层规律定下来
+    preconditions:
+      - 项目已初始化
+    input_schema:
+      required: [世界名, 核心规则草案]
+      optional: [参考作品, 已有设定集]
+    output_schema:
+      required: [世界与宇宙 与 规则与机制 两类档案]
+    agents: [world_architect, editor_in_chief]
+    tool_permissions:
+      allow: [novel entity create, novel search, novel allocate-id --type entity]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: frame, owner: world_architect, action: 定世界骨架与规律, gate: 每条规律写到能被违反}
+      - {id: boundary, owner: world_architect, action: 写能力边界与代价, depends_on: [frame]}
+      - {id: review, owner: editor_in_chief, action: 查自洽与可写性, depends_on: [boundary], gate: 无自相矛盾}
+      - {id: confirm, owner: author, action: 确认, depends_on: [review]}
+    quality_gates:
+      - 每条规则都写清「怎么破」——写不出破法的规则是口号，不是规则
+    failure_handling:
+      - 规则互相矛盾：列出来交作者裁，不自行取舍
+    pause_resume:
+      pause: [等作者裁矛盾]
+      resume: [裁定后继续]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交作者}
+    idempotency:
+      key: 档案 id
+      duplicate_guard: 同一设定不建第二份，改旧档
+    audit_events: [entity-create]
+    acceptance:
+      - 世界与宇宙、规则与机制两类都有可查的档案
+
+  - id: WF-05
+    name: 实体创建与维护
+    version: 1
+    stage: worldbuilding
+    description: 创建和更新结构化实体。所有实体的唯一入口。
+    trigger:
+      - 正文里出现了一个需要长期跟踪的对象
+      - 已有档案需要更新
+    preconditions:
+      - 类型已确定（人物／地点／势力／物品／技能／生物……）
+      - 目标目录已存在
+    input_schema:
+      required: [name, type]
+      optional: [aliases, summary, source_refs, subtype, world]
+    output_schema:
+      required: [ent_ 或 asset_ 形态的 id, frontmatter, 正文]
+    agents: [world_architect, researcher]
+    tool_permissions:
+      allow: [novel entity create, novel entity show, novel entity validate, novel allocate-id --type entity]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: resolve, owner: researcher, action: 先查是否已有同义档案, gate: 查过才算}
+      - {id: allocate, owner: world_architect, action: 发号, depends_on: [resolve]}
+      - {id: write, owner: world_architect, action: 写档案, depends_on: [allocate]}
+      - {id: validate, owner: world_architect, action: 契约校验, depends_on: [write], gate: 退出码 0}
+    quality_gates:
+      - 「新建之前先查重」——重名不重号，但同义异名要合并
+      - ID 形态必须是 `<前缀>_<六位>`，不接受复合型
+    failure_handling:
+      - 查重发现两份讲同一件事：合并，不并排放着
+      - 发号撞号：停，先修重号
+    pause_resume:
+      pause: [等合并决定]
+      resume: [合并后继续]
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 停下报告}
+    idempotency:
+      key: id
+      duplicate_guard: 同 id 不重复建；同 name 先查再建
+    audit_events: [entity-create, entity-validate]
+    acceptance:
+      - '`novel entity validate` 对该档案通过'
+      - '`novel validate` 全库重复 0'
+    detail_ref: canon_change
+
+  - id: WF-06
+    name: 事件和关系登记
+    version: 1
+    stage: worldbuilding
+    description: 维护事件、关系和状态变化。
+    trigger:
+      - 正文里发生了一件需要被记住的事
+      - 两个人（两方势力）的关系变了
+    preconditions:
+      - 事件或关系涉及的实体都已有 ID
+    input_schema:
+      required: [event 或 relation 主体, 参与方 id]
+      optional: [世界时间, 精度, 来源章节]
+    output_schema:
+      required: [evt_／rel_／sc_ 形态的记录]
+    agents: [world_architect, memory_keeper]
+    tool_permissions:
+      allow: [novel event create, novel relation create, novel state, novel search]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: locate, owner: memory_keeper, action: 定位到章节与段落, gate: 有出处}
+      - {id: record, owner: world_architect, action: 写事件或关系, depends_on: [locate]}
+      - {id: time, owner: world_architect, action: 标时间与精度, depends_on: [record], gate: 不确定就写不确定}
+      - {id: check, owner: world_architect, action: 查前后不矛盾, depends_on: [time]}
+    quality_gates:
+      - 时间不确定时必须标精度，不得伪造精确时刻
+      - 关系变化追加记录，不覆盖历史
+    failure_handling:
+      - 时间对不上：记 UNORDERED，不硬排
+    pause_resume:
+      pause: [等作者裁时序]
+      resume: [裁定后补边]
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 记为待定}
+    idempotency:
+      key: evt_/rel_ id
+      duplicate_guard: 同一事件不重复登记
+    audit_events: [event-create, relation-create]
+    acceptance:
+      - '`novel state` 能查到该实体的字段变化'
+      - '`novel knowledge` 查不到的记 NOT_RECORDED，不记「不知道」'
+
+  - id: WF-07
+    name: 资料研究与引用
+    version: 1
+    stage: research
+    description: 研究资料、摘录、来源和使用边界。
+    trigger:
+      - 写到不熟的领域
+      - 需要外部依据支撑某个设定
+    preconditions:
+      - 明确要查什么
+    input_schema:
+      required: [question]
+      optional: [允许的来源类型, 时间范围]
+    output_schema:
+      required: [摘录, 来源, 可用边界, 冲突说明]
+    agents: [researcher]
+    tool_permissions:
+      allow: [novel search, novel knowledge, novel reveal]
+      propose: []
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: query, owner: researcher, action: 查内部已知, gate: 查过再查外部}
+      - {id: external, owner: researcher, action: 外部检索, depends_on: [query]}
+      - {id: cite, owner: researcher, action: 记来源与边界, depends_on: [external], gate: 每条摘录有来源}
+      - {id: file, owner: researcher, action: 落 06_素材与研究, depends_on: [cite]}
+    quality_gates:
+      - 摘录必须带来源，无来源的不进素材区
+      - 内部与外部冲突时两者都记，不择一
+    failure_handling:
+      - 查不到：记「未找到」，不编
+    pause_resume:
+      pause: []
+      resume: []
+    retry_policy: {max_attempts: 2, backoff: 换关键词, on_exhausted: 记为未找到}
+    idempotency:
+      key: question + 来源
+      duplicate_guard: 同一问题同一来源不重复摘录
+    audit_events: [search, note]
+    acceptance:
+      - 每条素材都能追到来源
+
+  # ── 三条纲 ────────────────────────────────────────────────────────
+  - id: WF-08
+    name: 故事总纲设计
+    version: 1
+    stage: planning
+    description: 建立全书主线和核心叙事承诺。
+    trigger:
+      - 立项后要定全书骨架
+    preconditions:
+      - 世界基础设定已确认
+    input_schema:
+      required: [核心冲突, 主角, 结局倾向]
+      optional: [目标字数, 分卷数]
+    output_schema:
+      required: [故事总纲（plan_ 形态）]
+    agents: [editor, editor_in_chief]
+    tool_permissions:
+      allow: [novel plan, novel allocate-id --type plan, novel search]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish, novel write]
+    steps:
+      - {id: promise, owner: editor, action: 写核心叙事承诺, gate: 一句话说清读者图什么}
+      - {id: arc, owner: editor, action: 主线与人物弧, depends_on: [promise]}
+      - {id: review, owner: editor_in_chief, action: 查承诺与弧是否互洽, depends_on: [arc]}
+      - {id: confirm, owner: author, action: 确认, depends_on: [review], gate: 作者明说}
+    quality_gates:
+      - 总纲必须能回答「这本书承诺了什么」
+    failure_handling:
+      - 承诺过多：拆成续作或砍掉，不在总纲里全塞
+    pause_resume:
+      pause: [等作者确认]
+      resume: [确认后进 WF-09]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交作者}
+    idempotency:
+      key: plan_ id
+      duplicate_guard: 总纲只一份，改不建新
+    audit_events: [plan, approve]
+    acceptance:
+      - 总纲与后续卷纲不矛盾
+
+  - id: WF-09
+    name: 卷级粗纲设计
+    version: 1
+    stage: planning
+    description: 分卷目标、冲突、转折和结尾。
+    trigger:
+      - 总纲已确认，要拆卷
+    preconditions:
+      - 故事总纲存在
+    input_schema:
+      required: [total_plan_id, 本卷目标]
+      optional: [章数上限, 字数目标]
+    output_schema:
+      required: [卷级粗纲, 序列层结构（幕链）]
+    agents: [editor, editor_in_chief]
+    tool_permissions:
+      allow: [novel plan, novel search]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish, novel write]
+    steps:
+      - {id: goal, owner: editor, action: 写本卷目标与代价, gate: 每次价值翻转都要有}
+      - {id: acts, owner: editor, action: 排序列与幕链, depends_on: [goal]}
+      - {id: count, owner: editor, action: 估章数与字数, depends_on: [acts]}
+      - {id: review, owner: editor_in_chief, action: 查与总纲一致性, depends_on: [count]}
+    quality_gates:
+      - 幕链不能只有文字、没有数据——`plan_*_序列.yaml` 要真写出来，否则质量门空转
+    failure_handling:
+      - 章数估不准：给区间并写明依据，不给假精确值
+    pause_resume:
+      pause: [等作者看卷纲]
+      resume: [确认后进 WF-10]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交作者}
+    idempotency:
+      key: plan_ id（卷）
+      duplicate_guard: 一卷一份卷纲
+    audit_events: [plan]
+    acceptance:
+      - 卷纲能落到章，章纲能落到场景
+
+  - id: WF-10
+    name: 章节细纲设计
+    version: 1
+    stage: planning
+    description: 章节目标、因果、人物和信息推进。
+    trigger:
+      - 要开写某一章
+    preconditions:
+      - 卷级粗纲已确认
+      - 该章在卷纲的章数区间内
+    input_schema:
+      required: [volume_id, chapter_seq]
+      optional: [必须发生的剧情事实]
+    output_schema:
+      required: [章卡（plan_ 形态）, 必须发生的剧情事实时间轴]
+    agents: [editor]
+    tool_permissions:
+      allow: [novel plan, novel search, novel state, novel knowledge]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish, novel write]
+    steps:
+      - {id: objective, owner: editor, action: 写章目标与叙事功能, gate: 目标可判真假}
+      - {id: facts, owner: editor, action: 列必须发生的事实, depends_on: [objective]}
+      - {id: causality, owner: editor, action: 排因果链, depends_on: [facts]}
+      - {id: gate, owner: editor, action: 跑 `novel plan` 判断够不够开写, depends_on: [causality], gate: PASS}
+    quality_gates:
+      - '`novel plan` 判 PASS 才能进 WF-11'
+      - 章卡缺「必须发生的事实」= 不够开写
+    failure_handling:
+      - 因果断裂：回 WF-09 调卷纲，不在章卡里硬补
+    pause_resume:
+      pause: [plan 判 BLOCKED]
+      resume: [补齐后重跑 plan]
+    retry_policy: {max_attempts: 3, backoff: none, on_exhausted: 回卷纲层}
+    idempotency:
+      key: plan_ id（章）
+      duplicate_guard: 一章一份章卡
+    audit_events: [plan]
+    acceptance:
+      - '`novel plan` 判 PASS'
+
+  - id: WF-11
+    name: 场景节拍设计
+    version: 1
+    stage: planning
+    description: 场景目的、冲突、节奏和转场。
+    trigger:
+      - 章卡已 PASS，要拆场景
+    preconditions:
+      - 章卡存在且 `novel plan` PASS
+    input_schema:
+      required: [chapter_plan_id]
+      optional: [场景数上限]
+    output_schema:
+      required: [scene_ 形态的场景卡, 接缝三字段（entry/exit/carry）]
+    agents: [editor, dice_mistress]
+    tool_permissions:
+      allow: [novel plan, novel search, novel allocate-id --type scene]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish, novel write]
+    steps:
+      - {id: split, owner: editor, action: 按剧情事实拆场景, gate: 每场都能追回章卡}
+      - {id: seam, owner: editor, action: 写 entry/exit/carry, depends_on: [split], gate: 三字段都不空}
+      - {id: order, owner: editor, action: sequence 与 next 对齐, depends_on: [seam]}
+      - {id: dice, owner: dice_mistress, action: 需要时推演分支（可空转）, depends_on: [order]}
+    quality_gates:
+      - 接缝三字段补齐——场景切换断裂是读者最常掉的地方
+      - sequence 是叙事序不是编号，next 只能指 sequence+1
+    failure_handling:
+      - 某场拆不出目的：合并回上一场
+    pause_resume:
+      pause: []
+      resume: []
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交编辑}
+    idempotency:
+      key: scene_ id
+      duplicate_guard: 同章不重复拆场景
+    audit_events: [plan]
+    acceptance:
+      - 场景链连续，`validate` 无断链
+
+  # ── 正文 ──────────────────────────────────────────────────────────
+  - id: WF-12
+    name: 写前资料包生成
+    version: 1
+    stage: writing
+    description: 为主笔准备经核验的上下文。
+    trigger:
+      - 要开写某一章之前
+    preconditions:
+      - 场景节拍已就绪
+      - 索引可查
+    input_schema:
+      required: [chapter_plan_id, scene_ids]
+      optional: [预算上限]
+    output_schema:
+      required: [资料包（八级检索 + 预算账 + PASS/BLOCKED）]
+    agents: [researcher]
+    tool_permissions:
+      allow: [novel preflight, novel search, novel state, novel knowledge, novel reveal]
+      propose: []
+      deny: [写 Canon, novel publish, novel write]
+    steps:
+      - {id: collect, owner: researcher, action: 八级检索, gate: 每一级都报结果或报缺口}
+      - {id: budget, owner: researcher, action: 装预算，硬约束优先, depends_on: [collect]}
+      - {id: boundary, owner: researcher, action: 标「禁止角色知晓」, depends_on: [budget], gate: 缺这条资料包无效}
+      - {id: verdict, owner: researcher, action: 出 PASS／BLOCKED, depends_on: [boundary]}
+    quality_gates:
+      - 读不到的数据记 BLOCKER，不返回 0 条装作查过
+      - 截断要同时记在预算账和包字段里
+    failure_handling:
+      - 索引不可用：判 BLOCKED，不给「差不多」的资料包
+    pause_resume:
+      pause: [判 BLOCKED]
+      resume: [补索引或降预算后重跑]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交作者}
+    idempotency:
+      key: chapter_plan_id + 索引 commit
+      duplicate_guard: 同一索引版本不重复生成
+    audit_events: [preflight]
+    acceptance:
+      - 资料包结论可复现（同一索引同一输入得同一结论）
+
+  - id: WF-13
+    name: 正文初稿创作
+    version: 1
+    stage: writing
+    description: 按批准规划生成初稿。产物只进 staging。
+    trigger:
+      - 资料包 PASS，作者/总编确认写作输入
+    preconditions:
+      - '`novel preflight` 判 PASS'
+      - 章卡与场景节拍都在
+    input_schema:
+      required: [chapter_plan_id, preflight 结论]
+      optional: [字数目标, 风格约束]
+    output_schema:
+      required: [初稿（04_正文/初稿）, 任务记录]
+    agents: [writer, editor_in_chief]
+    tool_permissions:
+      allow: [novel write, novel preflight, novel search, novel stage]
+      propose: [novel stage]
+      deny: [写 Canon, novel publish, novel approve]
+    steps:
+      - {id: confirm, owner: editor_in_chief, action: 确认写作输入, gate: 作者或总编明确点头}
+      - {id: draft, owner: writer, action: 写初稿, depends_on: [confirm]}
+      - {id: self_check, owner: writer, action: 自查规划偏差, depends_on: [draft]}
+      - {id: handoff, owner: writer, action: 交审核, depends_on: [self_check]}
+    quality_gates:
+      - 初稿永不直接进 02_世界知识库
+      - 偏离批准细纲的地方要写明理由，不偷偷改
+    failure_handling:
+      - 资料包不足：停下要资料，不带病写
+    pause_resume:
+      pause: [等资料包补齐]
+      resume: [补齐后继续]
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 交作者}
+    idempotency:
+      key: chapter_plan_id
+      duplicate_guard: 同章不并行开两份初稿
+    audit_events: [write]
+    acceptance:
+      - 初稿在 `04_正文/初稿`，`02_世界知识库` 里没有任何新增
+    detail_ref: manuscript_production
+
+  - id: WF-14
+    name: 正文审核与修订
+    version: 1
+    stage: review
+    description: 十维审核并形成修订闭环。
+    trigger:
+      - 初稿交出
+    preconditions:
+      - 初稿已落盘
+      - 章卡与场景节拍可查（用于判规划偏差）
+    input_schema:
+      required: [draft_path]
+      optional: [风险等级]
+    output_schema:
+      required: [十维审核报告, 问题分级（阻断／重要／一般／主观）, 修订任务]
+    agents: [editor_in_chief, editor, world_architect, researcher]
+    tool_permissions:
+      allow: [novel review, novel search, novel state, novel knowledge, novel reveal, novel inspect]
+      propose: [novel issue, novel stage]
+      deny: [写 Canon, novel publish, 直接改写正式定稿]
+    steps:
+      - {id: route, owner: editor_in_chief, action: 按风险路由到审核维度, gate: 高风险不许自审}
+      - {id: ten_dim, owner: editor, action: 十维逐项过, depends_on: [route]}
+      - {id: setting, owner: world_architect, action: 设定与时间两项, depends_on: [route]}
+      - {id: info, owner: researcher, action: 信息边界一项, depends_on: [route]}
+      - {id: classify, owner: editor_in_chief, action: 问题分级, depends_on: [ten_dim, setting, info], gate: 风格建议不得伪装成事实错误}
+      - {id: repair, owner: writer, action: 修订, depends_on: [classify]}
+    quality_gates:
+      - 十项都要有结论，缺一项写「未审」而不是留空
+      - 分级不得把主观偏好写成阻断错误
+    failure_handling:
+      - 审核意见互相冲突：交总编裁，不让作者当裁判
+    pause_resume:
+      pause: [等作者定夺争议]
+      resume: [裁定后继续]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交总编}
+    idempotency:
+      key: draft_path + 草稿 sha256
+      duplicate_guard: 同一版草稿不重复审
+    audit_events: [review, issue]
+    acceptance:
+      - 十维清单逐项有结论
+      - 每一条阻断问题都能指到具体段落
+
+  - id: WF-15
+    name: 作者确认与定稿
+    version: 1
+    stage: finalize
+    description: 作者批准后锁定正式版本。
+    trigger:
+      - 审核通过，作者看过稿
+    preconditions:
+      - 无未处理阻断问题
+      - 作者明确批准
+    input_schema:
+      required: [draft_path, 批准范围]
+      optional: [定稿说明]
+    output_schema:
+      required: [04_正文/正式定稿 文件, 批准记录（带内容哈希）]
+    agents: [editor_in_chief, version_manager]
+    tool_permissions:
+      allow: [novel approve, novel inspect, novel publish]
+      propose: []
+      deny: [写 Canon（定稿本身不算 Canon）, 删档]
+    steps:
+      - {id: inspect, owner: version_manager, action: 出示内容哈希与差异, gate: 批准绑哈希}
+      - {id: approve, owner: author, action: 批准, depends_on: [inspect], gate: 作者明说}
+      - {id: publish, owner: version_manager, action: 转正式定稿, depends_on: [approve]}
+      - {id: sign, owner: editor_in_chief, action: 连续性签字（可选）, depends_on: [publish]}
+    quality_gates:
+      - 批准必须绑定内容哈希；哈希一变，批准作废
+      - 签字 ≠ 作者批准，两者不可互相替代
+    failure_handling:
+      - 批准后文件被手改：签字失效，重新批准，不回滚内容
+    pause_resume:
+      pause: [等作者点头]
+      resume: [点头后继续]
+    retry_policy: {max_attempts: 1, backoff: none, on_exhausted: 停在等待}
+    idempotency:
+      key: 内容 sha256
+      duplicate_guard: 同一内容不重复批准
+    audit_events: [approve, publish, sign-continuity]
+    acceptance:
+      - '`novel inspect` 显示的哈希与批准记录一致'
+    # 没有 detail_ref：批准链的细则在 `workflows/text_approval.py` 的代码里，
+    # 不在 `workflows/<slug>/workflow.yaml` 这种目录里。硬指一个不存在的目录
+    # 比留空更糟——validate 会报「细则不存在」，而人看到那条报错会以为是自己删了文件。
+
+  # ── 定稿之后 ──────────────────────────────────────────────────────
+  - id: WF-16
+    name: 记忆提取与入库
+    version: 1
+    stage: memory
+    description: 从定稿提取事件和状态更新提案。
+    trigger:
+      - 一章定稿
+    preconditions:
+      - 该章已批准并落正式定稿
+      - 源哈希可核
+    input_schema:
+      required: [chapter_id, 定稿 sha256]
+      optional: [提取范围]
+    output_schema:
+      required: [记忆提案（prop_ 形态）, 源哈希校验结果]
+    agents: [memory_keeper, world_architect]
+    tool_permissions:
+      allow: [novel proposal, novel search, novel state, novel knowledge]
+      propose: [novel stage, novel change]
+      deny: [写 Canon, novel publish]
+    steps:
+      - {id: extract, owner: memory_keeper, action: 提取事件与状态变化, gate: 每条有出处段落}
+      - {id: verify, owner: memory_keeper, action: 校验源哈希, depends_on: [extract]}
+      - {id: propose, owner: memory_keeper, action: 出提案, depends_on: [verify]}
+      - {id: apply, owner: author, action: 批准后落盘, depends_on: [propose], gate: 作者批准}
+    quality_gates:
+      - 源哈希对不上 = 提案作废，不「差不多就入库」
+      - 提取不出内容时记「本章无新增」，不留空提案
+    failure_handling:
+      - 提取与已有设定冲突：列冲突交作者，不自行取舍
+    pause_resume:
+      pause: [等作者批准提案]
+      resume: [批准后落盘]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 交作者}
+    idempotency:
+      key: chapter_id + 定稿 sha256
+      duplicate_guard: 同一章同一版本不重复提取
+    audit_events: [proposal, approve]
+    acceptance:
+      - 提案里的每条记录都能追回正文某一段
+    detail_ref: memory_update
+
+  - id: WF-17
+    name: 连续性检查
+    version: 1
+    stage: continuity
+    description: 检查跨章节和跨卷一致性。
+    trigger:
+      - 一章定稿后
+      - 作者要求体检
+    preconditions:
+      - 索引已重建到最新提交
+    input_schema:
+      required: [范围（章／卷／全书）]
+      optional: [关注维度]
+    output_schema:
+      required: [连续性报告, 每条问题的定位与依据]
+    agents: [world_architect, editor_in_chief]
+    tool_permissions:
+      allow: [novel continuity check, novel search, novel state, novel knowledge, novel reveal, novel timeline]
+      propose: [novel issue]
+      deny: [写 Canon, novel publish, 自行改正文]
+    steps:
+      - {id: timeline, owner: world_architect, action: 查事件序, gate: 查不到就记未记录}
+      - {id: state, owner: world_architect, action: 查状态连续性, depends_on: [timeline]}
+      - {id: knowledge, owner: world_architect, action: 查认知边界, depends_on: [state]}
+      - {id: report, owner: editor_in_chief, action: 汇总并分级, depends_on: [knowledge]}
+    quality_gates:
+      - 读不到的数据记「未记录」，不返回 0 条装作查过
+      - 「没查」不等于「没问题」
+    failure_handling:
+      - 索引陈旧：先 rebuild-index 再查，不拿旧索引下结论
+    pause_resume:
+      pause: [等索引重建]
+      resume: [重建后重跑]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: 报告未完成项}
+    idempotency:
+      key: 索引 build_id
+      duplicate_guard: 同一 build 不重复体检
+    audit_events: [continuity-check, issue]
+    acceptance:
+      - 报告里每条结论都能指到具体档案或段落
+
+  - id: WF-18
+    name: 版本发布与影响分析
+    version: 1
+    stage: release
+    description: 创建私库版本、Diff、影响分析和恢复提案。
+    trigger:
+      - 一批改动完成
+      - 要出一个可回滚的里程碑
+    preconditions:
+      - 待发布内容全部已批准
+      - 没有未处理阻断问题
+    input_schema:
+      required: [发布范围]
+      optional: [标签名, 说明]
+    output_schema:
+      required: [版本记录, Diff, 影响报告, 发布清单]
+    agents: [version_manager, editor_in_chief]
+    tool_permissions:
+      allow: [novel release plan, novel release prepare, novel release status, novel impact, novel deps, novel file diff]
+      propose: [novel release rollback]
+      deny: [写 Canon, 删档]
+    steps:
+      - {id: plan, owner: version_manager, action: 出发布计划, gate: 列出全部受影响文件}
+      - {id: prepare, owner: version_manager, action: 22 步准备（隔离快照）, depends_on: [plan]}
+      - {id: impact, owner: version_manager, action: 影响分析, depends_on: [prepare]}
+      - {id: status, owner: version_manager, action: 核对状态, depends_on: [impact], gate: 不得是 NO_RELEASE}
+    quality_gates:
+      - 发布必须能回滚；回滚指针与批准哈希必须对得上
+      - 存量内容首次发布要由作者批准「把现有文件当基线」，不是重新发布一遍
+    failure_handling:
+      - 中途失败：resume 或 rollback，不留半发布状态
+    pause_resume:
+      pause: [等作者批准基线]
+      resume: [批准后 resume]
+    retry_policy: {max_attempts: 2, backoff: none, on_exhausted: rollback}
+    idempotency:
+      key: 发布范围 + 内容哈希集合
+      duplicate_guard: 同一内容不重复发布
+    audit_events: [release-plan, release-prepare, release-status, impact]
+    acceptance:
+      - '`novel release status` 不是 NO_RELEASE'
+      - 回滚演练能恢复到发布前状态
+    detail_ref: release
+
+  - id: WF-19
+    name: 备份、恢复与诊断
+    version: 1
+    stage: maintenance
+    description: 本地备份、验证、恢复和系统健康检查。
+    trigger:
+      - 每日／每批改动后
+      - 作者感觉哪里不对
+    preconditions: []
+    input_schema:
+      required: []
+      optional: [备份范围, 目标备份 id]
+    output_schema:
+      required: [备份清单与回读校验结果, 或诊断报告]
+    agents: [version_manager]
+    tool_permissions:
+      allow: [novel backup, novel restore, novel doctor, novel status, novel release repair]
+      propose: [novel restore]
+      deny: [写 Canon, 覆盖现存文件（restore 默认不覆盖）]
+    steps:
+      - {id: backup, owner: version_manager, action: 创建备份, gate: 含清单与回读校验}
+      - {id: verify, owner: version_manager, action: 回读校验, depends_on: [backup]}
+      - {id: doctor, owner: version_manager, action: 健康检查, depends_on: [verify]}
+      - {id: report, owner: version_manager, action: 出报告, depends_on: [doctor]}
+    quality_gates:
+      - 备份必须回读校验，只写不验等于没有备份
+      - restore 默认预演，不覆盖现存文件
+    failure_handling:
+      - 回读校验失败：该备份标记无效，重新备
+    pause_resume:
+      pause: []
+      resume: []
+    retry_policy: {max_attempts: 3, backoff: none, on_exhausted: 报警}
+    idempotency:
+      key: 备份时间戳
+      duplicate_guard: 同一时刻不重复备
+    audit_events: [backup, restore, doctor]
+    acceptance:
+      - 备份可回读到文件级
+      - '`novel doctor` 全绿'
+
+# ── 不属于 WF-00..19 的流程 ─────────────────────────────────────────
+# `simulation` 是骰子娘的推演，V1.0 §10 目录里没有它——它不是一个「生产步骤」，
+# 是任意步骤里都可以插入的旁支。放在这里而不是硬塞进编号表，
+# 免得 WF-11 的「场景节拍」看起来必须过一遍随机推演。
+side_workflows:
+  - id: simulation
+    name: 推演与分支试算
+    version: 1
+    attached_to: [WF-11, WF-13]
+    description: 按需推演若干条可能走向，产物不落正式区。
+    detail_ref: simulation
+
+# ── 缺口（诚实记账，不用空壳填满） ──────────────────────────────────
+gaps:
+  - V1.0 §10.4 的任务状态机（queued→ready→running→waiting_review→approved/rejected→completed，
+    异常态 blocked/paused/failed/cancelled）目前只在 `tasks/` 里实现了一部分：
+    `novel task` 能建与查，**没有状态迁移命令**。`workflow pause/resume` 只写实例状态，不改任务状态机。
+  - WF-14 的十维清单已落到 `workflows/review.py` 的 `REVIEW_DIMENSIONS`，
+    但**没有逐项判定逻辑**——只保证「每项都有结论」，不保证结论对。
