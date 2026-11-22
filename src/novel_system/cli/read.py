@@ -411,16 +411,25 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
         stems = _link_index(pp)
         broken: list[tuple[str, str]] = []
+        # 历史区（08_Reviews / 90_Archive）的双链单独记：那里保留的是**当时**的编号，
+        # 指向的旧名在重编号后必然断。这是设计，不是缺陷——但不能因此整目录不查，
+        # 否则真断链跟着一起藏起来（2026-11-22 就被藏过 28 条）。
+        broken_hist: list[tuple[str, str]] = []
         cross: list[tuple[str, str]] = []
         total_links = 0
-        for path in pp.root.rglob("*.md"):
-            rel = path.relative_to(pp.root).as_posix()
-            if rel.startswith("90_Archive/"):
+        for path in pp.vault.rglob("*.md"):
+            rel = path.relative_to(pp.vault).as_posix()
+            # 旧系统归档是另一套文件（legacy_v1 / legacy_v1_git），双链指向它自己的内部；
+            # 隐藏目录是工具状态（.obsidian 等），不是内容。
+            if rel.startswith(("99_Archive/legacy_v1/", "99_Archive/legacy_v1_git/")):
+                continue
+            if any(part.startswith(".") for part in rel.split("/")):
                 continue
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
+            frozen = "/08_Reviews/" in f"/{rel}" or "/90_Archive/" in f"/{rel}"
             for match in WIKILINK.finditer(_link_text(text)):
                 total_links += 1
                 target = match.group(1).strip()
@@ -429,7 +438,7 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
                         cross.append((rel, target))
                         continue
                 if not _resolve_link(target, pp, stems):
-                    broken.append((rel, target))
+                    (broken_hist if frozen else broken).append((rel, target))
 
         if cross:
             fail(f"跨项目引用 {len(cross)} 条")
@@ -451,7 +460,16 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
             else:
                 warnings += len(broken)
         else:
-            ok(f"双链 {total_links} 条，无断链")
+            ok(f"双链 {total_links} 条，活文档无断链")
+        if broken_hist:
+            info(
+                f"历史区另有 {len(broken_hist)} 条断链"
+                "（08_Reviews/90_Archive 保留当时编号，属设计，不计失败）"
+            )
+            for rel, target in broken_hist[:5]:
+                info(f"  {rel} → [[{target}]]")
+            if len(broken_hist) > 5:
+                info(f"  ……另 {len(broken_hist) - 5} 条")
 
     print()
     if problems:

@@ -83,6 +83,18 @@ LEGACY_PREFIXES: dict[str, str] = {
 
 PREFIXES: dict[str, str] = {**PRD_PREFIXES, **LEGACY_PREFIXES}
 
+# 号段上限：该前缀的**活文档段**到哪里为止。
+#
+# `CH` 是唯一需要它的前缀。旧稿 28 份（`90_Archive/Original_Draft/`）占
+# 1001..1028，新正文只占 1..999。没有这条上限时，`allocate` 取「最大号 + 1」
+# 会拿到 1029——新正文第一章写出来的 ID 就落进了存档段。
+#
+# 上限**不是**自动越过的阈值：到了 999 就报错，让人先决定扩段方案。
+# 悄悄越过会同时破坏两件事：存档段的意义，以及「按 ID 猜年龄段」的可行性。
+BAND_LIMITS: dict[str, int] = {
+    "CH": 999,
+}
+
 # CLI 的类型名 → 前缀。大小写、单复数都收，少一次「凭记忆拼前缀」。
 TYPE_TO_PREFIX: dict[str, str] = {
     "CHARACTER": "CHAR",
@@ -302,8 +314,19 @@ class IdRegistry:
     def for_prefix(self, prefix: str) -> list[IdRecord]:
         return [r for r in self.records if r.prefix == prefix]
 
-    def max_number(self, prefix: str) -> int:
-        numbers = [r.number for r in self.for_prefix(prefix)]
+    def max_number(self, prefix: str, upper: int | None = None) -> int:
+        """该前缀的最大号。
+
+        `upper` 给定时只统计不超过它的号。理由是号段有分层：`CH` 的 1001 以上
+        留给旧稿存档（`90_Archive/Original_Draft/`），新正文只占 1..999。
+        不设上限的话，旧稿那 28 份会把新正文的发号游标推到 1029，
+        下一章正文就发到存档段里去了。
+        """
+        numbers = [
+            r.number
+            for r in self.for_prefix(prefix)
+            if upper is None or r.number <= upper
+        ]
         return max(numbers) if numbers else 0
 
     def collisions(self) -> dict[str, list[IdRecord]]:
@@ -444,7 +467,20 @@ class IdAllocator:
         try:
             # 取号要同时看两处：现存文件里的最大号，和审计里发过的最大号。
             # 只看前者会在删档后从洞里补号——那等于让旧引用指到另一个对象上。
-            base = max(registry.max_number(prefix), self._historical_max(prefix))
+            # 有号段上限时两处都只统计段内的号：段外是别的用途（旧稿存档），
+            # 让它们参与取最大号等于把新正文的游标推到存档段里去。
+            limit = BAND_LIMITS.get(prefix)
+            base = max(
+                registry.max_number(prefix, upper=limit),
+                self._historical_max(prefix, upper=limit),
+            )
+            if limit is not None and base + count > limit:
+                raise UsageError(
+                    f"{prefix} 的活文档号段已用尽（1..{limit}，下一个要发 {base + count}）。\n"
+                    f"{limit + 1:0{MIN_WIDTH}d} 起留给了存档段（旧稿等历史内容），"
+                    "自动越过去会让新文档与存档混在同一段里。\n"
+                    "要扩段请先定方案（比如把存档段整体上移），不要直接发号。"
+                )
             issued = [f"{prefix}-{n:0{MIN_WIDTH}d}" for n in range(base + 1, base + count + 1)]
             # 锁内复查：别的进程可能刚发过号。这里查**全部记录**（含 staging/归档）——
             # 取号取最大号本来就要看全库，否则会把号发到别人盘里的对象上。
@@ -478,7 +514,7 @@ class IdAllocator:
         with path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
 
-    def _historical_max(self, prefix: str) -> int:
+    def _historical_max(self, prefix: str, upper: int | None = None) -> int:
         """审计里该前缀发到过的最大号。文件被删了，号也不能回到前面的洞里。"""
         best = 0
         for row in self.history(limit=100_000):
@@ -487,6 +523,8 @@ class IdAllocator:
             for raw in row.get("ids") or []:
                 parsed = split_id(str(raw))
                 if parsed and parsed[0] == prefix:
+                    if upper is not None and parsed[1] > upper:
+                        continue
                     best = max(best, parsed[1])
         return best
 

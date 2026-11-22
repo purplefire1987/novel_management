@@ -11,7 +11,7 @@ import argparse
 
 from .. import config as cfg_mod
 from ..errors import ConflictError, SecurityError, UsageError
-from ..ids import IdAllocator, IdRegistry, resolve_prefix
+from ..ids import BAND_LIMITS, MIN_WIDTH, IdAllocator, IdRegistry, resolve_prefix
 from ..paths import ProjectPaths
 from ._common import fail, heading, info, ok, warn
 
@@ -38,10 +38,14 @@ def cmd_allocate_id(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     )
 
     registry = IdRegistry(vault, areas=areas)
-    current_max = registry.max_number(prefix)
+    # 有号段上限时，"当前最大号"必须报段内的号。报段外最大号（CH 的 1028
+    # 来自旧稿存档）会让人以为下一个要发 1029，与实际的 000003 对不上。
+    limit = BAND_LIMITS.get(prefix)
+    current_max = registry.max_number(prefix, upper=limit)
     stray = registry.stray_compound(prefix)
 
-    heading(f"分配 {prefix}（当前最大号 {current_max:04d}）")
+    band_note = f"，活文档段 1..{limit}" if limit is not None else ""
+    heading(f"分配 {prefix}（段内最大号 {current_max:0{MIN_WIDTH}d}{band_note}）")
     if scope_note:
         info(scope_note)
     if stray:
@@ -73,7 +77,7 @@ def cmd_allocate_id(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         ok(f"已分配并记录审计：{'、'.join(issued)}")
     else:
         ok(f"预演：将分配 {'、'.join(issued)}（加 --confirm 落盘）")
-    info(f"下一个号将是 {prefix}-{_next_of(issued):04d}")
+    info(f"下一个号将是 {prefix}-{_next_of(issued):0{MIN_WIDTH}d}")
 
     if args.json:
         import json

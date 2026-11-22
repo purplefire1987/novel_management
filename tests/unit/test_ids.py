@@ -351,3 +351,56 @@ def test_count_must_be_positive(vault: Path, runtime: Path) -> None:
     alloc = IdAllocator(vault, runtime, actor="test")
     with pytest.raises(UsageError):
         alloc.allocate("CHAR", count=0)
+
+
+# ---- 号段上限（CH 的旧稿存档段）--------------------------------------------
+#
+# 2026-11-22 全库重编号曾把旧稿 28 份压进 CH-000003..030，与新正文同号段。
+# 恢复独立段后（CH-001001..001028），`allocate` 若只取「最大号 + 1」，
+# 新正文第一章会拿到 1029——直接落进存档段。下面三条钉住这个边界。
+
+
+def _ch_vault(tmp_path: Path, ids: list[str]) -> Path:
+    root = tmp_path / "vault"
+    for i, eid in enumerate(ids):
+        band = "90_Archive" if int(eid.split("-")[1]) > 999 else "03_Manuscripts"
+        _write(root / "10_Projects" / "p1" / band / f"{eid}_第{i}.md", _card(eid, f"第{i}"))
+    return root / "10_Projects" / "p1"
+
+
+def test_ch_band_ignores_archive_segment(tmp_path: Path, runtime: Path) -> None:
+    """旧稿占 1001+ 时，新正文仍从 000001 起，不能拿到 1002。"""
+    root = _ch_vault(tmp_path, ["CH-001001", "CH-001002"])
+    alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
+    assert alloc.allocate("chapter") == ["CH-000001"]
+
+
+def test_ch_band_counts_only_in_band_numbers(tmp_path: Path, runtime: Path) -> None:
+    """段内已有 000007 时下一个是 000008，段外的 001028 不参与取号。"""
+    root = _ch_vault(tmp_path, ["CH-000007", "CH-001028"])
+    alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
+    assert alloc.allocate("chapter") == ["CH-000008"]
+
+
+def test_ch_band_exhausted_refuses(tmp_path: Path, runtime: Path) -> None:
+    """段满时拒绝发号。悄悄越过会把新正文写进存档段，那是不归路。"""
+    root = _ch_vault(tmp_path, ["CH-000999"])
+    alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
+    with pytest.raises(UsageError, match="活文档号段已用尽"):
+        alloc.allocate("chapter")
+
+
+def test_band_limit_does_not_affect_other_prefixes(tmp_path: Path, runtime: Path) -> None:
+    """CHAR 没有号段上限，1000 以上照发——上限是按前缀配的，不是全局。"""
+    root = _ch_vault(tmp_path, ["CH-000001"])
+    _write(root / "03_Manuscripts" / "CHAR-001204_甲.md", _card("CHAR-001204", "甲"))
+    alloc = IdAllocator(root, runtime, actor="test", areas=_areas(root))
+    assert alloc.allocate("CHAR") == ["CHAR-001205"]
+
+
+def test_max_number_upper_filters_out_band(tmp_path: Path) -> None:
+    """`upper` 只影响统计口径，不改登记表。"""
+    root = _ch_vault(tmp_path, ["CH-000005", "CH-001028"])
+    reg = IdRegistry(root, areas=_areas(root))
+    assert reg.max_number("CH") == 1028
+    assert reg.max_number("CH", upper=999) == 5

@@ -69,6 +69,11 @@ Vault 路径、项目列表（含 Markdown 计数）、索引（库文件名 `bu
      因此查重必须**跨子目录一起看**；模板里的 `id: {{id}}` 是占位符，不算身份、不参与查重。
    - `id` 与文件名前缀是否错位（如 `CHAR-0001_示例名.md` 里写 `id: LOC-0001`），算警告；
    - `[[双链]]` 是否可解析。解析范围是全 Vault 的文件名（Obsidian 语义），支持 `.md` / `.canvas` / `.base`，剥离 `#标题`；
+   - **被检查的文件也是全 Vault**：`00_System`（看板、工作台）、`90_Shared_Assets`、
+     `90_Archive` 都在范围内，只排除 `99_Archive/legacy_v1/` 与隐藏目录。
+     历史区（`08_Reviews`、`90_Archive`）的断链**单独列出、不计失败**——
+     那里保留当时编号，指向旧名在重编号后必然断，属设计而非缺陷。
+     （0.14.0 之前只扫项目根且整个跳过 `90_Archive`，曾让 28 条真断链藏了三天。）
    - 指向别项目的 `[[10_Projects/other/...]]` 算失败。
 
 `--strict` 把断链与缺子目录等警告升级为失败，适合提交前跑。
@@ -1155,11 +1160,16 @@ cat tmp/approval.json | novel schema check approval -
 - 发号用锁文件 `<runtime>/locks/id-allocate.lock` 防并发；锁被占时直接报错，
   不静默降级（PRD §8.1 明令禁止「无锁扫描最大号加一」）。
 - 复合型 ID（`EVT-CH-0001-001`）不计入号段，命令会提示有几个、在哪些文件。
+- **号段上限**（`ids.BAND_LIMITS`）：只有 `CH` 有，活文档段 `1..999`。
+  取号只统计段内的最大号，旧稿存档段（`CH-001001..001028`）不参与。
+  段满了报错而不是自动越过——越过去会让新正文写进存档段，且不可逆。
+  输出里的「段内最大号」也是这个口径，不是全库最大号。
 
 ```bash
 novel allocate-id --type CHARACTER                 # 预演
 novel allocate-id --type CHARACTER --confirm       # 真发号，写审计
 novel allocate-id --type FORESHADOW --count 3      # 一次三个
+novel allocate-id --type chapter                   # CH：段内 000002 → CH-000003
 ```
 
 ### `novel package-hash <文件|-> [--check <哈希>] [--canonical]`
