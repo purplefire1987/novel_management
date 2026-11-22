@@ -6,8 +6,8 @@
   "$defs": {
     "anyId": {
       "type": "string",
-      "pattern": "^[A-Z][A-Z]*(?:-[A-Z]+)*-[0-9]{4,6}$",
-      "description": "规范 ID：字母段前缀 + 4–6 位编号。EVT-CH-0001-001 这类复合形态不合法（PRD §8.1）"
+      "pattern": "^[a-z]+_[0-9]{6}$",
+      "description": "规范 ID：字母段前缀 + 4–6 位编号。EVT-ch_0001-001 这类复合形态不合法（PRD §8.1）"
     },
     "sha256": {
       "type": "string",
@@ -58,7 +58,7 @@
         "kind": { "const": "APPROVED_CANDIDATE" },
         "artifact_id": { "$ref": "#/$defs/anyId" },
         "content_hash": { "$ref": "#/$defs/sha256" },
-        "approval_id": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" },
+        "approval_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
         "block_id": { "$ref": "#/$defs/blockId" },
         "quote": { "type": "string", "minLength": 1 }
       }
@@ -81,7 +81,7 @@
       "required": ["kind", "decision_id"],
       "properties": {
         "kind": { "const": "AUTHOR_DECISION" },
-        "decision_id": { "type": "string", "pattern": "^APR-[0-9]{4,6}$" },
+        "decision_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
         "content_hash": { "$ref": "#/$defs/sha256" }
       }
     },
@@ -110,7 +110,7 @@
     },
     "entityRef": {
       "type": "string",
-      "pattern": "^(CHAR|LOC|FAC|ITEM|CREATURE|WORLD|SYS|SKL|FATE|ASSET)-[0-9]{4,6}$"
+      "pattern": "^ent_[0-9]{6}$"
     }
   }
 }

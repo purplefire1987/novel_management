@@ -35,7 +35,7 @@ MANIFEST_NAME = "manifest.json"
 DETAIL_NAME = "detail.json"
 ASSIGN_NAME = "assignments.json"
 LEDGER_DIR = "Imports"
-DRAFT_DIR = "Drafts"
+DRAFT_DIR = "初稿"  # V1.0 §8：04_正文/初稿（V4.0 的 `Drafts/`）
 UNSAFE_NAME = re.compile(r"[^0-9A-Za-z\u4e00-\u9fff._-]+")
 
 
@@ -386,14 +386,19 @@ def stage_batch(
     staging = StagingArea(pp, task)
 
     written: list[str] = []
+    # 目标路径从 ProjectPaths 取，不写字面量：V1.0 把 `03_Manuscripts/Drafts`
+    # 改成了 `04_正文/初稿`，写死字面量的地方每改一次目录就得改一轮代码。
+    ms_base = pp.manuscripts.relative_to(pp.root).as_posix()
     for entity_id, chapter in zip(ids, chosen):
         body = _read_chapter_body(raw_dir, chapter)
-        target = f"03_Manuscripts/{DRAFT_DIR}/{entity_id}.md"
+        target = f"{ms_base}/{DRAFT_DIR}/{entity_id}.md"
         data = _chapter_document(entity_id, pp.project_id, chapter, body).encode("utf-8")
         staging.stage(data=data, target_rel=target, actor=actor, note=f"{import_id} {chapter.locator}")
         written.append(target)
 
-    ledger_target = f"05_Ledgers/{LEDGER_DIR}/{import_id}.md"
+    # 导入台账是「研究记录」，不是世界知识：落在素材区（V1.0 解散了 05_Ledgers）。
+    asset_base = pp.assets.relative_to(pp.root).as_posix()
+    ledger_target = f"{asset_base}/{LEDGER_DIR}/{import_id}.md"
     ledger_body = _ledger_document(
         manifest,
         chapters,

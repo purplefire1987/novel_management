@@ -19,7 +19,7 @@ from ..staging import StagingArea, artifact_id_of
 from ..storage import sha256_file
 from ..tasks import Task
 
-CANON_PREFIX = "01_Canon"
+CANON_PREFIX = "02_世界知识库"
 
 
 def check_approval(

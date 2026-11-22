@@ -12,7 +12,7 @@
     "title": { "type": "string" },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
     "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
     "supersedes": { "type": ["string", "null"] },
     "tags": { "type": "array", "items": { "type": "string" } },
@@ -36,8 +36,8 @@
         "value": {}
       }
     },
-    "valid_from_event": { "type": "string", "pattern": "^EVT-[0-9]{4,6}$" },
-    "valid_until_event": { "type": "string", "pattern": "^EVT-[0-9]{4,6}$" },
+    "valid_from_event": { "type": "string", "pattern": "^evt_[0-9]{6}$" },
+    "valid_until_event": { "type": "string", "pattern": "^evt_[0-9]{6}$" },
     "negated": {
       "type": "boolean",
       "description": "显式否定认知（正文明确写了『他不知道』）。缺省 false 表示普通认知"

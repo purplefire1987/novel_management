@@ -9,8 +9,16 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^(CHAR|LOC|FAC|ORG|ITEM|CREATURE|SYS|RULE|WORLD|SKL|FATE|ASSET)-[0-9]{4,6}$",
-      "description": "稳定 ID：类型前缀 + 四位序号（PRD 写六位，库内实为四位，两种都接受），一经分配不得复用"
+      "pattern": "^(ent|asset)_[0-9]{6}$",
+      "description": "稳定 ID：`ent_`／`asset_` + 六位序号（V1.0 §9.2），一经分配不得复用"
+    },
+    "novel_id": {
+      "type": "string",
+      "description": "V1.0 §5.2 的项目隔离键。不设 pattern：V1.0 建议的前缀是 `novel_`，而现存 project_id 是 `novel-001` 这种连字符形态，把这两种钉死成一种会让一半文件非法"
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "V1.0 §5.2 的字段名，与库内的 `type` 同义。两个都收，不强制择一——强制择一等于要求 966 份档案同时改名，收益只有一个更漂亮的字段名"
     },
     "type": {
       "type": "string",
@@ -37,7 +45,21 @@
     },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "content_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "V1.0 §5.2。与 schema_version 是两回事：前者数「这份档案改过几次」，后者数「字段面是第几版」"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "V1.0 §5.2。写角色名或 author-local，不写模型名——模型会换，责任人不会"
+    },
+    "updated_by": { "type": "string" },
+    "confidence": {
+      "type": ["number", "string", "null"],
+      "description": "V1.0 §5.2 的可信度／证据强度。索引里既有 0..1 的小数也有 high/medium/low，收两种；**不能与 canon_status 混为一谈**（后者是「作者认不认」）"
+    },
+    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
     "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
     "supersedes": { "type": ["string", "null"] },
 
@@ -49,11 +71,11 @@
       "description": "中文子类（人物／生物／物品／方术……）。库内 32 种，不设枚举——枚举会成为治理负担"
     },
     "world": { "type": "string", "description": "所属世界名" },
-    "category": { "type": "string", "description": "素材分类（battle/dialogue/setting……），仅 04_Story_Assets 使用" },
+    "category": { "type": "string", "description": "素材分类（battle/dialogue/setting……），仅 06_素材与研究 使用" },
     "canon_status": {
       "type": "string",
-      "enum": ["draft", "proposed", "confirmed", "deprecated", "archived"],
-      "description": "v1.0 遗留状态。PRD §8.3 明令禁止再用一个字段混表产物状态／信息性质／审核状态，迁移后由 artifact_status + epistemic_type + review_status 取代"
+      "enum": ["idea", "proposal", "pending_review", "canon", "deprecated", "rejected"],
+      "description": "V1.1 §4.2 的六个值，顺序即原文顺序。**Agent 不得自行置为 canon**。旧值映射（2026-11-23 已全量迁移，仅 99_Archive 保留旧写法）：confirmed→canon、proposed→proposal、draft→proposal、archived→deprecated、under_review→pending_review、retcon_candidate→proposal（追溯修改现由 issue/change 承载）"
     },
     "status": {
       "type": "string",
@@ -75,7 +97,7 @@
     "school": { "type": "string", "description": "流派（v1.0 遗留）" },
     "race": { "type": "string", "description": "种族（v1.0 遗留）" },
     "race_groups": {
-      "description": "种族分组。库内有两种实现：WORLD-0025 用「族属 → 种族列表」的映射，其余档案用扁平列表。两种都合法",
+      "description": "种族分组。库内有两种实现：ent_0025 用「族属 → 种族列表」的映射，其余档案用扁平列表。两种都合法",
       "oneOf": [
         { "type": "array", "items": { "type": "string" } },
         {

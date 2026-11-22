@@ -2,21 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/novel-system/event.schema.json",
   "title": "世界内事件（时间线事实）",
-  "$comment": "两次对齐的事实要写在这里，否则下一个人会以为字段名是随手起的。① ID：库内 7 份原为 EVT-CH-xxxx-yyy 复合形态，PRD §18.1 明令禁止，2026-11-22 已改为 EVT-0001..0007 纯序号。② 字段名：PRD §9.3 写的是 event_id/summary/source_chapter/location，库内实际用 id/name/chapter_id/location_id；全库 1058 份统一以 id 为权威，故 required 用 id/type/name，PRD 字段名保留为可选别名。事件与章节的归属由 chapter_id 承载，不编进 ID——章节重排时那种 ID 会自己说谎。",
+  "$comment": "2026-11-22 按 V1.0 重对齐。① ID：库内 7 份原为 EVT-CH-xxxx-yyy 复合形态（V1.0 §9.2 明令 ID 不得夹入章节等易变文本），已改为 evt_000001..000007 纯序号。② 字段名：V1.0 §5.10 用的是「世界时间／时间精度／叙事时间／首次叙述章节」这套语义名，库内实存为 chapter_id/location_id/sequence；全库以 id 为权威，故 required 仍为 id/type/name，V1.0 的语义字段一律按新增纳入，不覆盖存量字段名。③ 本轮补齐的缘由：event create 写出的 novel_id/status/time_precision/narrative_time/created_by/confidence 六项在旧契约里全是未知字段，而 additionalProperties 为 false —— 即「工具写出的文件过不了自己的校验」。质检 gate 抓到后补的。",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "type", "name"],
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^EVT-[0-9]{4,6}$",
+      "pattern": "^evt_[0-9]{6}$",
       "description": "权威 ID：纯序号，不得把章节号编进 ID"
     },
     "type": { "const": "event" },
     "name": { "type": "string", "minLength": 1 },
     "event_id": {
       "type": "string",
-      "pattern": "^EVT-[0-9]{4,6}$",
+      "pattern": "^evt_[0-9]{6}$",
       "description": "PRD §9.3 的字段名，与 id 并存。id 为权威，此字段仅为符合 PRD 字面的可选别名"
     },
     "summary": {
@@ -26,24 +26,24 @@
     },
     "chapter_id": {
       "type": "string",
-      "pattern": "^CH-[0-9]{4,6}$",
+      "pattern": "^(ch|plan)_[0-9]{6}$",
       "description": "事件所属章节。归属写在这里，不写进 ID"
     },
     "source_chapter": {
       "type": "string",
-      "pattern": "^CH-[0-9]{4,6}$",
+      "pattern": "^(ch|plan)_[0-9]{6}$",
       "description": "PRD §9.3 字段名，与 chapter_id 同义。二者择一即可"
     },
     "sequence": { "type": "integer", "minimum": 0 },
     "canon_status": {
       "type": "string",
-      "enum": ["draft", "proposed", "confirmed", "deprecated", "archived"],
-      "description": "v1.0 遗留状态，与 entity 保持一致口径"
+      "enum": ["idea", "proposal", "pending_review", "canon", "deprecated", "rejected"],
+      "description": "V1.1 §4.2，与 entity 同一口径。注意与下方 fact_status 分开：canon_status 说「作者认不认」，fact_status 说「这件事在故事里算不算发生过」"
     },
     "artifact_type": { "const": "EVENT" },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "title": { "type": "string" },
     "world_time": {
@@ -58,12 +58,12 @@
     },
     "location_id": {
       "type": "string",
-      "pattern": "^LOC-[0-9]{4,6}$",
+      "pattern": "^ent_[0-9]{6}$",
       "description": "地点（库内字段名）"
     },
     "location": {
       "type": "string",
-      "pattern": "^LOC-[0-9]{4,6}$",
+      "pattern": "^ent_[0-9]{6}$",
       "description": "PRD §9.3 字段名，与 location_id 同义"
     },
     "consequences": { "type": "array", "items": { "type": "string" } },
@@ -82,6 +82,80 @@
     "tags": { "type": "array", "items": { "type": "string" } },
     "created_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
     "updated_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
-    "extensions": { "type": "object" }
+    "extensions": { "type": "object" },
+
+    "novel_id": {
+      "type": "string",
+      "description": "所属小说项目。V1.0 §5.10 要求的 novel_id 落在事件上，与实体一致"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "resolved", "abandoned"],
+      "description": "事件生命周期。与 canon_status 分开：canon_status 说的是「进没进 Canon」，status 说的是「这件事在时间线上还算不算数」"
+    },
+    "time_precision": {
+      "type": "string",
+      "enum": ["exact", "day", "month", "season", "year", "era", "unknown"],
+      "description": "时间精度（V1.0 §5.10 明列）。没写时间就记 unknown，不猜一个精度——猜出来的精度会让时间线比较变成假精确"
+    },
+    "duration": {
+      "type": ["string", "object"],
+      "description": "持续区间（V1.0 §5.10）。允许写成「三日」这类自然语言，或 {from,to} 结构"
+    },
+    "narrative_time": {
+      "type": "string",
+      "description": "叙事时间：在这本书里第几个被讲到。与 world_time 是两个坐标轴，倒叙时二者顺序相反"
+    },
+    "first_chapter_id": {
+      "type": "string",
+      "pattern": "^(ch|plan)_[0-9]{6}$",
+      "description": "首次叙述章节（V1.0 §5.10）。注意与 chapter_id 的区别：chapter_id 是「归属」，这里是「第一次被讲出来」"
+    },
+    "related_chapters": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(ch|plan)_[0-9]{6}$" },
+      "description": "相关章节（V1.0 §5.10）"
+    },
+    "witnesses": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "见证者（V1.0 §5.10）。与 participants 分开：在场不等于参与，见证者的认知会写进认知模型"
+    },
+    "causes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "前置原因（V1.0 §5.10）。可填事件 ID，也可填一句描述"
+    },
+    "involved": {
+      "type": "array",
+      "description": "涉及物品／技能／势力／规则／人物（V1.0 §5.10）",
+      "items": { "$ref": "_common.schema.json#/$defs/anyId" }
+    },
+    "states_before": {
+      "type": "array",
+      "description": "事件前状态。指向状态变化记录，不在这里重复写值",
+      "items": { "$ref": "_common.schema.json#/$defs/anyId" }
+    },
+    "states_after": {
+      "type": "array",
+      "description": "事件后状态。同上",
+      "items": { "$ref": "_common.schema.json#/$defs/anyId" }
+    },
+    "fact_status": {
+      "type": "string",
+      "enum": ["confirmed", "claimed", "rumored", "planned", "unknown"],
+      "description": "事实状态（V1.0 §5.10 要求区分作者确认发生／角色声称发生／传闻／计划事件）。缺省 unknown，不默认 confirmed——把传闻默认成事实，是这类库最难查的污染"
+    },
+    "information_status": {
+      "type": "string",
+      "enum": ["public", "partial", "secret", "unknown"],
+      "description": "信息状态：这件事在故事世界里被知道到什么程度。与 fact_status 正交——可以是「确实发生过但是秘密」"
+    },
+    "confidence": {
+      "type": ["number", "string", "null"],
+      "description": "证据强度。与 canon_status 分开：低可信度的事实也可以进 Canon，只要作者认了"
+    },
+    "created_by": { "type": "string" },
+    "updated_by": { "type": "string" }
   }
 }

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["task_id", "role", "result"],
   "properties": {
-    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "task_id": { "type": "string", "pattern": "^task_[0-9]{6}$" },
     "role": {
       "type": "string",
       "enum": [

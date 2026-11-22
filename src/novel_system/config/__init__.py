@@ -216,7 +216,7 @@ class Config:
     # ---- 派生路径 ----
     @property
     def projects_dir(self) -> Path:
-        return self.require_vault() / self.layout.get("projects_dir", "10_Projects")
+        return self.require_vault() / self.layout.get("projects_dir", "01_小说项目")
 
     def project_candidates(self) -> list[tuple[str, Path]]:
         """列出 Vault 内的项目：(project_id, 目录)。以 project.yaml 为准，读不到才退回目录名。"""
@@ -227,7 +227,7 @@ class Config:
         for path in sorted(base.iterdir()):
             if not path.is_dir() or path.name.startswith("."):
                 continue
-            meta = read_yaml(path / "00_Project" / "project.yaml")
+            meta = read_yaml(path / "10_项目配置" / "project.yaml")
             out.append((str(meta.get("project_id") or path.name), path))
         return out
 
@@ -270,7 +270,7 @@ class Config:
         return self.require_runtime().joinpath(*parts)
 
     def vault_system_dir(self) -> Path:
-        return self.require_vault() / self.layout.get("vault_system_dir", "00_System")
+        return self.require_vault() / self.layout.get("vault_system_dir", "00_作者工作台")
 
     def describe(self) -> list[str]:
         lines = [f"public_repo : {self.public_repo}"]
@@ -349,7 +349,7 @@ def load(
     vault_path: Path | None = None
     if raw_vault:
         vault_path = resolve_path(raw_vault)
-        vault_cfg = vault_path / (data.get("layout") or {}).get("vault_system_dir", "00_System") / "Vault_Config.yaml"
+        vault_cfg = vault_path / (data.get("layout") or {}).get("vault_system_dir", "00_作者工作台") / "Vault_Config.yaml"
         vault_data = read_yaml(vault_cfg)
         if vault_data:
             data = _merge(data, _normalize_vault_config(vault_data))

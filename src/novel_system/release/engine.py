@@ -65,8 +65,8 @@ from .workspace import (
 )
 
 FAULT_ENV = "NOVEL_RELEASE_FAULT"
-TEXT_PREFIX = "03_Manuscripts"
-MEMORY_PREFIXES = ("06_Memory", "01_Canon")
+TEXT_PREFIX = "04_正文"
+MEMORY_PREFIXES = ("05_记忆与连续性", "02_世界知识库")
 
 
 class InjectedFault(RuntimeError):

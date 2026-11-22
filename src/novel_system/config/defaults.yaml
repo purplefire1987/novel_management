@@ -1,6 +1,11 @@
 # 公共默认配置。不得写入作者绝对路径、私人项目名或私人数据。
-system:
-  config_version: 1
+#
+# 与 `config/defaults.yaml`（仓库根）逐字节一致，由
+# `tests/unit/test_config_defaults.py` 守。改一份就必须同步另一份。
+#
+# 说明：本文件**没有** `system.config_version` 与 `layout.runtime_subdirs`——
+# 那两个键在 `src/` 里 0 引用（2026-11-23 核实）。留着会让人以为改这里会生效，
+# 而实际生效的是 `cli/init.py` 的 `RUNTIME_DIRS`。
 
 author:
   author_id: "author-local"
@@ -20,33 +25,41 @@ privacy:
   cross_project_access: false
   agent_canon_write: false
 
-# Vault 与项目内使用的标准目录名。改这里等于改布局，必须同时更新 templates 与测试。
+# Vault 与项目内使用的标准目录名（V1.0 §8）。改这里等于改布局，必须同时更新 templates 与测试。
 layout:
-  vault_system_dir: "00_System"
-  projects_dir: "10_Projects"
-  shared_assets_dir: "90_Shared_Assets"
+  vault_system_dir: "00_作者工作台"
+  projects_dir: "01_小说项目"
+  shared_assets_dir: "02_作者级通用资料"
   vault_archive_dir: "99_Archive"
   project_subdirs:
-    - "00_Project"
-    - "01_Canon"
-    - "02_Planning"
-    - "03_Manuscripts"
-    - "04_Story_Assets"
-    - "05_Ledgers"
-    - "06_Memory"
-    - "07_Staging"
-    - "08_Reviews"
+    - "00_项目管理"
+    - "01_灵感与创意"
+    - "02_世界知识库"
+    - "03_故事规划"
+    - "04_正文"
+    - "05_记忆与连续性"
+    - "06_素材与研究"
+    - "07_审核与报告"
+    - "08_工作流与任务视图"
+    - "09_版本与变更记录"
+    - "10_项目配置"
+    - "_staging"
     - "90_Archive"
   canon_subdirs:
-    - "World"
-    - "Characters"
-    - "Locations"
-    - "Organizations"
-    - "Systems"
-    - "Rules"
-  runtime_subdirs:
-    - "cache"
-    - "index"
-    - "logs"
-    - "staging"
-    - "temp"
+    - "世界与宇宙"
+    - "地理与地点"
+    - "种族与族群"
+    - "人物与角色"
+    - "生物与生态"
+    - "势力与组织"
+    - "物品与装备"
+    - "技能与能力"
+    - "力量与成长"
+    - "事件与历史"
+    - "规则与机制"
+    - "资源与经济"
+    - "技术与文明"
+    - "文化与社会"
+    - "特殊设定"
+    - "关系与状态"
+    - "时间线"

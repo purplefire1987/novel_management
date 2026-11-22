@@ -19,7 +19,7 @@ SCAN_SUFFIXES = {".md", ".markdown", ".yaml", ".yml", ".json", ".txt", ".csv"}
 
 # 运行态草稿与归档不进基线：前者本来就是流动的，后者是历史堆积——
 # 纳进来会让 adopt 每次都报一堆「新增」，真正的手改反而被埋掉。
-EXCLUDE_PREFIXES = ("07_Staging", "08_Reviews", "90_Archive")
+EXCLUDE_PREFIXES = ("_staging", "07_审核与报告", "90_Archive")
 
 HISTORY_LIMIT = 100
 

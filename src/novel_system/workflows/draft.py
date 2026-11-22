@@ -37,10 +37,10 @@ from ..tasks import TaskStore
 from ..storage import dump_yaml, sha256_text
 from . import plan as plan_mod
 
-DRAFTS_SUBDIR = "Drafts"
+DRAFTS_SUBDIR = "初稿"  # V1.0 §8：04_正文/初稿
 # 第二道锁：即便 layout 被配错（把 canon_root 指到草稿目录），这一道也要拦住。
 # 所以不走配置，直接写字面量。
-CANON_LITERAL = "01_Canon"
+CANON_LITERAL = "02_世界知识库"
 
 TASK_TYPES = ("draft", "revision", "outline")
 

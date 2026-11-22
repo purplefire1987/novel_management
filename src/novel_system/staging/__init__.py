@@ -1,6 +1,6 @@
 """staging：Agent 产出的唯一落点。正式区在 publish 之前一个字都不动。
 
-目录约定：`07_Staging/<TASK-ID>/<area>/<目标正式相对路径>`，
+目录约定：`<staging_root>/<task_id>/<area>/<目标正式相对路径>`，
 `<area>` 由任务类型决定，保证工作流语义在目录上看得见；
 `manifest.json` 记录「这份产物拟替换哪个正式文件、基于哪个版本」。
 """

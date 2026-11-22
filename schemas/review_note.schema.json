@@ -23,8 +23,8 @@
     },
     "author": { "type": "string", "minLength": 1 },
     "scope": { "type": "string", "minLength": 1, "description": "这份意见管到哪里：哪几章、哪个层面" },
-    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
-    "chapter_id": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+    "task_id": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "chapter_id": { "type": "string", "pattern": "^ch_[0-9]{6}$" },
     "verdict": {
       "type": "string",
       "enum": ["pass", "revise", "reject", "partial"],

@@ -95,7 +95,7 @@ def _ordinal(raw_id: str) -> int:
 
 def _project_of(rel: str) -> str:
     parts = rel.split("/")
-    if len(parts) >= 2 and parts[0] == "10_Projects":
+    if len(parts) >= 2 and parts[0] == "01_小说项目":
         return parts[1]
     return ""
 

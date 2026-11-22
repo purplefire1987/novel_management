@@ -7,8 +7,8 @@
   "additionalProperties": false,
   "required": ["txn_id", "release_id", "state", "steps", "created_at"],
   "properties": {
-    "txn_id": { "type": "string", "pattern": "^TXN-[0-9]{4,6}$" },
-    "release_id": { "type": "string", "pattern": "^REL-[0-9]{4,6}$" },
+    "txn_id": { "type": "string", "pattern": "^src_[0-9]{6}$" },
+    "release_id": { "type": "string", "pattern": "^ver_[0-9]{6}$" },
     "base_release": { "type": ["string", "null"] },
     "release_plan_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
     "state": {

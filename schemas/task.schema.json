@@ -6,7 +6,11 @@
   "additionalProperties": false,
   "required": ["task_id", "project_id", "author_id", "task_type", "status", "created_at"],
   "properties": {
-    "task_id": { "type": "string", "pattern": "^TASK-[0-9]{6}$" },
+    "task_id": {
+      "type": "string",
+      "pattern": "^(task_[0-9]{6}|TASK-[0-9]{6})$",
+      "description": "V1.0 §9.2 的 `task_` 前缀。这里仍兼容 V4.0 的 `TASK-000001`：任务落在 Runtime，2026-11-22 的 Vault 重编号扫不到这一层，旧 runtime 目录里的任务号是既成事实——判它非法等于让旧任务一夜之间读不出来。新号只发 `task_`"
+    },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "author_id": { "type": "string", "minLength": 1, "description": "任务所属作者；与 project_id、task_id 一起构成任务的最小身份" },
     "task_type": {
@@ -25,7 +29,36 @@
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "in_progress", "blocked", "awaiting_author", "done", "cancelled"]
+      "enum": [
+        "queued",
+        "ready",
+        "running",
+        "waiting_review",
+        "approved",
+        "rejected",
+        "completed",
+        "blocked",
+        "paused",
+        "failed",
+        "cancelled"
+      ],
+      "description": "V1.0 §10.4 的十一态。V4.0 的 pending/in_progress/awaiting_author/done 不再写入，但读盘时归一（tasks.LEGACY_STATUS），旧 runtime 目录里的任务仍读得出来"
+    },
+    "status_history": {
+      "type": "array",
+      "description": "V1.0 §10.4：每次状态迁移记录操作者、时间、原因和关联任务",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "at"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "at": { "type": "string" },
+          "by": { "type": "string" },
+          "reason": { "type": "string" },
+          "related_task_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
     },
     "assigned_to": {
       "type": "string",

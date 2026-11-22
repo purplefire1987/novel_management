@@ -1,4 +1,4 @@
-"""稳定 ID 分配（V4.0 §8.1）。
+"""稳定 ID 分配（V1.0 §9.2）。
 
 规则来自 PRD，逐条落在这里：
 
@@ -8,18 +8,16 @@
 - 失败产生的空号可以保留。
 - 事件不因章节重排改 ID。本模块只发号，不承担「改号」职责。
 
-**位数取 6 位**（`CHAR-000001`），与 PRD §8.1 示例一致。2026-11-22 之前
-库内档案是 4 位，理由是「改六位要动全库文件名与所有引用」；作者当日裁定
-重编号，全库 1046 份已统一到 6 位，这条偏离随之关闭（原 R-14）。
-`schema` 的 pattern 仍放宽到 4–6 位——历史归档与 `{{id}}` 模板里还有 4 位，
-收紧会让它们校验失败。
+**形态取 `<前缀>_<六位数字>`**（`ent_000001`），与 V1.0 §9.2 一致。
+2026-11-22 之前是 V4.0 的 `CHAR-000001`（一类一前缀、连字符、4→6 位），
+作者当日裁定按 V1.0 全库重排，1046 份已统一，旧形态只留在
+`LEGACY_PREFIXES` / `LEGACY_ID_RE` 里做识别，不再发号。
 
-前缀表分两类：PRD 规范的 24 个，和 PRD 未定义的审阅／批次类前缀。后者不是
-「合法扩展」，是历史包袱：审阅记录按最新设计**不该带 id**
-（`review_note` 契约的 `required` 里没有 `id`），保留它们只是为了让分配器
-认得出历史号，不至于把 `REVIEW-0001` 当成未知前缀重新发号。
-2026-11-22 已把 `SKL`／`CREATURE`／`WORLD`／`FATE`／`ASSET`／`VOL` 六类
-迁到 PRD 前缀，它们不再可发号。
+前缀表分两类：`V1_PREFIXES`（V1.0 §9.2 的十二条 + 五条同风格补齐）是可发号的，
+`LEGACY_PREFIXES`（V4.0 的 `CHAR` / `ITEM` / `CH` 等）只用于**认出旧号并报出迁移
+去向**，本身不可发号。分开的理由：旧前缀若还能发号，同一个库里会同时长出
+`ent_000967` 和 `CHAR-000205` 两种形态，而「一个对象一个 ID」是后者唯一的存在
+理由被推翻的先兆。
 """
 
 from __future__ import annotations
@@ -38,125 +36,151 @@ from .storage import iter_files
 MIN_WIDTH = 6
 MAX_WIDTH = 6
 
-# PRD §8.1 的正式前缀。
-PRD_PREFIXES: dict[str, str] = {
-    "CHAR": "人物",
-    "LOC": "地点",
-    "FAC": "势力",
-    "ITEM": "物品",
-    "RULE": "世界规则",
-    "CH": "正文",
-    "PLAN-SERIES": "全书规划",
-    "PLAN-VOL": "卷规划",
-    "PLAN-CH": "章节规划",
-    "SCENE": "场景",
-    "EVT": "事件",
-    "AST": "断言",
-    "CHANGE": "状态变化",
-    "KNOW": "人物认知",
-    "REV": "读者揭示",
-    "FORESHADOW": "伏笔",
-    "MISSION": "剧情内任务",
-    "TASK": "执行任务",
-    "ISSUE": "问题",
-    "CR": "变更请求",
-    "APR": "审批",
-    "REL": "发布",
-    "IDX": "索引",
-    "IMP": "导入",
+# V1.0 §9.2 的前缀。形态是 `<前缀>_<六位数字>`。
+#
+# **单前缀 `ent_` 收所有世界知识实体，类别靠 `type` 字段区分。**
+# 这一点与 V4.0 的「一类一前缀」相反（CHAR/ITEM/LOC/FAC/RULE），
+# 后果是：**不能再从 ID 号段推断类型**。`ent_000086` 是人物还是生物，
+# 只能读 frontmatter。866 份实体在 2026-11-22 由五前缀合并重排而来，
+# 映射表在 `~/WorkBuddy/novel-runtime/reports/v1_remap_mapping.json`。
+V1_PREFIXES: dict[str, str] = {
+    "novel": "小说项目",
+    "idea": "灵感",
+    "ent": "世界知识实体（类别由 type 字段承载）",
+    "rel": "关系",
+    "evt": "事件",
+    "sc": "状态变化",
+    "wf": "工作流实例",
+    "task": "任务",
+    "prop": "变更提案",
+    "ver": "私库版本",
+    "bkp": "备份",
+    "src": "来源",
+    # 下面五类 V1.0 §9.2 没给。原文写的是「**建议**前缀」，不是封闭枚举，
+    # 所以按同风格补齐而不是硬塞进 ent_——塞进去会让「正文」与「世界设定」
+    # 共用一个号段，正文写得多的人永远分不清 ent_000400 是物品还是第 400 章。
+    "ch": "章节正文",
+    "plan": "规划（总纲／卷纲／章纲）",
+    "scene": "场景节拍",
+    "fs": "伏笔",
+    "asset": "素材卡",
 }
 
-# PRD 未定义、但库里可能有历史号的类别。**只用于认出旧号，不鼓励新增。**
-# 2026-11-22 已迁走的（SKL/CREATURE/WORLD/FATE/ASSET/VOL）不再列在这里——
-# 留着它们会让 `allocate-id --type SKL` 又发出一个非 PRD 前缀。
+# V4.0 旧形态（`CHAR-000001`）。**只用于识别未迁移的残留，不再发号。**
+# 2026-11-22 全库已迁到 V1 形态，这里留着是为了让 `validate` 能明确指出
+# 「这几份还是旧号」而不是笼统地说「不合法」。
 LEGACY_PREFIXES: dict[str, str] = {
-    "RELSHIP": "关系档案（PRD 无此前缀；REL 已让给发布）",
-    "REVIEW": "审阅记录（PRD 未定义；最新设计改为不带 id）",
-    "PREFLIGHT": "写前资料包（PRD 用任务承载）",
-    "MEMORY": "记忆条目（PRD 用 KNOW／摘要）",
-    "RB": "回滚点（PRD 用 REL）",
-    "INGEST": "导入批次（PRD 用 IMP）",
-    "OUTLINE": "大纲（PRD 用 PLAN-*）",
-    "LORE": "设定条目（v1.0 遗留）",
-    "GRAPH": "图谱分析（历史）",
+    "CHAR": "人物／生物／命途（已并入 ent）",
+    "LOC": "地点（已并入 ent）",
+    "FAC": "势力（已并入 ent）",
+    "ITEM": "物品／技能（已并入 ent，素材改 asset）",
+    "RULE": "世界条目（已并入 ent）",
+    "CH": "章节（已改为 ch）",
+    "SCENE": "场景（已改为 scene）",
+    "EVT": "事件（已改为 evt）",
+    "FORESHADOW": "伏笔（已改为 fs）",
+    "PLAN-VOL": "卷规划（已改为 plan）",
+    "PLAN-CH": "章规划（已改为 plan）",
 }
 
-PREFIXES: dict[str, str] = {**PRD_PREFIXES, **LEGACY_PREFIXES}
+PREFIXES: dict[str, str] = dict(V1_PREFIXES)
 
 # 号段上限：该前缀的**活文档段**到哪里为止。
 #
-# `CH` 是唯一需要它的前缀。旧稿 28 份（`90_Archive/Original_Draft/`）占
+# `ch` 是唯一需要它的前缀。旧稿 28 份（`90_Archive/Original_Draft/`）占
 # 1001..1028，新正文只占 1..999。没有这条上限时，`allocate` 取「最大号 + 1」
 # 会拿到 1029——新正文第一章写出来的 ID 就落进了存档段。
 #
 # 上限**不是**自动越过的阈值：到了 999 就报错，让人先决定扩段方案。
-# 悄悄越过会同时破坏两件事：存档段的意义，以及「按 ID 猜年龄段」的可行性。
+# 悄悄越过会同时破坏两件事：存档段的意义，以及「按 ID 猜年代」的可行性。
 BAND_LIMITS: dict[str, int] = {
-    "CH": 999,
+    "ch": 999,
 }
 
 # CLI 的类型名 → 前缀。大小写、单复数都收，少一次「凭记忆拼前缀」。
+# V1.0 下绝大多数类型都落到 `ent`——区别只在 frontmatter 的 `type` 字段。
 TYPE_TO_PREFIX: dict[str, str] = {
-    "CHARACTER": "CHAR",
-    "CHAR": "CHAR",
-    "PERSON": "CHAR",
-    "LOCATION": "LOC",
-    "PLACE": "LOC",
-    "FACTION": "FAC",
-    "ORGANIZATION": "FAC",
-    "ORG": "FAC",
-    "ITEM": "ITEM",
-    "OBJECT": "ITEM",
-    "RULE": "RULE",
-    "CHAPTER": "CH",
-    "TEXT": "CH",
-    "VOLUME": "PLAN-VOL",
-    "SCENE": "SCENE",
-    "EVENT": "EVT",
-    "ASSERTION": "AST",
-    "STATE_CHANGE": "CHANGE",
-    "STATECHANGE": "CHANGE",
-    "KNOWLEDGE": "KNOW",
-    "REVELATION": "REV",
-    "FORESHADOWING": "FORESHADOW",
-    "FORESHADOW": "FORESHADOW",
-    "MISSION": "MISSION",
-    "TASK": "TASK",
-    "ISSUE": "ISSUE",
-    "CHANGE_REQUEST": "CR",
-    "APPROVAL": "APR",
-    "RELEASE": "REL",
-    "INDEX": "IDX",
-    "IMPORT": "IMP",
-    # 下面五个是 2026-11-22 的迁移去向：PRD 没有对家，按作者裁定压到最接近的 PRD 前缀。
-    "SKILL": "ITEM",       # 技能 → 物品
-    "CREATURE": "CHAR",    # 生物 → 角色（PRD：生物是角色标签）
-    "WORLD": "RULE",       # 世界条目／体系总表 → 世界规则
-    "FATE": "CHAR",        # 命途 → 角色
-    "ASSET": "ITEM",       # 素材 → 物品
-    "RELATIONSHIP": "RELSHIP",
+    # ---- 世界知识实体：一律 ent ----
+    "CHARACTER": "ent",
+    "CHAR": "ent",
+    "PERSON": "ent",
+    "LOCATION": "ent",
+    "PLACE": "ent",
+    "FACTION": "ent",
+    "ORGANIZATION": "ent",
+    "ORG": "ent",
+    "ITEM": "ent",
+    "OBJECT": "ent",
+    "SKILL": "ent",
+    "CREATURE": "ent",
+    "WORLD": "ent",
+    "FATE": "ent",
+    "DESTINY": "ent",
+    "RULE": "ent",
+    "ENTITY": "ent",
+    "ENT": "ent",
+    # ---- 其余按 V1.0 前缀 ----
+    "CHAPTER": "ch",
+    "TEXT": "ch",
+    "VOLUME": "plan",
+    "PLAN": "plan",
+    "SCENE": "scene",
+    "FORESHADOW": "fs",
+    "FORESHADOWING": "fs",
+    "ASSET": "asset",
+    "EVENT": "evt",
+    "EVT": "evt",
+    "RELATIONSHIP": "rel",
+    "REL": "rel",
+    "RELATION": "rel",
+    "STATE_CHANGE": "sc",
+    "STATECHANGE": "sc",
+    "TASK": "task",
+    "IDEA": "idea",
+    "WORKFLOW": "wf",
+    "PROPOSAL": "prop",
+    "ISSUE": "prop",
+    "CHANGE_REQUEST": "prop",
+    "APPROVAL": "prop",
+    "VERSION": "ver",
+    "RELEASE": "ver",
+    "BACKUP": "bkp",
+    "SOURCE": "src",
+    "IMPORT": "src",
+    "PROJECT": "novel",
+    "NOVEL": "novel",
 }
 
-# 合法 ID = 字母段前缀 + **单个**数字段。前缀可多段（PLAN-CH），但每段必须是字母。
-# `EVT-CH-0001-001` 这种「前缀里夹数字」的复合型 PRD §8.1 明令禁止，
-# 这里直接判为不合法，让它落进 compound 清单而不是被误读成前缀 `EVT-CH-0001`。
-ID_RE = re.compile(r"^(?P<prefix>[A-Z][A-Z]*(?:-[A-Z]+)*)-(?P<num>\d{3,6})$")
-# 「看着像 ID 但形态不对」：多段大写/数字拼起来，且至少含一个数字。
-LOOSE_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$")
+# 合法 ID = 小写字母前缀 + 下划线 + 六位数字（V1.0 §9.2）。
+# `ent_000086`、`ch_001001`、`plan_000003` 都成立；
+# 旧形态 `CHAR-000086` 不再合法——它们落进 LEGACY_ID_RE，由调用方决定是报错还是提示迁移。
+ID_RE = re.compile(r"^(?P<prefix>[a-z]+)_(?P<num>\d{6})$")
+# V4.0 旧形态。用于「认出这是没迁移的旧号」，而不是判成「根本不是 ID」——
+# 判成不是 ID 的后果是它在查重时完全隐身。
+LEGACY_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3,6}$")
 
 ID_ALLOCATION_LOG = "id-allocations.jsonl"
 
 
 def resolve_prefix(kind: str) -> str:
-    """`CHARACTER` / `character` / `char` / `CHAR` 都认。未知前缀直接拒绝。"""
+    """`ent` / `ENT` / `entity` / `ENTITY` 都认。旧前缀明确报出迁移去向。
+
+    V1.0 下 `CHARACTER` 不再得到 `CHAR` 而是 `ent`——这是**故意的**：
+    类型信息归 `type` 字段，ID 只表达「这是一个世界知识实体」。
+    """
     raw = (kind or "").strip()
     if not raw:
         raise UsageError("未指定 ID 类型")
-    upper = raw.upper()
-    if upper in TYPE_TO_PREFIX:
-        return TYPE_TO_PREFIX[upper]
-    if upper in PREFIXES:
-        return upper
+    low = raw.lower()
+    if low in PREFIXES:
+        return low
+    up = raw.upper()
+    if up in TYPE_TO_PREFIX:
+        return TYPE_TO_PREFIX[up]
+    if up in LEGACY_PREFIXES:
+        tgt = TYPE_TO_PREFIX.get(up)
+        hint = f"。改用 --type {tgt}" if tgt else ""
+        raise UsageError(f"前缀 {up} 已废弃（{LEGACY_PREFIXES[up]}）{hint}")
     known = ", ".join(sorted(PREFIXES))
     raise UsageError(f"未知 ID 类型 {raw!r}。可用：{known}")
 
@@ -182,18 +206,20 @@ def split_id(raw: str) -> tuple[str, int] | None:
 
 
 def is_compound_id(raw: str) -> bool:
-    """看着像 ID、但不符合规范形态。两类都要收：
+    """看着像 ID、但不是 V1.0 形态的旧号。三类都要收：
 
-    - `EVT-CH-0001-001`：前缀里夹了数字段
-    - `VOL-0001-S1-DETAIL`：编号后面挂后缀
+    - `EVT-CH-0001-001`：前缀里夹了数字段（V4.0 时代的复合号）
+    - `PLAN-VOL-000001`：两段大写前缀（已并为 `plan_`）
+    - `VOL-0001-S1`：编号后面挂后缀
 
-    它们既不计入号段（取最大号会取到脏值），也不该被当成「不是 ID」而忽略——
-    忽略的结果是这些对象在查重时完全隐身。
+    判定用 `LEGACY_ID_RE` 而不是「有没有下划线」——**它防的是「隐身」**：
+    这些号既不计入号段（取最大号会取到脏值），也不该被当成「不是 ID」而忽略，
+    忽略的结果是它们在查重时完全看不见。
     """
     text = raw.strip()
     if split_id(text):
         return False
-    return bool(LOOSE_ID_RE.match(text)) and any(ch.isdigit() for ch in text)
+    return bool(LEGACY_ID_RE.match(text)) and text.count("-") >= 2
 
 
 class IdRegistry:
@@ -259,7 +285,11 @@ class IdRegistry:
             except ValueError:
                 rel = str(path)
             area = self.area_of(path)
-            head = path.stem.split("_")[0].strip()
+            # 文件名取 ID 要取**前两段**：V1.0 的文件名是 `ent_000339_浑天-地动仪.md`，
+            # 只取第一段会得到 "ent"，那不是 ID。注意不能按 `-` 切——`浑天-地动仪`
+            # 名字里本身就带连字符。
+            parts = path.stem.split("_")
+            head = "_".join(parts[:2]).strip() if len(parts) >= 2 else path.stem.strip()
             from_name = split_id(head)
 
             meta = fm.read(path)
@@ -367,12 +397,17 @@ class IdRegistry:
         return out
 
     def stray_compound(self, prefix: str) -> list[tuple[str, str]]:
-        """`EVT-CH-0001-001` 这类复合型，按「首段前缀」归到 EVT 名下。
+        """`EVT-CH-0001-001` 这类复合型，按「首段前缀」归到 evt 名下。
 
         PRD 禁止这种形态，但库里有——发号时要提醒作者「这个前缀看着是空的，
-        其实已经有一批旧号」。它们不参与取号，所以新号从 0001 开始不会撞。
+        其实已经有一批旧号」。它们不参与取号，所以新号从 000001 开始不会撞。
+
+        复合型都是 V4.0 遗留的大写形态（`EVT-`），而 `prefix` 是 V1.0 的小写
+        （`evt`），所以比较**不区分大小写**；按大小写敏感比会永远返回空，
+        那等于把「有一批旧号」这件事藏起来。
         """
-        return [(raw, src) for raw, src in self.compounds if raw.startswith(prefix + "-")]
+        probe = prefix.upper() + "-"
+        return [(raw, src) for raw, src in self.compounds if raw.upper().startswith(probe)]
 
 
 class IdAllocator:
@@ -400,23 +435,63 @@ class IdAllocator:
             )
         return self.runtime / "locks" / "id-allocate.lock"
 
+    def _holder_state(self, path: Path) -> tuple[str, bool | None]:
+        """读出锁的持有者描述，并判断它是否还活着。
+
+        返回 `(描述, 是否已死)`；`None` 表示**判断不了**（内容残缺、拿不到 pid、
+        或者 pid 归别的用户）。判断不了时一律当活锁处理——把活的锁误判成死的
+        会让两个进程同时发号，代价比多等 2 秒大得多。
+        """
+        try:
+            raw = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return "未知", None
+        m = re.search(r"pid=(\d+)", raw)
+        if not m:
+            # 写锁的进程可能刚 O_CREAT 完还没写内容就被杀了，文件是空的。
+            # 这种「空锁」是不是陈旧，静态判断不了，交给超时提示人工确认。
+            return raw or "未知（锁文件为空）", None
+        pid = int(m.group(1))
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return raw, True
+        except PermissionError:
+            return raw, False
+        except OSError:
+            return raw, None
+        return raw, False
+
     def _acquire(self, timeout: float | None = None):
         path = self._lock_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         deadline = time.monotonic() + (self.lock_timeout if timeout is None else timeout)
+        stale_cleared = False
         while True:
             try:
                 fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
             except FileExistsError:
-                if time.monotonic() > deadline:
-                    holder = ""
+                holder, dead = self._holder_state(path)
+                # 陈旧锁自动接管：进程已经不在，锁上的号是谁都发不出来。
+                # 只接管一次，且必须确认 pid 已死——避免「两个进程互相判定对方陈旧」。
+                if dead is True and not stale_cleared:
+                    stale_cleared = True
                     try:
-                        holder = path.read_text(encoding="utf-8").strip()
+                        path.unlink()
                     except OSError:
-                        pass
+                        raise ConflictError(
+                            f"陈旧锁删不掉（锁 {path}，持有者 {holder} 已不在运行）。"
+                            "请手工删除该文件后重试。"
+                        ) from None
+                    continue
+                if time.monotonic() > deadline:
+                    hint = (
+                        "持有进程已不在运行，锁是陈旧残留——删掉该锁文件即可继续。"
+                        if dead is True
+                        else "确认没有别的 novel 在跑后可删除该锁文件。"
+                    )
                     raise ConflictError(
-                        f"另一个进程正在分配 ID（锁 {path}，持有者 {holder or '未知'}）。"
-                        "确认没有别的 novel 在跑后可删除该锁文件。"
+                        f"另一个进程正在分配 ID（锁 {path}，持有者 {holder}）。{hint}"
                     ) from None
                 time.sleep(0.05)
                 continue
@@ -428,7 +503,8 @@ class IdAllocator:
         try:
             path.unlink()
         except OSError:
-            # 锁删不掉不该让已成功的分配变成失败；下次会因「持有者」提示人工处理。
+            # 锁删不掉不该让已成功的分配变成失败。留下的锁里记着自己的 pid，
+            # 本进程退出后 `_holder_state` 会认出它已死，下次发号自动接管。
             pass
 
     # ---- 分配 --------------------------------------------------------
@@ -481,7 +557,7 @@ class IdAllocator:
                     "自动越过去会让新文档与存档混在同一段里。\n"
                     "要扩段请先定方案（比如把存档段整体上移），不要直接发号。"
                 )
-            issued = [f"{prefix}-{n:0{MIN_WIDTH}d}" for n in range(base + 1, base + count + 1)]
+            issued = [f"{prefix}_{n:0{MIN_WIDTH}d}" for n in range(base + 1, base + count + 1)]
             # 锁内复查：别的进程可能刚发过号。这里查**全部记录**（含 staging/归档）——
             # 取号取最大号本来就要看全库，否则会把号发到别人盘里的对象上。
             taken = {r.id for r in IdRegistry(self.vault, areas=self.areas).records}

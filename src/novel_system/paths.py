@@ -1,6 +1,6 @@
 """项目内路径解析。所有写入/读取都必须经由这里，越界在入口就被拒。
 
-目录名以 `00_Project/project.yaml` 为准（V4.0 §4.3），读不到才退回 §4.2 默认值。
+目录名以 `10_项目配置/project.yaml` 为准（V1.0 §8），读不到才退回 §4.2 默认值。
 """
 
 from __future__ import annotations
@@ -11,23 +11,111 @@ from pathlib import Path
 from . import config as cfg_mod
 from .errors import SecurityError, UsageError
 
-CANON_KINDS = ("World", "Characters", "Locations", "Organizations", "Systems", "Rules")
+# V1.0 §8 的 16 类知识库分类（+ 时间线，共 17 个目录）。
+# 分类依据是 frontmatter 的 `type`，不是原目录——旧结构里 World/ 装了 336 份物品、
+# Systems/ 装了 171 份技能，按目录搬只会把错配原样保留。
+CANON_KINDS = (
+    "世界与宇宙",
+    "地理与地点",
+    "种族与族群",
+    "人物与角色",
+    "生物与生态",
+    "势力与组织",
+    "物品与装备",
+    "技能与能力",
+    "力量与成长",
+    "事件与历史",
+    "规则与机制",
+    "资源与经济",
+    "技术与文明",
+    "文化与社会",
+    "特殊设定",
+    "关系与状态",
+    "时间线",
+)
 
-# V4.0 §4.2 默认目录名。project.yaml 中同名键可覆盖。
+# V1.0 §8 目录名。project.yaml 中同名键可覆盖。
 DEFAULT_DIRS = {
-    "project_meta_root": "00_Project",
-    "canon_root": "01_Canon",
-    "planning_root": "02_Planning",
-    "manuscript_root": "03_Manuscripts",
-    "assets_root": "04_Story_Assets",
-    "ledger_root": "05_Ledgers",
-    "memory_root": "06_Memory",
-    "staging_root": "07_Staging",
-    "review_root": "08_Reviews",
+    "project_meta_root": "10_项目配置",
+    "canon_root": "02_世界知识库",
+    "planning_root": "03_故事规划",
+    "manuscript_root": "04_正文",
+    "assets_root": "06_素材与研究",
+    # V1.0 取消了独立的 Ledgers 目录：事件与关系进知识库、伏笔进规划、
+    # 骰子进素材。这里指向知识库根，让仍按 ledger_root 取路径的老代码继续工作。
+    "ledger_root": "02_世界知识库",
+    "memory_root": "05_记忆与连续性",
+    "staging_root": "_staging",
+    "review_root": "07_审核与报告",
     "archive_root": "90_Archive",
+    # V1.0 §8 的 01_灵感与创意。WF-01 的落点，与规划区分开：
+    # 灵感还没有「打不打算写」的判断，规划已经有。
+    "idea_root": "01_灵感与创意",
 }
 
-MANUSCRIPT_STAGES = ("Drafts", "Revisions", "Final")
+MANUSCRIPT_STAGES = ("初稿", "修订稿", "正式定稿")
+
+# frontmatter 的 `type` → 知识库分类目录。
+#
+# 这张表只服务「新建实体时放哪个目录」，不服务「已有档案算哪一类」——
+# 后者读它自己的目录，改分类靠搬文件（那是人的决定，不是代码的）。
+#
+# V1.0 §5.1 给的是「类型域」，一域底下有多个具体类型（势力与组织里有国家、
+# 宗门、商会），所以这里一个域收多个别名。别名不设上限，但**必须落在十七类里**，
+# 落不进去的说明该走 `04_Story_Assets`（素材）而不是知识库。
+TYPE_TO_CANON_KIND = {
+    "world": "世界与宇宙",
+    "cosmos": "世界与宇宙",
+    "plane": "世界与宇宙",
+    "location": "地理与地点",
+    "place": "地理与地点",
+    "race": "种族与族群",
+    "species": "种族与族群",
+    "clan": "种族与族群",
+    "character": "人物与角色",
+    "person": "人物与角色",
+    "creature": "生物与生态",
+    "beast": "生物与生态",
+    "faction": "势力与组织",
+    "organization": "势力与组织",
+    "org": "势力与组织",
+    "item": "物品与装备",
+    "equipment": "物品与装备",
+    "artifact": "物品与装备",
+    "skill": "技能与能力",
+    "ability": "技能与能力",
+    "spell": "技能与能力",
+    "power": "力量与成长",
+    "realm": "力量与成长",
+    "level": "力量与成长",
+    "career": "力量与成长",
+    "destiny": "力量与成长",
+    "event": "事件与历史",
+    "history": "事件与历史",
+    "rule": "规则与机制",
+    "mechanic": "规则与机制",
+    "law": "规则与机制",
+    "resource": "资源与经济",
+    "economy": "资源与经济",
+    "currency": "资源与经济",
+    "technology": "技术与文明",
+    "civilization": "技术与文明",
+    "culture": "文化与社会",
+    "society": "文化与社会",
+    "religion": "文化与社会",
+    "special": "特殊设定",
+    "anomaly": "特殊设定",
+    "relation": "关系与状态",
+    "relationship": "关系与状态",
+    "state": "关系与状态",
+    "timeline": "时间线",
+}
+
+# 不进知识库的类型：素材卡与模板有自己的目录。
+NON_CANON_TYPES = {
+    "story_asset": "assets_root",
+    "template": "assets_root",
+}
 
 # ID 查重的三级别。**不是三种目录**——是「同一 ID 出现在两处时该怎么判」：
 # formal 里撞两次 = 真撞号；pending（待发布/审阅）里的副本是同一对象在途，
@@ -65,7 +153,7 @@ class ProjectPaths:
         if not root.is_dir():
             raise UsageError(f"项目目录不存在：{root}")
         cfg_mod.ensure_inside(root, vault)
-        meta = cfg_mod.read_yaml(root / "00_Project" / "project.yaml")
+        meta = cfg_mod.read_yaml(root / "10_项目配置" / "project.yaml")
         return cls(vault=vault, root=root, project_id=pid, meta=meta)
 
     # ---- 目录名 ----
@@ -180,6 +268,26 @@ class ProjectPaths:
         if stage not in MANUSCRIPT_STAGES:
             raise UsageError(f"未知正文阶段：{stage}（可选 {', '.join(MANUSCRIPT_STAGES)}）")
         return self.manuscripts / stage
+
+    def dir_for_type(self, entity_type: str) -> Path:
+        """`type` → 该建档的目录。**不猜**：认不出就报错并列出可用类型。
+
+        报错而不是兜底到 `特殊设定`，理由是兜底会把「类型填错了」变成
+        「文件去了奇怪的地方」，而后者要到很久以后才被发现。
+        """
+        key = (entity_type or "").strip().lower()
+        if not key:
+            raise UsageError("未指定实体类型（--type）")
+        if key in NON_CANON_TYPES:
+            return self.in_dir(NON_CANON_TYPES[key])
+        kind = TYPE_TO_CANON_KIND.get(key)
+        if kind is None:
+            raise UsageError(
+                f"未知实体类型 {entity_type!r}。"
+                f"知识库可用的类型：{', '.join(sorted(TYPE_TO_CANON_KIND))}；"
+                f"素材类用：{', '.join(sorted(NON_CANON_TYPES))}"
+            )
+        return self.canon_dir(kind)
 
     def control_roots(self) -> list[Path]:
         """受控区根目录：Canon、定稿、账本、记忆、规划、素材。"""

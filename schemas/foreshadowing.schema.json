@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["id", "type", "name"],
   "properties": {
-    "id": { "type": "string", "pattern": "^FORESHADOW-[0-9]{4,6}$" },
+    "id": { "type": "string", "pattern": "^fs_[0-9]{6}$" },
     "type": { "const": "foreshadowing" },
     "name": { "type": "string", "minLength": 1 },
     "status": {
@@ -17,11 +17,12 @@
     },
     "canon_status": {
       "type": "string",
-      "enum": ["draft", "proposed", "confirmed", "deprecated", "archived"]
+      "enum": ["idea", "proposal", "pending_review", "canon", "deprecated", "rejected"],
+      "description": "V1.1 §4.2 六值，与 entity 同口径"
     },
     "planted_in": {
       "type": "string",
-      "pattern": "^CH-[0-9]{4,6}$",
+      "pattern": "^((ch|plan)_[0-9]{6}|CH-[0-9]{3,4})$",
       "description": "埋设章节（库内字段名）"
     },
     "target_reveal_window": {
@@ -29,8 +30,8 @@
       "additionalProperties": false,
       "description": "计划揭示窗口（库内字段名），与 target_window 同义",
       "properties": {
-        "start": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
-        "end": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" }
+        "start": { "type": "string", "pattern": "^((ch|plan)_[0-9]{6}|CH-[0-9]{3,4})$" },
+        "end": { "type": "string", "pattern": "^((ch|plan)_[0-9]{6}|CH-[0-9]{3,4})$" }
       }
     },
     "importance": {
@@ -41,7 +42,7 @@
     "title": { "type": "string", "minLength": 1 },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^TASK-[0-9]{4,6}$" },
+    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
     "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
     "supersedes": { "type": ["string", "null"] },
     "tags": { "type": "array", "items": { "type": "string" } },
@@ -59,7 +60,7 @@
       "additionalProperties": false,
       "description": "埋设来源：哪一章哪一段",
       "properties": {
-        "chapter_id": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
+        "chapter_id": { "type": "string", "pattern": "^((ch|plan)_[0-9]{6}|CH-[0-9]{3,4})$" },
         "block_id": { "$ref": "_common.schema.json#/$defs/blockId" }
       }
     },
@@ -74,8 +75,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "from_chapter": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" },
-        "to_chapter": { "type": "string", "pattern": "^CH-[0-9]{4,6}$" }
+        "from_chapter": { "type": "string", "pattern": "^((ch|plan)_[0-9]{6}|CH-[0-9]{3,4})$" },
+        "to_chapter": { "type": "string", "pattern": "^((ch|plan)_[0-9]{6}|CH-[0-9]{3,4})$" }
       }
     },
     "window_policy": {

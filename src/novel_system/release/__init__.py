@@ -109,7 +109,7 @@ def publish_task(
         raise SecurityError(f"任务 {task.task_id} 是 read_only，没有可发布内容")
     if task.status == "cancelled":
         raise ConflictError(f"任务 {task.task_id} 已取消，不能发布")
-    if task.status == "done":
+    if task.status == "completed":
         raise ConflictError(
             f"任务 {task.task_id} 已经发布过；内容有更新请新建任务（novel task create）再走一遍 stage/approve"
         )
@@ -150,9 +150,7 @@ def publish_task(
     if result.state == "ACTIVE":
         task.output_files = sorted(set(task.output_files) | set(result.written))
         task.approval_state = "approved"
-        task.status = "done"
-        task.closed_at = now_iso()
-        task_store.save(task)
+        task_store.mark_published(task, actor=actor, release_id=plan_id)
 
     canon_touched = any(c.path.startswith(CANON_PREFIX + "/") for c in plan.changes)
     baseline = AuthorBaseline(runtime, pp.project_id)

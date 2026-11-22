@@ -9,12 +9,13 @@ import sys
 from pathlib import Path
 
 from .. import config as cfg_mod
+from .. import ids as ids_mod
 from ..approvals import ApprovalStore
 from ..audit import OperationLog
 from ..baseline import AuthorBaseline
 from ..backup import BackupStore
 from ..errors import UsageError
-from ..paths import CANON_KINDS, ProjectPaths
+from ..paths import ProjectPaths
 from ..staging import StagingArea
 from ..storage import human_size, sha256_file
 from ..tasks import TASK_STATUSES, TaskStore
@@ -289,7 +290,7 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     vault = cfg.require_vault()
 
     heading("Vault 结构")
-    for name in (cfg.layout.get("vault_system_dir", "00_System"), cfg.layout.get("projects_dir", "10_Projects")):
+    for name in (cfg.layout.get("vault_system_dir", "00_作者工作台"), cfg.layout.get("projects_dir", "01_小说项目")):
         if (vault / name).is_dir():
             ok(f"{name}/ 存在")
         else:
@@ -297,13 +298,13 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
             problems += 1
 
     heading("项目元数据")
-    projects_dir = vault / cfg.layout.get("projects_dir", "10_Projects")
+    projects_dir = vault / cfg.layout.get("projects_dir", "01_小说项目")
     seen: dict[str, Path] = {}
     if projects_dir.is_dir():
         for root in sorted(p for p in projects_dir.iterdir() if p.is_dir() and not p.name.startswith(".")):
-            meta_path = root / "00_Project" / "project.yaml"
+            meta_path = root / "10_项目配置" / "project.yaml"
             if not meta_path.exists():
-                fail(f"{root.name}: 缺 00_Project/project.yaml")
+                fail(f"{root.name}: 缺 10_项目配置/project.yaml")
                 problems += 1
                 continue
             data = cfg_mod.read_yaml(meta_path)
@@ -361,7 +362,7 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         soft_dup = 0
         misnamed: list[str] = []
         counted: dict[str, int] = {}
-        for path in _iter_files(pp.root, skip_dirs=("07_Staging",)):
+        for path in _iter_files(pp.root, skip_dirs=("_staging",)):
             if path.suffix.lower() != ".md":
                 continue
             rel = path.relative_to(pp.root)
@@ -389,10 +390,13 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
                     soft_dup += 1
             else:
                 ids[eid] = (path, formal)
-            # 目录名不可靠（World/Creatures 是合法层级），只看文件名与 id 是否错位
-            file_prefix = path.stem.split("_")[0].split("-")[0]
-            if "-" in path.stem and file_prefix and not eid.startswith(file_prefix + "-"):
-                misnamed.append(f"{rel}: id={eid} 与文件名前缀 {file_prefix}- 不符")
+            # 目录名不可靠，只看文件名与 id 是否错位。
+            # V1.0 的 ID 是 `ent_000339`（下划线 + 数字末段），所以取文件名前两段
+            # 拼回去比对；名称里可能还有下划线（`ent_000339_浑天-地动仪`），不能只切第一段。
+            head = path.stem.split("_")
+            file_id = f"{head[0]}_{head[1]}" if len(head) >= 2 else ""
+            if file_id and ids_mod.split_id(file_id) and file_id != eid:
+                misnamed.append(f"{rel}: id={eid} 与文件名前缀 {file_id} 不符")
 
         problems += dup
         parts = " / ".join(f"{k} {v}" for k, v in sorted(counted.items()))

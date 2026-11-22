@@ -22,7 +22,7 @@ from ..errors import UsageError
 
 # 项目内不索引的三个目录：Agent 提案区、审阅意见、已废弃旧版。
 # 它们都不是「当前事实」，进索引会让 `search` 返回一堆不该被当作依据的内容。
-_PROJECT_SKIP_DIRS = ("07_Staging", "08_Reviews", "90_Archive")
+_PROJECT_SKIP_DIRS = ("_staging", "07_审核与报告", "90_Archive")
 
 # Vault 根归档目录名。**这里是兜底默认值，真实调用方应从配置取**（见 skip_dirs_from_layout）。
 # 教训：早期硬编码成 `90_Archive`，而 V4.0 的 Vault 归档叫 `99_Archive`，

@@ -49,12 +49,12 @@ def cmd_allocate_id(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     if scope_note:
         info(scope_note)
     if stray:
-        warn(f"另有 {len(stray)} 个复合型 ID 以 {prefix}- 开头，不计入号段：")
+        warn(f"另有 {len(stray)} 个复合型旧 ID 以 {prefix.upper()}- 开头，不计入号段：")
         for raw, source in stray[:5]:
             info(f"{raw} ← {source}")
-        info("PRD §8.1 禁止复合型；迁移前它们不参与取号")
+        info("V1.0 §9.2 禁止复合型；迁移前它们不参与取号")
 
-    others = [k for k in registry.conflicts() if not k.startswith(prefix + "-")]
+    others = [k for k in registry.conflicts() if not k.startswith(prefix + "_")]
     if others:
         warn(f"正式区另有 {len(others)} 个其它前缀的重复 ID（与本前缀无关，validate 会报）")
     in_flight = registry.pending_copies()
@@ -77,7 +77,7 @@ def cmd_allocate_id(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         ok(f"已分配并记录审计：{'、'.join(issued)}")
     else:
         ok(f"预演：将分配 {'、'.join(issued)}（加 --confirm 落盘）")
-    info(f"下一个号将是 {prefix}-{_next_of(issued):0{MIN_WIDTH}d}")
+    info(f"下一个号将是 {prefix}_{_next_of(issued):0{MIN_WIDTH}d}")
 
     if args.json:
         import json
