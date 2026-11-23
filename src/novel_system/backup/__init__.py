@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,10 @@ BACKUP_PREFIX = "BK-"
 FILES_DIR = "files"
 MANIFEST_NAME = "manifest.csv"
 META_NAME = "meta.json"
+
+#: `--prune` 的默认保留份数。取 10 是因为一次写作会话通常产生个位数备份，
+#: 10 份足够覆盖「今天早上还好好的」这种回溯深度。
+DEFAULT_KEEP = 10
 
 
 @dataclass
@@ -132,6 +137,65 @@ class BackupStore:
             meta["path"] = str(path)
             out.append(meta)
         return out
+
+    # ---- 保留策略 ----
+    def prune(self, *, keep: int = DEFAULT_KEEP, dry_run: bool = True) -> dict:
+        """按创建时间保留最近 `keep` 份，其余列为可删。
+
+        **只碰 `BK-*`。** 人工建的备份（比如 `maps-prov-39-20261123-010652`）
+        命名不带这个前缀，因此永远不在清理范围内——自动删掉人亲手建的备份，
+        是这套工具最不该做的事。
+
+        默认 `dry_run`：备份的唯一价值是「还在」，清理必须是一次显式决定。
+        """
+        if keep < 1:
+            raise UsageError("--keep 至少为 1：一份都不留，restore 就没有对象了")
+        root = self.require_root()
+
+        items: list[dict] = []
+        for path in root.glob(f"{BACKUP_PREFIX}*"):
+            if not path.is_dir():
+                continue
+            created, size, files = "", 0, 0
+            meta_path = path / META_NAME
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    created = str(meta.get("created_at") or "")
+                    size = int(meta.get("bytes") or 0)
+                    files = int(meta.get("files") or 0)
+                except (json.JSONDecodeError, OSError, ValueError):
+                    pass
+            # 排序一律用目录 mtime：meta.created_at 是带时区的字符串，
+            # 混了时区做字典序会排错，而「哪份更新」不能排错。
+            mtime = path.stat().st_mtime
+            items.append(
+                {
+                    "backup_id": path.name,
+                    "path": str(path),
+                    "created_at": created,
+                    "mtime": mtime,
+                    "bytes": size,
+                    "files": files,
+                }
+            )
+
+        items.sort(key=lambda item: item["mtime"], reverse=True)
+        kept, removable = items[:keep], items[keep:]
+        freed = sum(int(item["bytes"]) for item in removable)
+
+        if not dry_run:
+            for item in removable:
+                shutil.rmtree(item["path"])
+
+        return {
+            "root": str(root),
+            "total": len(items),
+            "kept": kept,
+            "removable": removable,
+            "freed_bytes": freed,
+            "dry_run": dry_run,
+        }
 
     def load(self, backup_id: str) -> dict:
         dest = self._path(backup_id)

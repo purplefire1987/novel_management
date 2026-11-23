@@ -492,6 +492,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_backup.add_argument("--label", default="", help="备注标签")
     p_backup.add_argument("--no-git", action="store_true", help="不备份 .git")
     p_backup.add_argument("--list", action="store_true", help="只列出现有备份")
+    p_backup.add_argument(
+        "--prune",
+        action="store_true",
+        help="清理旧备份：只处理 BK-*，人工建的备份不动（默认只列不删）",
+    )
+    p_backup.add_argument("--keep", type=int, default=10, help="保留最近 N 份（配合 --prune），默认 10")
+    p_backup.add_argument("--confirm", action="store_true", help="真正删除（不加则只预演）")
     p_backup.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
 
     p_restore = sub.add_parser("restore", help="从备份恢复（默认预演，不覆盖现存文件）", parents=[sub_common])

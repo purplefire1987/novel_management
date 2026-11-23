@@ -6,7 +6,7 @@ import argparse
 
 from .. import config as cfg_mod
 from ..audit import ensure_actor
-from ..backup import BackupStore
+from ..backup import DEFAULT_KEEP, BackupStore
 from ..errors import UsageError
 from ..storage import human_size
 from ._common import backup_store, fail, info, ok, oplog, warn
@@ -27,6 +27,33 @@ def cmd_backup(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
                 f"{human_size(int(meta.get('bytes') or 0)):>9}  "
                 f"verified={meta.get('verified')}  {meta.get('label') or ''}"
             )
+        return 0
+
+    if getattr(args, "prune", False):
+        # 不能用 `keep or DEFAULT_KEEP`：`--keep 0` 是 0（falsy），会被静默改成 10，
+        # 于是 prune() 里那条 `keep < 1` 的拒绝永远收不到 0。默认值由 argparse 给。
+        keep = int(getattr(args, "keep", DEFAULT_KEEP))
+        result = store.prune(keep=keep, dry_run=not getattr(args, "confirm", False))
+        if not result["total"]:
+            print(f"没有备份可清理（目录：{result['root']}）")
+            return 0
+        if not result["removable"]:
+            ok(f"{result['total']} 份备份，未超过保留数 {keep}，无需清理")
+            return 0
+
+        if result["dry_run"]:
+            print(f"将删除 {len(result['removable'])} 份，释放 {human_size(result['freed_bytes'])}")
+        else:
+            ok(f"已删除 {len(result['removable'])} 份，释放 {human_size(result['freed_bytes'])}")
+        for item in result["removable"]:
+            print(
+                f"  - {item['backup_id']:<24} {human_size(item['bytes']):>9}  "
+                f"{item['files']:>6} 文件  {item['created_at']}"
+            )
+        if result["dry_run"]:
+            print()
+            print("预演不删。确认清理请加 --confirm")
+            print("只处理 BK-*：人工建的备份（例如 maps-prov-39-*）不受影响")
         return 0
 
     vault = cfg.require_vault()
