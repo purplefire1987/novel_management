@@ -2,6 +2,38 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.15.8 — 2026-11-23
+
+**更正一条误判，并补全 `approve` 之后的指引。**
+
+审查报告 P1-2 原写「`novel publish` 直调 `publish_task()`，绕过 22 步协议」。
+复核 `release/__init__.py:133` 后发现 `publish_task()` **内部调的就是 `execute()`**——
+同一个 22 步执行器（含 `check_gates`、`check_approval`、`contract.check`）。
+`publish` 不是旁路，是 `release execute` 的按任务快捷入口：自找该任务的计划、
+核对已获批准，然后执行同一套步骤。
+
+错因记在这里：当时只看到 `flow.py` 里那行 `publish_task(...)` 就下了结论，
+没有往下读一层函数体。**判据停在调用层，结论就会停在错误的那一层。**
+
+真正的问题只有一处，已修：`approve`（正文批准）之后只打印
+`novel publish --task X` 一行，而实际链路是四步——
+
+```
+0) novel proposal declare-none --chapter ch_XXXXXX --reason <原因>   （本章不产记忆时）
+1) novel release prepare --task <task>
+2) novel approve release <REL-ID> --hash <计划哈希> --as author
+3) novel publish --task <task> --as author --confirm
+```
+
+第 0 步是实测才发现的：直接跑 `release prepare` 会被记忆闭环以
+`NO_MEMORY_DECISION` 拒绝（正文与记忆必须同批发布）。提示语里不写这一步，
+用户走第一步就撞墙。章节号从 `task.output_files` 里提取，不用手填。
+
+实测（临时库，从零）：`declare-none` → `prepare`（REL-000001，计划哈希 bac6a108…）
+→ `approve release` → `publish` → 正式区确实写入 `04_正文/初稿/ch_000001.md`，
+产出 `receipt RCPT-000001` 与 `index IDX-000001`。这同时验证了
+**22 步协议在临时库能跑完整圈**——真库至今 `release status` 仍判 `NO_RELEASE`。
+
 ## 0.15.7 — 2026-11-23
 
 **`novel write` 在真库 100% 不可用，原因是规划查找只认一个键。**

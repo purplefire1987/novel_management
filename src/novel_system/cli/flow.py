@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -302,7 +303,21 @@ def cmd_approve(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     for record in records:
         info(f"{record.target}  {record.sha256[:16]}…")
     print(f"  op: {op.op_id}")
-    print(f"下一步：novel publish --task {task.task_id} --as author --confirm")
+    chapter = ""
+    for record in records:
+        found = re.search(r"(ch_[0-9]{6})", record.target)
+        if found:
+            chapter = found.group(1)
+            break
+    print("下一步（第 0 步不做，第 1 步会以 NO_MEMORY_DECISION 拒绝）：")
+    print(
+        f"  0) 本章不产记忆：novel proposal declare-none --chapter {chapter or '<ch_XXXXXX>'} "
+        "--reason <原因>"
+    )
+    print(f"  1) novel release prepare --task {task.task_id}")
+    print("  2) novel approve release <REL-ID> --hash <计划哈希> --as author")
+    print(f"  3) novel publish --task {task.task_id} --as author --confirm")
+    print("  publish 是 release execute 的按任务快捷入口，跑的是同一套 22 步")
     return 0
 
 

@@ -111,16 +111,27 @@ workflow run   开一个实例（只记账，不执行步骤）
 
 这不是"功能缺失"，是**验收假象**：`workflow validate` 全绿，读者会以为流程可执行。
 
-### P1-2 两条发布路径，提示语指向没有闸门的那条
+### P1-2 `approve` 的提示语只说了发布链路的最后一步（原判有误，已更正）
 
-| 路径 | 实现 | 前置 |
-|---|---|---|
-| `novel publish` | `flow.py` → `release.publish_task()` 直调 | 单章，审过即可 |
-| `novel release prepare/execute` | `release_cmd.py` → 22 步协议 | 计划 → 批准 → 执行 |
+> **本条原判是错的，先更正。** 原文写「`publish` 直调 `publish_task()`，绕过 22 步协议」。
+> 复核 `release/__init__.py:133` 发现 `publish_task()` **内部调的就是 `execute()`**——同一个
+> 22 步执行器（含 `check_gates`、`check_approval`、`contract.check`）。`publish` 不是旁路，
+> 是 `release execute` 的**按任务快捷入口**：自己找到该任务的计划、核对已获批准，然后执行同一套步骤。
+> 之前只看 `flow.py` 里那行 `publish_task(...)` 就下了结论，没往下读一层函数体。
 
-`approve` 成功后打印的下一步是 `novel publish`（快路），而不是 `novel release`（完整协议）。**用户被系统地引导到没有 22 步闸门的那条分支上。** 而 ADR-015 写的是"发布必须走协议"。
+真正的问题只剩一处：`approve`（正文批准）成功后只打印 `novel publish --task X`，
+而实际前置是三步：
 
-两条路共用底层 `publish_task`，所以不是重复实现——但"什么时候该用哪条"没有任何文档说明。真实库 `release status` 判 `NO_RELEASE`，`releases/` 0 个文件：**22 步协议从上线到现在一次都没走过。**
+1. `novel release prepare --task X` —— 生成发布计划
+2. `novel approve release <REL-ID> --hash <计划哈希> --as author` —— 批准计划
+3. `novel publish --task X --as author --confirm` —— 执行
+
+漏掉前两步，用户会先撞一次「任务还没有准备发布计划」，再被错误信息指引回头补。
+信息没丢，只是延后一轮才暴露。已在 0.15.8 把三步写进提示语，并注明第 3 步与
+`release execute` 等价。
+
+**仍然成立的部分**：真实库 `release status` 判 `NO_RELEASE`、`releases/` 0 个文件——
+22 步协议从上线至今一次都没走过。这条链路能不能跑，只有临时库验证过（22 步全绿）。
 
 ### P1-3 契约 27 份里 8 份没有任何代码引用
 
@@ -287,7 +298,7 @@ unit=25 文件  integration=16 文件  用例=579
 | 1 | ~~正文契约二选一~~ | **已做（0.15.6）**：错的是契约，改契约不动数据；28 份正文已入契约 |
 | 2 | ~~给 `plan` 加 `create`~~ | **已做（0.15.7）**：顺带查出 `find_plan` 只认 `id`，`write` 在真库原本 100% 不可用 |
 | 3 | 重写 `known_risks.md`（或标注为历史归档） | 它是唯一的风险入口，过期比没有更坏 |
-| 4 | 明确 `publish` 与 `release` 的分工，改 `approve` 的提示语 | 提示语指向旁路，等于协议形同虚设 |
+| 4 | ~~明确 `publish` 与 `release` 的分工，改 `approve` 的提示语~~ | **已改（0.15.8）**：原判「提示语指向旁路」有误，`publish` 走的就是 22 步；只补全了缺失的前两步 |
 | 5 | 备份加保留策略（保留最近 N 份 + 按天去重） | 189MB 且线性增长，越晚处理越贵 |
 | 6 | 清 215 处旧路径（先 docs，再 29 个源码文件） | 纯机械，但量大，适合单独一批 |
 | 7 | 修 258 个红测试，或整体标注 `@pytest.mark.legacy` 隔离 | 让绿的部分重新有信号 |
