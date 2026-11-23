@@ -154,7 +154,12 @@ TYPE_TO_PREFIX: dict[str, str] = {
 ID_RE = re.compile(r"^(?P<prefix>[a-z]+)_(?P<num>\d{6})$")
 # V4.0 旧形态。用于「认出这是没迁移的旧号」，而不是判成「根本不是 ID」——
 # 判成不是 ID 的后果是它在查重时完全隐身。
-LEGACY_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3,6}$")
+#
+# 尾部那截 `(?:-[A-Z0-9]+)*` 是补的：`is_compound_id` 的 docstring 一直声明收
+# 三类，第三类是「编号后面挂后缀」的 `VOL-0001-S1`，但原来的正则以 `\d{3,6}$`
+# 收尾，这类根本匹配不上——声明与实现不符。库里旧号已经是 0 份（2026-11-22
+# 重排），放宽只影响「认出来并报告」，不影响发号，所以补在这里而不是改口径。
+LEGACY_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3,6}(?:-[A-Z0-9]+)*$")
 
 ID_ALLOCATION_LOG = "id-allocations.jsonl"
 

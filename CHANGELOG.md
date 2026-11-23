@@ -2,6 +2,37 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.15.10 — 2026-11-23
+
+**测试停在 V4.0，把已裁定的 V1.0 形态判成错。** 全量 270 红，其中 60 条是
+「测试过时」而不是「代码有错」——2026-11-22 全库重排后测试没跟上。
+
+契约侧（`test_schema_contract` 22 红 → 全绿）：
+
+- 样本里的 ID 从四位补足六位（38 处，只改 `valid` 分支）。`invalid` 分支一个没动：
+  那是故意写错的样本，改了等于把测试本身废掉。
+- `entity` / `event` 的 `canon_status: confirmed` → `canon`（旧值已于 11-23 全量迁移）。
+- `task.status: pending` → `queued`：`TASK_STATUSES` 的 11 个值里没有 `pending`，
+  实现默认值是 `queued`，错的是样本。
+- `dependency.artifact_id: PLAN-ch_0102` → `plan_000102`（复合形态已废）。
+- **`memory.schema.json` 的 `scope.entities` 还写着 `^(CHAR|LOC|ORG|ITEM|CREATURE)-[0-9]{4}$`**
+  ——这是契约自己的 bug，不是样本的。改为复用 `_common` 的 `anyId`。
+- `test_id_pattern_accepts_four_and_six_digits` 改名并反写判据：原判据是「四位和六位
+  都必须通过」（当时库内实为四位），现在四位形态已不存在，继续接受它等于允许旧形态
+  长回来。守卫意图不变，仍是「不让存量数据被判非法」。
+
+ID 侧（`test_ids` 38 红 → 全绿，58 条通过）：
+
+- 整个文件按 V1.0 形态重写。关键点不是字符替换：**`ent_` 是单前缀，人物和地点共用
+  一个号段**，原测试「CHAR 号段」与「LOC 号段」互相独立的假设已不成立，fixture 因此
+  改成三份实体 `ent_000001..003` 共用一个号段。
+- 新增两条把已知的误判钉住：`--type CHAR` **返回 `ent` 而不是报错**（`TYPE_TO_PREFIX`
+  先命中，故意如此）；走废弃分支的是 `FAC` / `LOC` / `PLAN-VOL`。
+- **`is_compound_id` 实现没做到自己 docstring 声明的事**：docstring 说收三类，第三类
+  是「编号后挂后缀」的 `VOL-0001-S1`，但 `LEGACY_ID_RE` 以 `\d{3,6}$` 收尾，这类根本
+  匹配不上。补了尾部 `(?:-[A-Z0-9]+)*`。旧号库里已是 0 份，放宽只影响「认出来并报告」，
+  不影响发号。
+
 ## 0.15.9 — 2026-11-23
 
 **备份没有保留策略：189MB，且每次都是全量拷贝。**
