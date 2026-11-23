@@ -14,14 +14,14 @@
     "decision"
   ],
   "properties": {
-    "approval_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+    "approval_id": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
     "actor_type": {
       "type": "string",
       "enum": ["AUTHOR", "SYSTEM"],
       "description": "正文批准只接受 AUTHOR；SYSTEM 仅用于自动校验留痕"
     },
     "actor_id": { "type": "string" },
-    "task_id": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "task_id": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
     "target_type": {
       "type": "string",
       "enum": ["ARTIFACT", "PROPOSAL", "RELEASE", "PLAN", "CHANGE_REQUEST"]

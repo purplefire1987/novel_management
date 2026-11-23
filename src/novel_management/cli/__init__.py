@@ -78,6 +78,7 @@ HANDLERS = {
     "maps": maps_cmd.cmd_maps,
     "schema": schema_cmd.cmd_schema,
     "allocate-id": id_cmd.cmd_allocate_id,
+    "legacy-ids": id_cmd.cmd_legacy_ids,
     "note": note_cmd.cmd_note,
     "package-hash": schema_cmd.cmd_package_hash,
     "preflight": agent_cmd.cmd_preflight,
@@ -546,8 +547,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_alloc.add_argument(
         "--type",
         required=True,
-        help="V1.0 §9.2 的类别名或前缀：ent（实体）/ ch（正文）/ scene / evt / plan / idea / prop / fs …"
-        "；旧形态 CHARACTER／LOCATION 仍认，但新号只发小写下划线形态",
+        help="V1.3 §27.2.1 的类别名或前缀（大写）：ENT（实体）/ CH（正文）/ SCN / EVT / VOL / OUT"
+        " / PRP / FSP …；旧形态 CHARACTER／LOCATION 仍认，但发出来的是 `ENT-<ULID>`",
     )
     p_alloc.add_argument("--count", type=int, default=1, help="一次分配几个（默认 1）")
     p_alloc.add_argument("--reason", default="", help="分配原因，写进审计")
@@ -555,6 +556,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_alloc.add_argument("--allow-dirty", action="store_true", help="本前缀已有重号仍发号（不推荐）")
     p_alloc.add_argument("--json", action="store_true", help="附带 JSON 输出")
     p_alloc.add_argument("--as", dest="actor", default=None, help="操作者：author 或 agent 名")
+
+    # ---- legacy-ids ----
+    p_legacy = sub.add_parser(
+        "legacy-ids",
+        help="列出未迁到 V1.3 形态的旧 ID，按区划分组（只读）",
+        parents=[sub_common],
+    )
+    p_legacy.add_argument("--limit", type=int, default=20, help="每区最多列几条（默认 20）")
 
     # ---- package-hash ----
     p_ph = sub.add_parser("package-hash", help="算规范化 JSON 的 sha256（审批与发布绑这个值）", parents=[sub_common])
@@ -568,7 +577,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="产出写前资料包：八级检索、预算账、PASS／BLOCKED（PRD §13）",
         parents=[sub_common],
     )
-    p_pf.add_argument("chapter", help="章节 ID，如 CH-000102")
+    p_pf.add_argument("chapter", help="章节 ID，如 CH-<ULID>")
     p_pf.add_argument("--base-release", default="", help="基线发布；省略则取当前正式指针")
     p_pf.add_argument(
         "--budget", type=int, default=DEFAULT_CONTEXT_LIMIT, help=f"上下文预算上限（默认 {DEFAULT_CONTEXT_LIMIT}）"
@@ -757,7 +766,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_dc.add_argument("--json", action="store_true")
 
     p_ds = deps_sub.add_parser("show", help="看某份产物的依赖与状态", parents=[sub_common])
-    p_ds.add_argument("artifact", help="产物 ID，如 PLAN-CH-0001")
+    p_ds.add_argument("artifact", help="产物 ID，如 PLAN-<ULID> 或 CH-<ULID>")
 
     p_dl = deps_sub.add_parser(
         "closure", help="发布前问：每条正文的记忆都说清楚了吗", parents=[sub_common]
@@ -781,7 +790,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_na.add_argument("--body-file", default="", help="从文件读正文")
     p_na.add_argument("--scope", default="", help="这份意见管到哪里；默认同标题")
     p_na.add_argument("--task-id", default="", help="关联任务，如 task_000001")
-    p_na.add_argument("--chapter-id", default="", help="关联章节，如 CH-0001")
+    p_na.add_argument("--chapter-id", default="", help="关联章节，如 CH-<ULID>")
     p_na.add_argument("--verdict", default="", help="pass / revise / reject / partial（只是意见，不是批准）")
     p_na.add_argument("--source-sha256", default="", help="被审对象的内容指纹，正文一改即视为过期")
     p_na.add_argument("--created-at", default="", help="日期，默认今天")

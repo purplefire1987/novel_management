@@ -89,7 +89,7 @@ def test_unknown_field_is_rejected(store: SchemaStore, samples: dict, name: str)
 
 def test_extensions_is_the_only_escape_hatch(store: SchemaStore) -> None:
     """扩展只能进 extensions，不能就地加字段。"""
-    base = {"id": "ent_000001", "type": "character", "name": "示例"}
+    base = {"id": "ENT-01M85DMB000000000000000001", "type": "character", "name": "示例"}
     assert store.check("entity", {**base, "extensions": {"我方扩展": 1}}) == []
     assert store.check("entity", {**base, "我方扩展": 1}) != []
 
@@ -130,22 +130,37 @@ def test_all_schemas_are_valid_json_and_declare_draft(store: SchemaStore) -> Non
 
 
 def test_id_pattern_accepts_current_form_only(store: SchemaStore) -> None:
-    """当前形态是 `ent_000001`（下划线 + 六位 + 单前缀）。
+    """当前形态是 `ENT-<26 位 Crockford Base32>`（V1.3 §27.2）。
 
-    这条测试原先守的是「四位数和六位数都必须通过」，理由是当时库内实为
-    `CHAR-0001`、PRD 写六位，两种并存。2026-11-22 作者裁定按 V1.0 §9.2 全库
-    重排，1046 份统一成 `ent_000001`，四位数形态已不存在——继续接受它等于
-    允许旧形态重新长回来。所以判据反过来：当前形态必须通过，V4.0 连字符形态
-    必须被拒。守卫的意图没变，仍是「不让存量数据被判非法」。
+    这条测试守了两代形态，每次都把判据**反过来**而不是放宽：
+
+    - 最早守「四位数和六位数都要通过」，因为库里 `CHAR-0001` 与 PRD 六位并存。
+    - 2026-11-22 全库重排成 `ent_000001` 后，改成「下划线形态通过、连字符形态被拒」。
+    - 2026-11-23 迁到 V1.3 的 `ENT-<ULID>`，于是两代旧形态一起变成「必须被拒」。
+
+    守卫的意图一直没变：**不让已经作废的形态重新长回来**。所以这里不写
+    「至少接受一种」，而是逐代列出必须被拒的具体样串——放宽成「有错就行」
+    会让某一代悄悄复活而测试仍然绿。
     """
-    valid = {"id": "ent_000001", "type": "character", "name": "当前形态"}
-    prefixed = {"id": "asset_000001", "type": "character", "name": "同 schema 的另一前缀"}
+    valid = {"id": "ENT-01M85DMB000000000000000001", "type": "character", "name": "当前形态"}
+    # 同一份 schema 也收 story_asset，前缀换成 AST 仍应由 entity 契约接受。
+    prefixed = {"id": "AST-01M85DMB000000000000000001", "type": "character", "name": "同 schema 的另一前缀"}
     assert store.check("entity", valid) == []
     assert store.check("entity", prefixed) == []
 
-    for legacy in ("CHAR-0001", "CHAR-000001", "LOC-0001"):
-        bad = {"id": legacy, "type": "character", "name": "V4.0 旧形态"}
-        assert store.check("entity", bad) != [], f"{legacy} 是旧形态，不该通过"
+    legacy: tuple[str, ...] = (
+        "CHAR-0001",        # V4.0 四位数
+        "CHAR-000001",      # V4.0 六位数
+        "LOC-0001",         # V4.0 一类一前缀
+        "ent_000001",       # V1.0 下划线六位
+        "ast_000001",       # V1.0 素材形态
+        "ent-01M85DMB000000000000000001",  # 前缀小写、连字符——混形，最容易被漏掉
+        "ENT-01M85DMB",     # ULID 截断
+        "ENT-01M85DMB00000000000000000I",  # 字母表外（ULID 排除 I L O U）
+    )
+    for bad_id in legacy:
+        bad = {"id": bad_id, "type": "character", "name": "旧形态或非法形态"}
+        assert store.check("entity", bad) != [], f"{bad_id} 不该通过"
 
 
 def test_compound_id_is_rejected(store: SchemaStore) -> None:

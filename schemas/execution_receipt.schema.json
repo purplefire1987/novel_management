@@ -7,12 +7,12 @@
   "additionalProperties": false,
   "required": ["receipt_id", "release_id", "manifest_hash", "created_at"],
   "properties": {
-    "receipt_id": { "type": "string", "pattern": "^task_[0-9]{6}$" },
-    "release_id": { "type": "string", "pattern": "^ver_[0-9]{6}$" },
+    "receipt_id": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
+    "release_id": { "type": "string", "pattern": "^VER-[0-9A-HJKMNP-TV-Z]{26}$" },
     "base_release": { "type": ["string", "null"] },
     "manifest_hash": { "$ref": "_common.schema.json#/$defs/sha256" },
     "canon_revision": { "type": "string" },
-    "index_build_id": { "type": "string", "pattern": "^src_[0-9]{6}$" },
+    "index_build_id": { "type": "string", "pattern": "^SRC-[0-9A-HJKMNP-TV-Z]{26}$" },
     "active_since": { "type": "string", "format": "date-time" },
     "repaired": {
       "type": "boolean",

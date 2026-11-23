@@ -8,8 +8,8 @@
   "properties": {
     "task_id": {
       "type": "string",
-      "pattern": "^task_[0-9]{6}$",
-      "description": "V1.0 §9.2 的 `task_` 前缀。V4.0 的 `TASK-000001` 兼容已在 0.15.5 删除（`runtime/tasks` 一直是 0 条，没有兼容对象）。若真要导入旧 runtime，先在那边把号改成 `task_` 再进来"
+      "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "V1.3 §27.2 的 `TSK-<ULID>`。三代旧号（`TASK-000001` / `task_000001` / V1.3 之前的六位序号）都不再合法，只由 `legacy-ids` 报告"
     },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "author_id": { "type": "string", "minLength": 1, "description": "任务所属作者；与 project_id、task_id 一起构成任务的最小身份" },

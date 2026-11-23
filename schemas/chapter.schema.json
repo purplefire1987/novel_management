@@ -9,8 +9,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^(ch_[0-9]{6}|CH-[0-9]{3,4})$",
-      "description": "全局唯一。索引（indexing/builder.py）、查重、validate（cli/inspect_cmd.py）三处都取 meta['id']，故此处不得改名为 chapter_id。号段：新正文 ch_000001–000999，2026-11 导入的旧稿 ch_001001–001028"
+      "pattern": "^CH-[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "全局唯一。索引（indexing/builder.py）、查重、validate（cli/inspect_cmd.py）三处都取 meta['id']，故此处不得改名为 chapter_id。V1.3 §27.2 起为 `CH-<ULID>`：旧形态的 1..999 正文段 / 1001..1028 旧稿段在换形时一并作废——ULID 没有号段，也就没有「旧稿占着后段」的问题"
     },
     "type": {
       "type": "string",
@@ -34,7 +34,7 @@
     },
     "volume_id": {
       "type": "string",
-      "pattern": "^plan_[0-9]{6}$",
+      "pattern": "^(VOL|OUT|PLAN)-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "所属卷的规划 ID。旧契约用整数 volume，实际数据一律写卷规划 ID，故以 volume_id 为准"
     },
     "volume": {
@@ -66,7 +66,7 @@
     },
     "created_by_task": {
       "type": "string",
-      "pattern": "^task_[0-9]{6}$",
+      "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "产出这份稿的任务 ID"
     },
     "approved_by": {

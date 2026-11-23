@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["issue_id", "severity", "category", "description", "status"],
   "properties": {
-    "issue_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+    "issue_id": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
     "severity": {
       "type": "string",
       "enum": ["BLOCKER", "NON_BLOCKING", "SUGGESTION"]

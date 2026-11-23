@@ -42,7 +42,7 @@
     "title": { "type": "string", "minLength": 1 },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "created_by_task": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
     "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
     "supersedes": { "type": ["string", "null"] },
     "tags": { "type": "array", "items": { "type": "string" } },

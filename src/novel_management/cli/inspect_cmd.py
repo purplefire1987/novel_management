@@ -398,11 +398,12 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
             else:
                 ids[eid] = (path, formal)
             # 目录名不可靠，只看文件名与 id 是否错位。
-            # V1.0 的 ID 是 `ent_000339`（下划线 + 数字末段），所以取文件名前两段
-            # 拼回去比对；名称里可能还有下划线（`ent_000339_浑天-地动仪`），不能只切第一段。
-            head = path.stem.split("_")
-            file_id = f"{head[0]}_{head[1]}" if len(head) >= 2 else ""
-            if file_id and ids_mod.split_id(file_id) and file_id != eid:
+            # 取 ID 的规则**只在 `domain.ids.id_from_filename` 里写一份**：
+            # 之前这段逻辑在 `IdRegistry._collect` 与这里各抄了一遍，改形态时
+            # 漏掉一处，于是 doctor 报「错位 40 份」而 validate 报 0 份——
+            # 两个命令对同一批文件给出相反结论。
+            file_id = ids_mod.id_from_filename(path.stem) or ""
+            if file_id and ids_mod.is_id(file_id) and file_id != eid:
                 misnamed.append(f"{rel}: id={eid} 与文件名前缀 {file_id} 不符")
 
         problems += dup

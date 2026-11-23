@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["change_id", "change_type", "reason", "release_strategy"],
   "properties": {
-    "change_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+    "change_id": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
     "change_type": {
       "type": "string",
       "enum": ["RETCON", "CORRECTION", "EXTENSION", "WITHDRAWAL"]

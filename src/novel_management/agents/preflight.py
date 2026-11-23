@@ -49,8 +49,8 @@ PREFLIGHT_DIR = "preflight"
 ID_PREFIX = "PREFLIGHT"
 SCHEMA_NAME = "preflight"
 
-CHAPTER_ID_RE = re.compile(r"^CH-[0-9]{4,6}$")
-PREFLIGHT_ID_RE = re.compile(rf"^{ID_PREFIX}-([0-9]{{4,6}})$")
+CHAPTER_ID_RE = re.compile(r"^CH-[0-9A-HJKMNP-TV-Z]{26}$")
+PREFLIGHT_ID_RE = re.compile(rf"^{ID_PREFIX}-([0-9A-HJKMNP-TV-Z]{{26}})$")
 
 # 一次 preflight 最多追多少个实体。规划里列了几十个名字时，
 # 全量追会把预算吃光，然后把该看的伏笔挤掉——先截断并记下来，比默默少看更安全。
@@ -497,7 +497,7 @@ def build(
     """产出一份资料包。`write=False` 只算不落盘。"""
     chapter = (chapter_id or "").strip()
     if not CHAPTER_ID_RE.match(chapter):
-        raise UsageError(f"章节 ID 形状不对：{chapter!r}（应形如 CH-000102）")
+        raise UsageError(f"章节 ID 形状不对：{chapter!r}（应形如 CH-<ULID>）")
 
     registry.role(role)  # 角色不合法就在这里停，不要跑到一半才发现
     budget = budget or Budget()

@@ -1,6 +1,6 @@
 """`novel preflight`：产出一份写前资料包。
 
-§20.2 的命令形状是 `novel preflight CH-000102 --base-release REL-000020`，照抄。
+§20.2 的命令形状是 `novel preflight CH-<ULID> --base-release VER-<ULID>`，照抄。
 多出来的只有三个参数，都为了「先看再落盘」与「预算可调」：
 `--budget`／`--search-limit`／`--no-write`。
 

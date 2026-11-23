@@ -90,10 +90,10 @@ def _fm_blocks(fm: list[str]) -> list[list[str]]:
 
 #: 行政区划表的 ID 由**文件名**决定（`naming.admin_table` → `ent_000963_行政区划表`）。
 #:
-#: 旧版写死 `id: WORLD-0040`。0.14.0 全库重排后正式档案是 `ent_000963`，
-#: 重跑一次 `import-admin` 就会把 ID 从 `ent_000963` 改回 `WORLD-0040`——
-#: 一条命令把一份正式档案变成旧形态，且 `validate` 要等到下次扫描才报。
-ID_RE = re.compile(r"^(ent_\d{6})")
+#: 旧版写死 `id: WORLD-0040`；0.14.0 重排成 `ent_000963`；0.16.0 迁到
+#: `ENT-<ULID>`。ID **只能从文件名取，不能写死**：写死一次就是把「重跑一条命令
+#: 把正式档案改回旧形态」这个 bug 装回去，而且 `validate` 要等到下次扫描才报。
+ID_RE = re.compile(r"^(ENT-[0-9A-HJKMNP-TV-Z]{26})")
 
 
 def target_id() -> str:
@@ -101,7 +101,7 @@ def target_id() -> str:
     m = ID_RE.match(OUT.stem)
     if not m:
         raise SystemExit(
-            f"✗ 行政区划表文件名里没有合法 ID：{OUT.name}（应为 ent_XXXXXX_<名>.md）"
+            f"✗ 行政区划表文件名里没有合法 ID：{OUT.name}（应为 ENT-<ULID>_<名>.md）"
         )
     return m.group(1)
 

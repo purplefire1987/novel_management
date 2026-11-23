@@ -2,21 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/novel-system/event.schema.json",
   "title": "世界内事件（时间线事实）",
-  "$comment": "2026-11-22 按 V1.0 重对齐。① ID：库内 7 份原为 EVT-CH-xxxx-yyy 复合形态（V1.0 §9.2 明令 ID 不得夹入章节等易变文本），已改为 evt_000001..000007 纯序号。② 字段名：V1.0 §5.10 用的是「世界时间／时间精度／叙事时间／首次叙述章节」这套语义名，库内实存为 chapter_id/location_id/sequence；全库以 id 为权威，故 required 仍为 id/type/name，V1.0 的语义字段一律按新增纳入，不覆盖存量字段名。③ 本轮补齐的缘由：event create 写出的 novel_id/status/time_precision/narrative_time/created_by/confidence 六项在旧契约里全是未知字段，而 additionalProperties 为 false —— 即「工具写出的文件过不了自己的校验」。质检 gate 抓到后补的。",
+  "$comment": "2026-11-23 按 V1.3 §27.2 换 ID 形态：`EVT-<ULID>`。此前两代（`EVT-CH-xxxx-yyy` 复合号 → `evt_000001..000007` 纯序号）均已作废，仅由 legacy-ids 报告。其余三处历史对齐保留说明如下。② 字段名：V1.0 §5.10 用的是「世界时间／时间精度／叙事时间／首次叙述章节」这套语义名，库内实存为 chapter_id/location_id/sequence；全库以 id 为权威，故 required 仍为 id/type/name，V1.0 的语义字段一律按新增纳入，不覆盖存量字段名。③ 补齐的缘由：event create 写出的 novel_id/status/time_precision/narrative_time/created_by/confidence 六项在旧契约里全是未知字段，而 additionalProperties 为 false —— 即「工具写出的文件过不了自己的校验」。质检 gate 抓到后补的。",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "type", "name"],
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^evt_[0-9]{6}$",
+      "pattern": "^EVT-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "权威 ID：纯序号，不得把章节号编进 ID"
     },
     "type": { "const": "event" },
     "name": { "type": "string", "minLength": 1 },
     "event_id": {
       "type": "string",
-      "pattern": "^evt_[0-9]{6}$",
+      "pattern": "^EVT-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "PRD §9.3 的字段名，与 id 并存。id 为权威，此字段仅为符合 PRD 字面的可选别名"
     },
     "summary": {
@@ -26,12 +26,12 @@
     },
     "chapter_id": {
       "type": "string",
-      "pattern": "^(ch|plan)_[0-9]{6}$",
+      "pattern": "^(CH|VOL|OUT|PLAN)-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "事件所属章节。归属写在这里，不写进 ID"
     },
     "source_chapter": {
       "type": "string",
-      "pattern": "^(ch|plan)_[0-9]{6}$",
+      "pattern": "^(CH|VOL|OUT|PLAN)-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "PRD §9.3 字段名，与 chapter_id 同义。二者择一即可"
     },
     "sequence": { "type": "integer", "minimum": 0 },
@@ -43,7 +43,7 @@
     "artifact_type": { "const": "EVENT" },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "created_by_task": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "title": { "type": "string" },
     "world_time": {
@@ -58,12 +58,12 @@
     },
     "location_id": {
       "type": "string",
-      "pattern": "^ent_[0-9]{6}$",
+      "pattern": "^ENT-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "地点（库内字段名）"
     },
     "location": {
       "type": "string",
-      "pattern": "^ent_[0-9]{6}$",
+      "pattern": "^ENT-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "PRD §9.3 字段名，与 location_id 同义"
     },
     "consequences": { "type": "array", "items": { "type": "string" } },
@@ -108,12 +108,12 @@
     },
     "first_chapter_id": {
       "type": "string",
-      "pattern": "^(ch|plan)_[0-9]{6}$",
+      "pattern": "^(CH|VOL|OUT|PLAN)-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "首次叙述章节（V1.0 §5.10）。注意与 chapter_id 的区别：chapter_id 是「归属」，这里是「第一次被讲出来」"
     },
     "related_chapters": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^(ch|plan)_[0-9]{6}$" },
+      "items": { "type": "string", "pattern": "^(CH|VOL|OUT|PLAN)-[0-9A-HJKMNP-TV-Z]{26}$" },
       "description": "相关章节（V1.0 §5.10）"
     },
     "witnesses": {

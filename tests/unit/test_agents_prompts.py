@@ -53,9 +53,9 @@ def test_release_section_states_absence() -> None:
     empty = next(s for s in prompts.build("writer").sections if s.key == "release")
     assert "尚未发布过" in empty.body
     filled = next(
-        s for s in prompts.build("writer", release="REL-000020").sections if s.key == "release"
+        s for s in prompts.build("writer", release="REL-01M85DMB0000000000000031NM").sections if s.key == "release"
     )
-    assert "REL-000020" in filled.body
+    assert "REL-01M85DMB0000000000000031NM" in filled.body
 
 
 def test_missing_card_raises(tmp_path: Path) -> None:
@@ -76,7 +76,7 @@ def test_extract_json_handles_fences_and_noise() -> None:
 
 def _envelope(role: str = "researcher") -> dict:
     return {
-        "task_id": "task_000001",
+        "task_id": "TSK-01M85DMB000000000000000001",
         "role": role,
         "result": {"key_constraints": []},
     }

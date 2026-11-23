@@ -352,8 +352,10 @@ def apply_fixups(regions: dict[str, Region]) -> None:
                     region.direct.append(jun)
 
 
-#: 地点档案的 ID 形态（0.14.0 起：`ent_` + 六位）。旧形态 `LOC-0001` 已全库重排。
-ID_RE = re.compile(r"^(ent_\d{6})")
+#: 地点档案的 ID 形态（0.16.0 起：V1.3 的 `ENT-<ULID>`）。
+#: 两代更早的形态（`LOC-0001`、`ent_000086`）都已全库重排，这里不再兼容——
+#: 兼容旧形态会让「只认当前形态」的校验器与画图脚本对同一批文件给出相反结论。
+ID_RE = re.compile(r"^(ENT-[0-9A-HJKMNP-TV-Z]{26})")
 
 
 def type_of(path: Path) -> str:
@@ -362,16 +364,20 @@ def type_of(path: Path) -> str:
 
 
 def loc_files() -> dict[str, Path]:
-    """地点档案：`ent_*.md` 且 frontmatter `type: location`。
+    """地点档案：`ENT-*.md` 且 frontmatter `type: location`。
 
-    0.14.0 把 `LOC-0001` 全库重排成 `ent_000001` 后，这里还在 glob `LOC-*.md`：
-    结果是空字典，71 个治所全判「待建档」，地图从 111 节点掉到 40。
-    不能只把 glob 改成 `ent_*.md`——同目录里还有世界表、行政区划表等
-    **同前缀**档案，按 `type` 过滤才是「哪些是地点」的权威判据
-    （ID 只说明「唯一」，不说明「是什么」）。
+    这段代码被同一类 bug 打中过两次，值得记下来：0.14.0 把 `LOC-0001` 重排成
+    `ent_000001` 后这里还在 glob `LOC-*.md`，0.16.0 换到 `ENT-<ULID>` 后
+    同样的问题又来一遍。两次的现象一模一样：**空字典 → 71 个治所全判「待建档」，
+    地图从 111 节点掉到 40，而命令不报错**。
+
+    换形态时，凡是从**文件名**取东西的地方都必须跟着改：glob 模式、剥前缀的正则、
+    按 ID 建索引的键。只改 glob 会让「40 节点且不报错」变成「40 节点但仍不报错」。
+    同目录里还有世界表、行政区划表等**同前缀**档案，按 `type` 过滤才是
+    「哪些是地点」的权威判据（ID 只说明「唯一」，不说明「是什么」）。
     """
     out: dict[str, Path] = {}
-    for p in LOC_DIR.glob("ent_*.md"):
+    for p in LOC_DIR.glob("ENT-*.md"):
         if type_of(p) == "location":
             out[p.stem] = p
     return out
@@ -384,7 +390,13 @@ def name_of(stem: str) -> str:
     新形态是 `ent_000906_怒涛府`，按首个下划线切会得到 `000906_怒涛府`，
     于是地名表全部对不上、71 个治所全判「待建档」——而命令不报错，只生成一张缺角的图。
     """
-    m = re.match(r"^(?:ent_\d{6}|LOC-\d{4})_(.+)$", stem)
+    # 这里**保留**旧形态的剥离：剥前缀是显示层的事，认不出就只是名字长一点；
+    # 与「哪些文件算地点」那种必须只认当前形态的判断不同（见 `loc_files`）。
+    # 两处若都写成「只认当前形态」，迁移期间的半成品状态会整片报错，
+    # 而报错的内容是「名字对不上」，很难指向真正的原因。
+    m = re.match(
+        rf"^(?:ENT-[0-9A-HJKMNP-TV-Z]{{26}}|ent_\d{{6}}|LOC-\d{{4}})_(.+)$", stem
+    )
     return m.group(1) if m else stem
 
 
@@ -436,7 +448,7 @@ def loc_rel(loc_id: str) -> str:
     if _LOC_INDEX is None:
         _LOC_INDEX = {
             m.group(1): p.relative_to(VAULT).as_posix()
-            for p in LOC_DIR.glob("ent_*.md")
+            for p in LOC_DIR.glob("ENT-*.md")
             if type_of(p) == "location" and (m := ID_RE.match(p.stem))
         }
     return _LOC_INDEX.get(loc_id, "")

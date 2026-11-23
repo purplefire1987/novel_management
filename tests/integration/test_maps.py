@@ -22,7 +22,7 @@ from novel_management.cli import main
 STATE = "试验州"
 WORLD_TABLE = """\
 ---
-id: ent_000029
+id: ENT-01M85DMB00000000000000001T
 type: world
 ---
 ## 试验州
@@ -34,7 +34,7 @@ type: world
 
 ADMIN_TABLE = """\
 ---
-id: ent_000040
+id: ENT-01M85DMB00000000000000001E
 type: world
 ---
 ## 试验州
@@ -64,13 +64,13 @@ naming:
   upper_outside: 测试世界之外
   map_page: 测试地图
   tree_page: 测试层级
-  world_table: ent_000029_九州表
-  admin_table: ent_000040_行政区划表
+  world_table: ENT-01M85DMB00000000000000001T_九州表
+  admin_table: ENT-01M85DMB00000000000000001E_行政区划表
   admin_alias: 测试区划表
   admin_aliases:
     - 测试区划
     - 测试别名
-  office_table: ent_000009_测试官职
+  office_table: ENT-01M85DMB000000000000000009_测试官职
   office_note: 测试品级见该表
   xlsx: 资产表.xlsx
   xlsx_path: 90_Archive/Raw_Sources/资产表.xlsx
@@ -81,9 +81,9 @@ state_cities:
 page_notes:
   special_note: 界外条目不入行政序列。
   same_city_example: |-
-    - 测试同城说明（例：[[ent_000001_灰石渡|灰石渡]]），不要当成两个地方。
+    - 测试同城说明（例：[[ENT-01M85DMB000000000000000001_灰石渡|灰石渡]]），不要当成两个地方。
   links:
-    - "- **测试关联**：[[ent_000001_灰石渡|灰石渡]]"
+    - "- **测试关联**：[[ENT-01M85DMB000000000000000001_灰石渡|灰石渡]]"
 """
 
 
@@ -103,25 +103,25 @@ def _seed(project: Path, *, layout: bool = True) -> None:
     """造一份最小但格式正确的地名数据（现行 ent_ 形态）。"""
     totals = project / "02_世界知识库" / "世界与宇宙"
     totals.mkdir(parents=True, exist_ok=True)
-    (totals / "ent_000029_九州表.md").write_text(WORLD_TABLE, encoding="utf-8")
-    (totals / "ent_000040_行政区划表.md").write_text(ADMIN_TABLE, encoding="utf-8")
+    (totals / "ENT-01M85DMB00000000000000001T_九州表.md").write_text(WORLD_TABLE, encoding="utf-8")
+    (totals / "ENT-01M85DMB00000000000000001E_行政区划表.md").write_text(ADMIN_TABLE, encoding="utf-8")
 
     locs = project / "02_世界知识库" / "地理与地点"
     locs.mkdir(parents=True, exist_ok=True)
-    (locs / "ent_000073_试验州.md").write_text(
-        "---\nid: ent_000073\ntype: location\nsubtype: 州域\nname: 试验州\n---\n"
+    (locs / "ENT-01M85DMB00000000000000002B_试验州.md").write_text(
+        "---\nid: ENT-01M85DMB00000000000000002B\ntype: location\nsubtype: 州域\nname: 试验州\n---\n"
         "\n# 试验州\n\n## 档案\n\n- **层级**：测试世界 › 试验州\n",
         encoding="utf-8",
     )
-    (locs / "ent_000001_灰石渡.md").write_text(
-        "---\nid: ent_000001\ntype: location\nsubtype: 地点\nname: 灰石渡\n---\n"
+    (locs / "ENT-01M85DMB000000000000000001_灰石渡.md").write_text(
+        "---\nid: ENT-01M85DMB000000000000000001\ntype: location\nsubtype: 地点\nname: 灰石渡\n---\n"
         "\n# 灰石渡\n\n## 档案\n\n- **层级**：测试世界 › 试验州\n",
         encoding="utf-8",
     )
     # 干扰项：同前缀、同目录，但不是地点。旧实现按 `LOC-` 前缀扫，天然不会碰到它；
     # 改成 `ent_*.md` 之后若忘了 `type` 过滤，它会被当成第 3 个地点混进图里。
-    (locs / "ent_000099_不是地点.md").write_text(
-        "---\nid: ent_000099\ntype: item\nname: 不是地点\n---\n", encoding="utf-8"
+    (locs / "ENT-01M85DMB00000000000000002V_不是地点.md").write_text(
+        "---\nid: ENT-01M85DMB00000000000000002V\ntype: item\nname: 不是地点\n---\n", encoding="utf-8"
     )
     if layout:
         meta = project / "10_项目配置"

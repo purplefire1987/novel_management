@@ -25,12 +25,12 @@
     "gate_result"
   ],
   "properties": {
-    "preflight_id": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "preflight_id": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
     "base_release": {
       "type": ["string", "null"],
       "description": "基线发布；从未发布过时为 null，并在 issues 里写明「读的是工作树」"
     },
-    "chapter_id": { "type": "string", "pattern": "^ch_[0-9]{6}$" },
+    "chapter_id": { "type": "string", "pattern": "^CH-[0-9A-HJKMNP-TV-Z]{26}$" },
     "input_hashes": {
       "type": "object",
       "additionalProperties": { "$ref": "_common.schema.json#/$defs/sha256" }

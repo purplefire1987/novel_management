@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["release_id", "base_release", "changes", "schema_version"],
   "properties": {
-    "release_id": { "type": "string", "pattern": "^ver_[0-9]{6}$" },
+    "release_id": { "type": "string", "pattern": "^VER-[0-9A-HJKMNP-TV-Z]{26}$" },
     "base_release": {
       "type": ["string", "null"],
       "description": "基线发布；首次发布为 null"
@@ -29,20 +29,20 @@
     "removals": { "type": "array", "items": { "type": "string" } },
     "text_approvals": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+      "items": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
       "description": "正文批准引用；缺一条就不能发布对应正文"
     },
     "memory_approvals": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^prop_[0-9]{6}$" }
+      "items": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" }
     },
     "change_requests": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^prop_[0-9]{6}$" }
+      "items": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" }
     },
     "nonblocking_issues": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+      "items": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
       "description": "计划放行的非阻断问题；BLOCKER 不得出现在这里"
     },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },

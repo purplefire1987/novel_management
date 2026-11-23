@@ -473,7 +473,7 @@ TOOLS: tuple[Tool, ...] = (
         "plan",
         CAP_READ_CANON,
         "读某章的已批准规划（按 frontmatter id 找，不看文件名）",
-        (Param("chapter", "str", True, "章节 ID，如 CH-0001"),),
+        (Param("chapter", "str", True, "章节 ID，如 CH-<ULID>"),),
         _run_plan,
     ),
     Tool(

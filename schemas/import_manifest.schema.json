@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["import_id", "created_at", "files", "raw_bytes_preserved"],
   "properties": {
-    "import_id": { "type": "string", "pattern": "^src_[0-9]{6}$" },
+    "import_id": { "type": "string", "pattern": "^SRC-[0-9A-HJKMNP-TV-Z]{26}$" },
     "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "created_at": { "type": "string", "format": "date-time" },
     "files": {

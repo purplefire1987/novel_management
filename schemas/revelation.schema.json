@@ -12,7 +12,7 @@
     "title": { "type": "string" },
     "artifact_status": { "$ref": "_common.schema.json#/$defs/artifactStatus" },
     "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-    "created_by_task": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "created_by_task": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
     "derived_from": { "type": "array", "items": { "$ref": "_common.schema.json#/$defs/anyId" } },
     "supersedes": { "type": ["string", "null"] },
     "tags": { "type": "array", "items": { "type": "string" } },
@@ -20,14 +20,14 @@
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
 
-    "proposition_ref": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+    "proposition_ref": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
     "narrative_position": {
       "type": "object",
       "additionalProperties": false,
       "required": ["chapter_id"],
       "properties": {
-        "chapter_id": { "type": "string", "pattern": "^ch_[0-9]{6}$" },
-        "scene_id": { "type": "string", "pattern": "^scene_[0-9]{6}$" },
+        "chapter_id": { "type": "string", "pattern": "^CH-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "scene_id": { "type": "string", "pattern": "^SCN-[0-9A-HJKMNP-TV-Z]{26}$" },
         "block_id": { "$ref": "_common.schema.json#/$defs/blockId" }
       }
     },

@@ -9,8 +9,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^rel_[0-9]{6}$",
-      "description": "V1.0 §9.2 的关系前缀，六位序号"
+      "pattern": "^REL-[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "V1.3 §27.2 的关系前缀 `REL-<ULID>`"
     },
     "type": { "const": "relationship" },
     "name": {
@@ -21,12 +21,12 @@
     "novel_id": { "type": "string" },
     "from_entity_id": {
       "type": "string",
-      "pattern": "^ent_[0-9]{6}$",
+      "pattern": "^ENT-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "关系的起点。有方向：师徒与「师承自」在这一侧相反"
     },
     "to_entity_id": {
       "type": "string",
-      "pattern": "^ent_[0-9]{6}$",
+      "pattern": "^ENT-[0-9A-HJKMNP-TV-Z]{26}$",
       "description": "关系的终点"
     },
     "relationship_type": {

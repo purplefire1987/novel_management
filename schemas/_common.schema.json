@@ -6,8 +6,8 @@
   "$defs": {
     "anyId": {
       "type": "string",
-      "pattern": "^[a-z]+_[0-9]{6}$",
-      "description": "规范 ID：字母段前缀 + 4–6 位编号。EVT-ch_0001-001 这类复合形态不合法（PRD §8.1）"
+      "pattern": "^[A-Z][A-Z0-9]{1,7}-[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "规范 ID（V1.3 §27.2）：大写类型前缀 + 连字符 + 26 位 Crockford Base32（ULID）。前缀宽度放到 2–8 位是为了让 §27.2.1 的注册表扩展不必回头改校验器。两代旧形态（`CHAR-0001` 与 `ent_000001`）不再合法，只由 `domain.ids.legacy_form()` 识别并报告"
     },
     "sha256": {
       "type": "string",
@@ -58,7 +58,7 @@
         "kind": { "const": "APPROVED_CANDIDATE" },
         "artifact_id": { "$ref": "#/$defs/anyId" },
         "content_hash": { "$ref": "#/$defs/sha256" },
-        "approval_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+        "approval_id": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
         "block_id": { "$ref": "#/$defs/blockId" },
         "quote": { "type": "string", "minLength": 1 }
       }
@@ -81,7 +81,7 @@
       "required": ["kind", "decision_id"],
       "properties": {
         "kind": { "const": "AUTHOR_DECISION" },
-        "decision_id": { "type": "string", "pattern": "^prop_[0-9]{6}$" },
+        "decision_id": { "type": "string", "pattern": "^PRP-[0-9A-HJKMNP-TV-Z]{26}$" },
         "content_hash": { "$ref": "#/$defs/sha256" }
       }
     },
@@ -110,7 +110,7 @@
     },
     "entityRef": {
       "type": "string",
-      "pattern": "^ent_[0-9]{6}$"
+      "pattern": "^ENT-[0-9A-HJKMNP-TV-Z]{26}$"
     }
   }
 }

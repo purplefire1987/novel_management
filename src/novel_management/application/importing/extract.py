@@ -26,7 +26,16 @@ from novel_management.domain.errors import ParseError
 from novel_management.infrastructure.filesystem.paths import ProjectPaths
 from novel_management.application.importing.model import Chapter
 
-ID_RE = re.compile(r"\b(?P<id>[A-Z]{2,10}-[0-9]{3,6})\b")
+# 正文里出现过的对象 ID。两代形态都要认：V1.3 的 `ENT-<ULID>` 与更早的
+# `CH-000102`。**只扫不判**——这里不做合法性裁决，只把「正文提到过哪些号」捞出来，
+# 合不合法交给 `domain.ids.legacy_form()`。少认一代的后果是那批引用在导入
+# 报告里完全隐身，而这个报告正是决定「这段正文能不能落库」的依据之一。
+ID_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?P<id>"
+    r"[A-Z][A-Z0-9]{1,7}-[0-9A-HJKMNP-TV-Z]{26}"   # V1.3
+    r"|[A-Z]{2,10}-[0-9]{3,6}"                      # V4.0 / V1.0 连字符形态
+    r")(?![0-9A-Za-z])"
+)
 
 # 词典里名字太短会命中一切（「李」「王」）。两字起，且要求整词匹配。
 MIN_NAME_LEN = 2

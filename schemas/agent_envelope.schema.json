@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["task_id", "role", "result"],
   "properties": {
-    "task_id": { "type": "string", "pattern": "^task_[0-9]{6}$" },
+    "task_id": { "type": "string", "pattern": "^TSK-[0-9A-HJKMNP-TV-Z]{26}$" },
     "role": {
       "type": "string",
       "enum": [
