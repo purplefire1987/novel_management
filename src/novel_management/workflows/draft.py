@@ -32,8 +32,8 @@ from ..agents.metering import Meter
 from ..adapters.mock import LLMClient
 from ..domain.errors import ConflictError, SecurityError, UsageError
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..staging import StagingArea
-from ..tasks import TaskStore
+from novel_management.application.staging import StagingArea
+from novel_management.application.tasks import TaskStore
 from ..infrastructure.filesystem.storage import dump_yaml, sha256_text
 from . import plan as plan_mod
 

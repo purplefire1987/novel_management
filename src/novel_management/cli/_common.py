@@ -8,13 +8,13 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..infrastructure.filesystem import frontmatter as fm
-from ..approvals import ApprovalStore
+from novel_management.application.approvals import ApprovalStore
 from ..audit import OperationLog
 from ..infrastructure.backup import BackupStore
-from ..baseline import AuthorBaseline
+from novel_management.application.baseline import AuthorBaseline
 from ..domain.errors import NovelError, SecurityError, UsageError
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..tasks import TaskStore
+from novel_management.application.tasks import TaskStore
 
 
 def ok(msg: str) -> None:

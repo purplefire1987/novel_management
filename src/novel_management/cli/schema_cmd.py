@@ -14,7 +14,7 @@ from pathlib import Path
 from novel_management.domain import canonical
 from .. import config as cfg_mod
 from ..domain.errors import CanonicalError, SchemaError, UsageError
-from ..schema import SchemaStore
+from novel_management.schemas.store import SchemaStore
 from ._common import fail, heading, info, ok, warn
 
 

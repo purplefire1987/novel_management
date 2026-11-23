@@ -9,15 +9,15 @@ import sys
 from pathlib import Path
 
 from .. import config as cfg_mod
-from ..approvals import ApprovalFile
-from ..changes import ChangeStore, IssueStore
+from novel_management.application.approvals import ApprovalFile
+from novel_management.application.changes import ChangeStore, IssueStore
 from ..audit import ensure_actor, file_stamp
 from ..domain.errors import SecurityError, UsageError
 from ..infrastructure.database.indexing.source import skip_dirs_from_layout
-from ..release import describe_result, publish_task
-from ..staging import StagingArea
+from novel_management.application.release import describe_result, publish_task
+from novel_management.application.staging import StagingArea
 from ..infrastructure.filesystem.storage import sha256_file
-from ..tasks import TASK_TYPES, WRITE_MODES, Task
+from novel_management.application.tasks import TASK_TYPES, WRITE_MODES, Task
 from ._common import (
     approval_store,
     baseline,
@@ -93,7 +93,7 @@ def cmd_task(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
             else:
                 print("\n  批准: 尚无")
         if getattr(args, "json", False):
-            from ..tasks import task_json
+            from novel_management.application.tasks import task_json
 
             print(task_json(task))
         return 0
@@ -107,7 +107,7 @@ def cmd_task(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
             status=getattr(args, "status", "") or "",
         )
         if getattr(args, "json", False):
-            from ..tasks import task_json
+            from novel_management.application.tasks import task_json
 
             print(json.dumps([json.loads(task_json(t)) for t in items], ensure_ascii=False, indent=2))
             return 0
@@ -125,7 +125,7 @@ def cmd_task(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     if action == "transition":
         # `TaskStore.transition()` 一直有实现、有迁移表、有跳步拒绝，却从没有命令入口。
         # 于是 §10.4 的状态机在代码里成立、在操作上不存在——作者只能手改 yaml。
-        from ..tasks import TRANSITIONS
+        from novel_management.application.tasks import TRANSITIONS
 
         task = store.load(args.task_id)
         before = task.status

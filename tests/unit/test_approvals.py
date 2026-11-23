@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_management.approvals import ApprovalFile, ApprovalStore
+from novel_management.application.approvals import ApprovalFile, ApprovalStore
 from novel_management.domain.errors import ApprovalError
 
 

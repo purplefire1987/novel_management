@@ -23,7 +23,7 @@ import json
 
 from .. import config as cfg_mod
 from ..audit import ensure_actor
-from ..changes import (
+from novel_management.application.changes import (
     BLOCKER,
     SEVERITIES,
     ChangeStore,

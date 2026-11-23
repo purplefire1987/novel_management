@@ -37,9 +37,9 @@ from ..audit import AUTHOR, now_iso
 from ..config import read_yaml
 from ..domain.errors import ConflictError, SecurityError, UsageError
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..staging import StagingArea
+from novel_management.application.staging import StagingArea
 from ..infrastructure.filesystem.storage import dump_yaml, sha256_text, write_text_atomic
-from ..tasks import TaskStore
+from novel_management.application.tasks import TaskStore
 from . import dimensions as dim_mod
 
 REVIEW_DIR = "reviews"

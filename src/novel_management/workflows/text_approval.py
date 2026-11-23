@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..approvals import Approval, ApprovalFile, ApprovalStore
+from novel_management.application.approvals import Approval, ApprovalFile, ApprovalStore
 from ..audit import AUTHOR
 from ..domain.errors import ApprovalError, SecurityError
 from ..infrastructure.filesystem.paths import ProjectPaths

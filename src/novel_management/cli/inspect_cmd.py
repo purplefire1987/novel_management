@@ -17,15 +17,15 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from novel_management.domain import ids as ids_mod
-from ..approvals import ApprovalStore
+from novel_management.application.approvals import ApprovalStore
 from ..audit import OperationLog
-from ..baseline import AuthorBaseline
+from novel_management.application.baseline import AuthorBaseline
 from ..infrastructure.backup import BackupStore
 from ..domain.errors import UsageError
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..staging import StagingArea
+from novel_management.application.staging import StagingArea
 from ..infrastructure.filesystem.storage import human_size, sha256_file
-from ..tasks import TASK_STATUSES, TaskStore
+from novel_management.application.tasks import TASK_STATUSES, TaskStore
 from ._common import fail, heading, info, ok, project, read_frontmatter, task_store, warn
 
 

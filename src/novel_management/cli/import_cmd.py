@@ -22,9 +22,9 @@ from pathlib import Path
 from .. import config as cfg_mod
 from ..audit import ensure_actor
 from ..domain.errors import UsageError
-from ..importing import ImportStore, run_scan, stage_batch
-from ..importing.model import read_locator
-from ..importing.report import plan_batches
+from novel_management.application.importing import ImportStore, run_scan, stage_batch
+from novel_management.application.importing.model import read_locator
+from novel_management.application.importing.report import plan_batches
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ._common import fail, heading, info, ok, oplog, project, task_store, warn
 

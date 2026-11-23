@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from novel_management.importing.parser import _heading_of, split_chapters
+from novel_management.application.importing.parser import _heading_of, split_chapters
 
 
 def _split(text: str, *, fmt: str = "markdown", level: int = 0):

@@ -18,10 +18,10 @@ import json
 
 from .. import config as cfg_mod
 from ..audit import ensure_actor
-from ..changes import ChangeStore, IssueStore
+from novel_management.application.changes import ChangeStore, IssueStore
 from ..domain.errors import ConflictError, SecurityError, UsageError
 from ..infrastructure.database.indexing.source import skip_dirs_from_layout
-from ..release import (
+from novel_management.application.release import (
     PublishLock,
     ReleasePlan,
     ReleaseStore,
@@ -36,7 +36,7 @@ from ..release import (
     resume,
     status,
 )
-from ..staging import StagingArea
+from novel_management.application.staging import StagingArea
 from ._common import approval_store, heading, info, ok, oplog, project, task_store, warn
 
 

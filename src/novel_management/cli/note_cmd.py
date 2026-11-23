@@ -20,7 +20,7 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..domain.errors import ConflictError, UsageError
-from ..reviews import KIND_DIRS, KIND_TYPES, Note, list_notes, target_path, write_note
+from novel_management.application.reviews import KIND_DIRS, KIND_TYPES, Note, list_notes, target_path, write_note
 from ._common import fail, heading, info, ok, oplog, project, warn
 
 

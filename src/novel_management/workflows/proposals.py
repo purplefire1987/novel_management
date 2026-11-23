@@ -35,13 +35,13 @@ from ..infrastructure.filesystem import markdown as md
 from ..agents import runner
 from ..agents.metering import Meter
 from ..adapters.mock import LLMClient
-from ..approvals import ApprovalStore
+from novel_management.application.approvals import ApprovalStore
 from ..audit import AUTHOR, now_iso
 from ..config import read_yaml
 from ..domain.errors import ApprovalError, ConflictError, SecurityError, UsageError
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ..infrastructure.filesystem.storage import dump_yaml, sha256_file, write_text_atomic
-from ..tasks import TaskStore
+from novel_management.application.tasks import TaskStore
 from ..infrastructure.database.indexing.schema import SCHEMA_VERSION
 from . import review as review_mod
 

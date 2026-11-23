@@ -12,7 +12,7 @@ import pytest
 
 from novel_management.domain.canonical import package_hash
 from novel_management.domain.errors import UsageError
-from novel_management.release.model import (
+from novel_management.application.release.model import (
     STEP_NAMES,
     ActivePointer,
     Change,
@@ -309,7 +309,7 @@ def test_records_satisfy_their_schema(name: str, builder) -> None:
     T02 时这四份 schema 的字段是从 PRD §17.4 与 §18.2 反推的（known_risks R-16）；
     T06 真写记录时如果对不上，要么 schema 要改，要么实现要改——**不能两边都当没看见**。
     """
-    from novel_management.schema import SchemaStore
+    from novel_management.schemas.store import SchemaStore
 
     problems = SchemaStore().check(name, builder().as_dict())
     assert problems == [], f"{name} 不符合契约：{problems}"

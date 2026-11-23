@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from ..adapters.mock import LLMClient
-from ..schema import check as schema_check
+from novel_management.schemas.store import check as schema_check
 from . import prompts, registry
 from .metering import Meter
 

@@ -26,7 +26,7 @@ from ..audit import ensure_actor, now_iso
 from ..domain.errors import ConflictError, UsageError
 from novel_management.domain.ids import IdAllocator, IdRegistry, resolve_prefix
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..schema import SchemaStore, schema_name_for
+from novel_management.schemas.store import SchemaStore, schema_name_for
 from ..infrastructure.filesystem.storage import dump_yaml, write_text_atomic
 from ._common import fail, heading, info, name_slug, ok, project, read_meta, warn
 

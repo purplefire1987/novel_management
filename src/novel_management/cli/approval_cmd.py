@@ -34,14 +34,14 @@ import argparse
 import json
 
 from .. import config as cfg_mod
-from ..approvals import ApprovalFile
+from novel_management.application.approvals import ApprovalFile
 from ..audit import ensure_actor
 from novel_management.domain.canonical import package_hash
-from ..changes import IssueStore, ChangeStore
+from novel_management.application.changes import IssueStore, ChangeStore
 from ..domain.errors import ApprovalError, UsageError
-from ..staging import StagedFile, StagingArea, artifact_id_of
+from novel_management.application.staging import StagedFile, StagingArea, artifact_id_of
 from ..infrastructure.filesystem.storage import sha256_file
-from ..tasks import is_task_id
+from novel_management.application.tasks import is_task_id
 from ._common import approval_store, heading, info, ok, oplog, project, task_store, warn
 
 # 帮助文案里举的例子。写成常量是因为 `TASK-000001` 这种旧形态散落在十几条
@@ -242,7 +242,7 @@ def _approve_release(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     与文件级批准的区别：这里批的是「这份计划」——基线与变更清单绑在一起。
     计划重新准备过（哪怕内容一样）哈希就会变，旧批准自动作废。
     """
-    from ..release import ReleaseStore
+    from novel_management.application.release import ReleaseStore
 
     actor = ensure_actor(getattr(args, "actor", None), "approve")
     store = ReleaseStore(cfg.require_runtime())
