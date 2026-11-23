@@ -18,11 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..canonical import utc_now
-from ..errors import ConflictError, UsageError
+from ..domain.errors import ConflictError, UsageError
 from ..ids import IdAllocator
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
-from ..storage import write_atomic, write_new
+from ..infrastructure.filesystem.storage import write_atomic, write_new
 from ..tasks import TaskStore
 from . import extract as extract_mod
 from .model import Chapter, ImportFile, ImportManifest, make_locator, read_locator

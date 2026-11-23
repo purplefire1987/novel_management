@@ -30,10 +30,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .. import markdown as md
-from ..errors import UsageError
-from ..paths import ProjectPaths
-from ..storage import sha256_file
+from ..infrastructure.filesystem import markdown as md
+from ..domain.errors import UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import sha256_file
 
 VALID = "VALID"
 STALE = "STALE"

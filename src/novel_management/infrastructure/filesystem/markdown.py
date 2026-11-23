@@ -21,9 +21,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from . import config as cfg_mod
+from ... import config as cfg_mod
 from . import frontmatter as fm
-from .errors import ParseError
+from ...domain.errors import ParseError
 
 BLOCK_ID_PREFIX = "p"
 BLOCK_ID_WIDTH = 4
@@ -125,7 +125,7 @@ def load_meta(raw: str, where: str = "<string>") -> dict:
 
 def decode(data: bytes) -> str:
     """按 UTF-8 解码并统一换行、去 BOM。非 UTF-8 直接报错，不猜编码。"""
-    from .canonical import normalize_text
+    from ...canonical import normalize_text
 
     try:
         text = data.decode("utf-8")

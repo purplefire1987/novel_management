@@ -15,7 +15,7 @@ from novel_management.agents.budget import (
     estimate_tokens,
     measure_item,
 )
-from novel_management.errors import UsageError
+from novel_management.domain.errors import UsageError
 
 
 def test_estimate_tokens_counts_non_space() -> None:

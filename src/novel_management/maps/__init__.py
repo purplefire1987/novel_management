@@ -26,7 +26,7 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..config import ConfigError
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem.paths import ProjectPaths
 
 LAYOUT_NAME = "jiuzhou_layout.yaml"
 MAPS_SUBDIR = ("全局仪表盘", "Maps")  # V1.0 §8：00_作者工作台/全局仪表盘（V4.0 的 `Dashboards`）

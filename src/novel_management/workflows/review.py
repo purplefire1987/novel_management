@@ -35,10 +35,10 @@ from pathlib import Path
 
 from ..audit import AUTHOR, now_iso
 from ..config import read_yaml
-from ..errors import ConflictError, SecurityError, UsageError
-from ..paths import ProjectPaths
+from ..domain.errors import ConflictError, SecurityError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
-from ..storage import dump_yaml, sha256_text, write_text_atomic
+from ..infrastructure.filesystem.storage import dump_yaml, sha256_text, write_text_atomic
 from ..tasks import TaskStore
 from . import dimensions as dim_mod
 
@@ -263,7 +263,7 @@ def deterministic_risk(text: str) -> tuple[str, list[dict]]:
 
 def _body_of(text: str, path: Path) -> str:
     """取正文。解析失败时退回整份文本，并在调用方看来仍是「可检查」的。"""
-    from .. import markdown as md
+    from ..infrastructure.filesystem import markdown as md
 
     try:
         return md.parse(text, str(path)).body

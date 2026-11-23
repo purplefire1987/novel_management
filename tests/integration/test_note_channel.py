@@ -98,7 +98,7 @@ def test_verdict_outside_enum_is_rejected_by_schema(vault_env) -> None:
 def test_reviews_are_not_in_formal_area(vault_env) -> None:
     """08_Reviews 不该进正式区：不是作品内容，也不该被算进签字基线。"""
     from novel_management import config as cfg_mod
-    from novel_management.paths import PUBLISH_TARGETS, ProjectPaths
+    from novel_management.infrastructure.filesystem.paths import PUBLISH_TARGETS, ProjectPaths
 
     vault, runtime = vault_env
     cfg = cfg_mod.load(vault=vault, runtime=runtime, project=PROJECT)

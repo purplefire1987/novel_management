@@ -25,9 +25,9 @@ from pathlib import Path
 
 from ..approvals import Approval, ApprovalFile, ApprovalStore
 from ..audit import AUTHOR
-from ..errors import ApprovalError, SecurityError
-from ..paths import ProjectPaths
-from ..storage import sha256_file
+from ..domain.errors import ApprovalError, SecurityError
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import sha256_file
 from . import review as review_mod
 
 SCOPE_CHAPTER_TEXT = "CHAPTER_TEXT"

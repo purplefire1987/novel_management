@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_management.errors import UsageError
+from novel_management.domain.errors import UsageError
 from novel_management.importing.model import (
     ImportManifest,
     make_locator,

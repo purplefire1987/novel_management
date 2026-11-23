@@ -12,11 +12,11 @@ from .. import config as cfg_mod
 from ..approvals import ApprovalFile
 from ..changes import ChangeStore, IssueStore
 from ..audit import ensure_actor, file_stamp
-from ..errors import SecurityError, UsageError
-from ..indexing.source import skip_dirs_from_layout
+from ..domain.errors import SecurityError, UsageError
+from ..infrastructure.database.indexing.source import skip_dirs_from_layout
 from ..release import describe_result, publish_task
 from ..staging import StagingArea
-from ..storage import sha256_file
+from ..infrastructure.filesystem.storage import sha256_file
 from ..tasks import TASK_TYPES, WRITE_MODES, Task
 from ._common import (
     approval_store,

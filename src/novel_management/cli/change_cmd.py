@@ -30,9 +30,9 @@ from ..changes import (
     IssueStore,
     analyse,
 )
-from ..errors import UsageError
-from ..indexing import connect
-from ..indexing.locate import active_db
+from ..domain.errors import UsageError
+from ..infrastructure.database.indexing import connect
+from ..infrastructure.database.indexing.locate import active_db
 from ._common import heading, info, ok, oplog, project, warn
 
 

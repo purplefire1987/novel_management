@@ -22,7 +22,7 @@ from pathlib import Path
 from ..adapters.mock import MockLLM
 from ..agents.metering import Meter
 from ..audit import AUTHOR, ensure_actor
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from ..validation import closure as closure_mod
 from ..validation import dependencies as dep_mod
 from ..workflows import proposals as prop_mod

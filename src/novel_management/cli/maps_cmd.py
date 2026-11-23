@@ -15,7 +15,7 @@ import argparse
 
 from .. import config as cfg_mod
 from .. import maps
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from ._common import info, ok, project, warn
 
 

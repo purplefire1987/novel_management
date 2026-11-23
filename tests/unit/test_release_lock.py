@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_management.errors import ConflictError, UsageError
+from novel_management.domain.errors import ConflictError, UsageError
 from novel_management.release import lock as lock_mod
 from novel_management.release.lock import PublishLock, boot_id, read_holder
 

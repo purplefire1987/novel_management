@@ -23,9 +23,9 @@ import json
 from pathlib import Path
 
 from .. import config as cfg_mod
-from .. import frontmatter as fm
-from ..errors import UsageError
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem import frontmatter as fm
+from ..domain.errors import UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ._common import fail, heading, info, ok, project, read_meta, warn
 
 # 时间精度取值。`unknown` 是合法的，但它意味着这条事件排不进时间线。

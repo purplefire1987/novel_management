@@ -19,8 +19,8 @@ import json
 from .. import config as cfg_mod
 from ..audit import ensure_actor
 from ..changes import ChangeStore, IssueStore
-from ..errors import ConflictError, SecurityError, UsageError
-from ..indexing.source import skip_dirs_from_layout
+from ..domain.errors import ConflictError, SecurityError, UsageError
+from ..infrastructure.database.indexing.source import skip_dirs_from_layout
 from ..release import (
     PublishLock,
     ReleasePlan,

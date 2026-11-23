@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from .model import MARKDOWN_SUFFIXES, REJECTED_SUFFIXES, TEXT_SUFFIXES, ImportFile
 
 

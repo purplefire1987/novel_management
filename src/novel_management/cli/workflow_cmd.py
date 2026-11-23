@@ -19,7 +19,7 @@ import json
 
 from .. import config as cfg_mod
 from ..config import ConfigError
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from ..workflows import registry
 from ._common import fail, heading, info, ok, warn
 

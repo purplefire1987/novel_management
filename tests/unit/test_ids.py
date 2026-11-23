@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_management.errors import ConflictError, UsageError
+from novel_management.domain.errors import ConflictError, UsageError
 from novel_management.ids import IdAllocator, IdRegistry, is_compound_id, resolve_prefix, split_id
 
 

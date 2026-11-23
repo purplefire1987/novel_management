@@ -13,10 +13,10 @@
 from __future__ import annotations
 
 from ..approvals import Approval
-from ..errors import ApprovalError, ConflictError
-from ..paths import ProjectPaths
+from ..domain.errors import ApprovalError, ConflictError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea, artifact_id_of
-from ..storage import sha256_file
+from ..infrastructure.filesystem.storage import sha256_file
 from ..tasks import Task
 
 CANON_PREFIX = "02_世界知识库"

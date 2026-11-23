@@ -25,17 +25,17 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .. import markdown as md
+from ..infrastructure.filesystem import markdown as md
 from ..canonical import utc_now
 from ..changes import ChangeStore, IssueStore  # noqa: F401 - 类型提示用
-from ..errors import ApprovalError, ConflictError, ParseError, SecurityError, UsageError
+from ..domain.errors import ApprovalError, ConflictError, ParseError, SecurityError, UsageError
 from ..ids import IdRegistry
-from ..indexing import schema as index_schema
-from ..indexing.builder import build_index
-from ..indexing.source import WorktreeSource, skip_dirs_from_layout
-from ..paths import ProjectPaths
+from ..infrastructure.database.indexing import schema as index_schema
+from ..infrastructure.database.indexing.builder import build_index
+from ..infrastructure.database.indexing.source import WorktreeSource, skip_dirs_from_layout
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
-from ..storage import copy_verified, sha256_file, write_atomic
+from ..infrastructure.filesystem.storage import copy_verified, sha256_file, write_atomic
 from ..validation import contract as contract_mod
 from ..version import __version__
 from .gates import CANON_PREFIX, check_approval, check_gates

@@ -30,15 +30,15 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import markdown as md
+from ..infrastructure.filesystem import markdown as md
 from ..adapters.mock import LLMClient
 from ..canonical import utc_now
-from ..errors import UsageError
-from ..indexing import locate as locate_mod
-from ..indexing.search import index_metadata as index_metadata_of
-from ..paths import ProjectPaths
+from ..domain.errors import UsageError
+from ..infrastructure.database.indexing import locate as locate_mod
+from ..infrastructure.database.indexing.search import index_metadata as index_metadata_of
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..schema import check as schema_check
-from ..storage import dump_yaml, sha256_file, write_text_atomic
+from ..infrastructure.filesystem.storage import dump_yaml, sha256_file, write_text_atomic
 from ..version import __version__
 from . import registry, runner, tools
 from .budget import Budget

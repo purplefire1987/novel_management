@@ -23,11 +23,11 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..audit import ensure_actor, now_iso
-from ..errors import ConflictError, UsageError
+from ..domain.errors import ConflictError, UsageError
 from ..ids import IdAllocator, IdRegistry, resolve_prefix
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..schema import SchemaStore, schema_name_for
-from ..storage import dump_yaml, write_text_atomic
+from ..infrastructure.filesystem.storage import dump_yaml, write_text_atomic
 from ._common import fail, heading, info, name_slug, ok, project, read_meta, warn
 
 

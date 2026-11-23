@@ -10,9 +10,9 @@ from __future__ import annotations
 import argparse
 
 from .. import config as cfg_mod
-from ..errors import ConflictError, SecurityError, UsageError
+from ..domain.errors import ConflictError, SecurityError, UsageError
 from ..ids import BAND_LIMITS, MIN_WIDTH, IdAllocator, IdRegistry, resolve_prefix
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ._common import fail, heading, info, ok, warn
 
 

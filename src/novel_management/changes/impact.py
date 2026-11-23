@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..errors import UsageError
+from ..domain.errors import UsageError
 
 PLANNING_PREFIX = "03_故事规划"
 MANUSCRIPT_PREFIX = "04_正文"

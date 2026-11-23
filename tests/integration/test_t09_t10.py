@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 
 from novel_management.cli import main
-from novel_management.storage import sha256_file
+from novel_management.infrastructure.filesystem.storage import sha256_file
 
 # ---------------------------------------------------------------------------
 # 虚构素材
@@ -376,7 +376,7 @@ def test_approve_text_binds_bytes(env, capsys) -> None:
     """批完之后草稿再被改，批准就失效——这是设计。"""
     from novel_management import config as cfg_mod
     from novel_management.approvals import ApprovalStore
-    from novel_management.paths import ProjectPaths
+    from novel_management.infrastructure.filesystem.paths import ProjectPaths
     from novel_management.workflows import text_approval
 
     task = _task(env)

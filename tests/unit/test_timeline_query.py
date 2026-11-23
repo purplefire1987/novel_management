@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 
 from novel_management.cli import main
-from novel_management.indexing import connect
-from novel_management.indexing.locate import active_db
+from novel_management.infrastructure.database.indexing import connect
+from novel_management.infrastructure.database.indexing.locate import active_db
 from novel_management.timeline import (
     AMBIGUOUS,
     DISPUTED,

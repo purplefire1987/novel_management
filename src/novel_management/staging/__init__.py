@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..audit import now_iso
-from ..errors import ConflictError, SecurityError, UsageError
-from ..paths import ProjectPaths
-from ..storage import sha256_bytes, sha256_file, write_atomic, write_new
+from ..domain.errors import ConflictError, SecurityError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import sha256_bytes, sha256_file, write_atomic, write_new
 from ..tasks import Task
 
 MANIFEST_NAME = "manifest.json"

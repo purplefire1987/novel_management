@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from novel_management.cli import main
-from novel_management.storage import sha256_file
+from novel_management.infrastructure.filesystem.storage import sha256_file
 
 TARGET = "03_Manuscripts/Drafts/CH-0001.md"
 

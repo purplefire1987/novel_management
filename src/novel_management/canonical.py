@@ -23,8 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .errors import CanonicalError
-from .storage import sha256_bytes
+from .domain.errors import CanonicalError
+from .infrastructure.filesystem.storage import sha256_bytes
 
 BOM_UTF8 = b"\xef\xbb\xbf"
 BOM_CHAR = "\ufeff"

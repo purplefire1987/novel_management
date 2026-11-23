@@ -27,11 +27,11 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .. import markdown as md
-from ..errors import ConflictError, UsageError
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem import markdown as md
+from ..domain.errors import ConflictError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..ids import IdAllocator
-from ..storage import dump_yaml, read_text, sha256_text, write_text_atomic
+from ..infrastructure.filesystem.storage import dump_yaml, read_text, sha256_text, write_text_atomic
 
 # ---------------------------------------------------------------------------
 # §10.2 的字段表

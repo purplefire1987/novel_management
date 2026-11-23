@@ -19,8 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..errors import UsageError
-from ..paths import ProjectPaths
+from ..domain.errors import UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
 from ..tasks import TaskStore
 from . import dependencies as dep_mod

@@ -21,7 +21,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..errors import UsageError
+from ....domain.errors import UsageError
 
 TRIGRAM_MIN = 3
 DEFAULT_LIMIT = 20

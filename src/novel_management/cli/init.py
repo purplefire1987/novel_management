@@ -10,8 +10,8 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..audit import now_iso
-from ..errors import UsageError
-from ..storage import write_atomic
+from ..domain.errors import UsageError
+from ..infrastructure.filesystem.storage import write_atomic
 from ._common import fail, heading, info, ok, read_frontmatter, slugify, warn
 
 VAULT_CONFIG = """\

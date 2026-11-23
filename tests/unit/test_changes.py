@@ -18,7 +18,7 @@ from novel_management.changes import (
     IssueStore,
     RETCON,
 )
-from novel_management.errors import ApprovalError, UsageError
+from novel_management.domain.errors import ApprovalError, UsageError
 
 
 def _issues(tmp_path: Path) -> IssueStore:
@@ -168,7 +168,7 @@ def _index_conn():
     """
     import sqlite3
 
-    from novel_management.indexing.schema import create_schema
+    from novel_management.infrastructure.database.indexing.schema import create_schema
 
     conn = sqlite3.connect(":memory:")
     create_schema(conn)

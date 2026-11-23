@@ -17,7 +17,7 @@ import argparse
 from ..agents import preflight as pf
 from ..agents.budget import Budget
 from ..agents.metering import Meter, usage_path
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from . import _common as common
 
 

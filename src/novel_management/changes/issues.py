@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..audit import now_iso
-from ..errors import ApprovalError, UsageError
-from ..storage import write_atomic
+from ..domain.errors import ApprovalError, UsageError
+from ..infrastructure.filesystem.storage import write_atomic
 
 BLOCKER = "BLOCKER"
 NON_BLOCKING = "NON_BLOCKING"

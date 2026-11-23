@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from ..errors import ConflictError
+from ....domain.errors import ConflictError
 
 CHUNK = 1 << 20
 

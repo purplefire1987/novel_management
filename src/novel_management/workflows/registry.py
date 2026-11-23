@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 
 from ..config import ConfigError
-from ..errors import UsageError
+from ..domain.errors import UsageError
 
 CATALOG_NAME = "catalog.yaml"
 

@@ -32,9 +32,9 @@ import yaml
 
 from .. import schema as schema_mod
 from ..audit import now_iso
-from ..errors import ConflictError, UsageError
-from ..paths import ProjectPaths
-from ..storage import write_new
+from ..domain.errors import ConflictError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import write_new
 
 # kind → 08_Reviews 下的子目录。目录名与库里现存的分类一致，不另造一套。
 KIND_DIRS: dict[str, tuple[str, ...]] = {

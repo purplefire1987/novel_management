@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 from novel_management import config as cfg_mod
-from novel_management.errors import SecurityError
-from novel_management.paths import ProjectPaths
+from novel_management.domain.errors import SecurityError
+from novel_management.infrastructure.filesystem.paths import ProjectPaths
 from novel_management.release.model import Change
 from novel_management.validation import contract
 

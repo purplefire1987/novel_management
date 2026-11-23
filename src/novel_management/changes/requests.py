@@ -29,9 +29,9 @@ from pathlib import Path
 
 from ..audit import now_iso
 from ..canonical import package_hash
-from ..errors import ApprovalError, UsageError
+from ..domain.errors import ApprovalError, UsageError
 from ..staging import artifact_id_of
-from ..storage import write_atomic
+from ..infrastructure.filesystem.storage import write_atomic
 
 PLAN_CHANGE = "PLAN_CHANGE"
 STATE_CHANGE = "STATE_CHANGE"

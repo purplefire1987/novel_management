@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .canonical import canonical_json, parse_iso
-from .errors import SchemaError
+from .domain.errors import SchemaError
 
 SCHEMA_SUFFIX = ".schema.json"
 DEFAULT_ROOTS = (

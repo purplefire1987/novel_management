@@ -28,8 +28,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..errors import ConflictError, UsageError
-from ..storage import sha256_file, write_atomic, write_new
+from ..domain.errors import ConflictError, UsageError
+from ..infrastructure.filesystem.storage import sha256_file, write_atomic, write_new
 from .model import (
     ActivePointer,
     Journal,

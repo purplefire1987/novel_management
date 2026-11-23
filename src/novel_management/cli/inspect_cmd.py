@@ -20,11 +20,11 @@ from .. import ids as ids_mod
 from ..approvals import ApprovalStore
 from ..audit import OperationLog
 from ..baseline import AuthorBaseline
-from ..backup import BackupStore
-from ..errors import UsageError
-from ..paths import ProjectPaths
+from ..infrastructure.backup import BackupStore
+from ..domain.errors import UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
-from ..storage import human_size, sha256_file
+from ..infrastructure.filesystem.storage import human_size, sha256_file
 from ..tasks import TASK_STATUSES, TaskStore
 from ._common import fail, heading, info, ok, project, read_frontmatter, task_store, warn
 
@@ -59,7 +59,7 @@ def cmd_doctor(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     try:
         import sqlite3
 
-        from ..indexing import detect_fts
+        from ..infrastructure.database.indexing import detect_fts
 
         conn = sqlite3.connect(":memory:")
         try:
@@ -166,8 +166,8 @@ def cmd_status(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
     print(f"  Runtime: {cfg.runtime or '(未配置)'}")
     if cfg.runtime:
-        from ..indexing import locate
-        from ..errors import UsageError
+        from ..infrastructure.database.indexing import locate
+        from ..domain.errors import UsageError
 
         try:
             db = locate.active_db(cfg.runtime)
@@ -356,7 +356,7 @@ def cmd_validate(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         # 但「归档目录里引用了同一个 ID」与「正式区里两份档案抢同一个 ID」不是一回事：
         # 前者是历史事实，后者会让「按 ID 取对象」产生歧义。所以分开报——
         # 正式区内的冲突算失败，牵连到归档的只算警告。
-        from ..storage import iter_files as _iter_files
+        from ..infrastructure.filesystem.storage import iter_files as _iter_files
 
         def _formal(path: Path) -> bool:
             try:

@@ -21,9 +21,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ..errors import ConflictError, UsageError
-from ..paths import ProjectPaths
-from ..storage import sha256_bytes, sha256_file
+from ..domain.errors import ConflictError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import sha256_bytes, sha256_file
 from .model import Change, ManifestFile, ReleasePlan
 
 # 不进快照的目录名：运行态、提案区、审阅意见、废弃旧版、编辑器缓存。

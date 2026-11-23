@@ -29,7 +29,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..errors import UsageError
+from ..domain.errors import UsageError
 
 # 默认值按「一部中文长篇的一章」量级取：一章 6000–9000 字，
 # 加资料包与输出，32k 的窗口是当前的保守假设。改这里等于改预算策略。

@@ -323,7 +323,7 @@ def test_14_3_registry_matches_documented_matrix() -> None:
 def test_14_3_no_role_may_write_canon_or_publish() -> None:
     """执行层硬拦：不是「提示词说了」，是调用就抛。"""
     from novel_management.agents import registry
-    from novel_management.errors import SecurityError
+    from novel_management.domain.errors import SecurityError
 
     for role in registry.ROLES:
         assert role.canon_write is False

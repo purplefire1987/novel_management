@@ -152,7 +152,7 @@ _BY_ID = {item.id: item for item in REVIEW_DIMENSIONS}
 
 
 def get(dimension_id: str) -> Dimension:
-    from ..errors import UsageError
+    from ..domain.errors import UsageError
 
     key = (dimension_id or "").strip()
     if key not in _BY_ID:

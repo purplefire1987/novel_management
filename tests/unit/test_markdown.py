@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from novel_management import markdown as md
-from novel_management.errors import ParseError
+from novel_management.infrastructure.filesystem import markdown as md
+from novel_management.domain.errors import ParseError
 
 DOC = """\
 ---

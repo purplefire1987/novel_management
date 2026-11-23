@@ -22,7 +22,7 @@ from ..agents.budget import (
     DEFAULT_HARD_RESERVE,
     DEFAULT_OUTPUT_RESERVE,
 )
-from ..errors import NovelError
+from ..domain.errors import NovelError
 from ..tasks import TASK_STATUSES, TASK_TYPES
 from . import (
     agent_cmd,

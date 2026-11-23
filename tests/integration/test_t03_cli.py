@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from novel_management.cli import main
-from novel_management.storage import sha256_file
+from novel_management.infrastructure.filesystem.storage import sha256_file
 
 CHAR = """\
 ---

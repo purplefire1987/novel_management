@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Protocol
 
-from ..errors import UsageError
+from ....domain.errors import UsageError
 
 # 项目内不索引的三个目录：Agent 提案区、审阅意见、已废弃旧版。
 # 它们都不是「当前事实」，进索引会让 `search` 返回一堆不该被当作依据的内容。

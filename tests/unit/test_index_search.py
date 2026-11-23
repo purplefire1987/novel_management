@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 from novel_management.cli import main
-from novel_management.indexing import WorktreeSource, build_index, connect, search
-from novel_management.indexing.search import MODE_FTS, MODE_ID, MODE_LIKE, MODE_NAME
+from novel_management.infrastructure.database.indexing import WorktreeSource, build_index, connect, search
+from novel_management.infrastructure.database.indexing.search import MODE_FTS, MODE_ID, MODE_LIKE, MODE_NAME
 
 CHAR1 = """\
 ---
@@ -168,7 +168,7 @@ def test_limit_is_respected(index: Path) -> None:
 
 
 def test_empty_query_is_usage_error(index: Path) -> None:
-    from novel_management.errors import UsageError
+    from novel_management.domain.errors import UsageError
 
     with pytest.raises(UsageError):
         _search(index, "   ")

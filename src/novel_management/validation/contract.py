@@ -37,11 +37,11 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from .. import markdown as md
+from ..infrastructure.filesystem import markdown as md
 from .. import schema as schema_mod
 from ..ids import split_id
-from ..paths import ProjectPaths
-from ..storage import sha256_file
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import sha256_file
 
 BLOCKER = "BLOCKER"
 WARN = "WARN"
@@ -109,7 +109,7 @@ class Report:
     def raise_if_blocked(self) -> None:
         if not self.blockers:
             return
-        from ..errors import SecurityError
+        from ..domain.errors import SecurityError
 
         detail = "；".join(f"[{i.code}] {i.message}" for i in self.blockers[:5])
         more = f"（共 {len(self.blockers)} 项）" if len(self.blockers) > 5 else ""

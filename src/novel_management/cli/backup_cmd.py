@@ -6,9 +6,9 @@ import argparse
 
 from .. import config as cfg_mod
 from ..audit import ensure_actor
-from ..backup import DEFAULT_KEEP, BackupStore
-from ..errors import UsageError
-from ..storage import human_size
+from ..infrastructure.backup import DEFAULT_KEEP, BackupStore
+from ..domain.errors import UsageError
+from ..infrastructure.filesystem.storage import human_size
 from ._common import backup_store, fail, info, ok, oplog, warn
 
 

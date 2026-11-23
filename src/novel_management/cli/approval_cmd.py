@@ -38,9 +38,9 @@ from ..approvals import ApprovalFile
 from ..audit import ensure_actor
 from ..canonical import package_hash
 from ..changes import IssueStore, ChangeStore
-from ..errors import ApprovalError, UsageError
+from ..domain.errors import ApprovalError, UsageError
 from ..staging import StagedFile, StagingArea, artifact_id_of
-from ..storage import sha256_file
+from ..infrastructure.filesystem.storage import sha256_file
 from ..tasks import is_task_id
 from ._common import approval_store, heading, info, ok, oplog, project, task_store, warn
 

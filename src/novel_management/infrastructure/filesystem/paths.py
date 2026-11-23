@@ -8,8 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import config as cfg_mod
-from .errors import SecurityError, UsageError
+from ... import config as cfg_mod
+from ...domain.errors import SecurityError, UsageError
 
 # V1.0 §8 的 16 类知识库分类（+ 时间线，共 17 个目录）。
 # 分类依据是 frontmatter 的 `type`，不是原目录——旧结构里 World/ 装了 336 份物品、

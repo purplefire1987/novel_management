@@ -21,9 +21,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .. import markdown as md
-from ..errors import ParseError
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem import markdown as md
+from ..domain.errors import ParseError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from .model import Chapter
 
 ID_RE = re.compile(r"\b(?P<id>[A-Z]{2,10}-[0-9]{3,6})\b")

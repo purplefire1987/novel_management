@@ -30,11 +30,11 @@ from ..agents import preflight as pf
 from ..agents import runner
 from ..agents.metering import Meter
 from ..adapters.mock import LLMClient
-from ..errors import ConflictError, SecurityError, UsageError
-from ..paths import ProjectPaths
+from ..domain.errors import ConflictError, SecurityError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
 from ..tasks import TaskStore
-from ..storage import dump_yaml, sha256_text
+from ..infrastructure.filesystem.storage import dump_yaml, sha256_text
 from . import plan as plan_mod
 
 DRAFTS_SUBDIR = "初稿"  # V1.0 §8：04_正文/初稿

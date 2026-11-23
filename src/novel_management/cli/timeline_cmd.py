@@ -14,8 +14,8 @@ import argparse
 import json
 
 from .. import config as cfg_mod
-from ..indexing import connect, index_metadata
-from ..indexing.locate import active_db
+from ..infrastructure.database.indexing import connect, index_metadata
+from ..infrastructure.database.indexing.locate import active_db
 from ..timeline import (
     MODE_AFTER,
     MODE_BEFORE,

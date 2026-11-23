@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 from .. import config as cfg_mod
-from ..errors import UsageError
-from ..indexing.locate import active_db, index_dir, manifest_path, pointer_path
-from ..indexing import (
+from ..domain.errors import UsageError
+from ..infrastructure.database.indexing.locate import active_db, index_dir, manifest_path, pointer_path
+from ..infrastructure.database.indexing import (
     EMPTY_TABLES,
     GitRevisionSource,
     WorktreeSource,
@@ -20,7 +20,7 @@ from ..indexing import (
     is_dirty,
     search,
 )
-from ..indexing.source import skip_dirs_from_layout
+from ..infrastructure.database.indexing.source import skip_dirs_from_layout
 from ._common import fail, heading, info, ok, warn
 
 def _pick_source(vault: Path, revision: str | None, skip_dirs: tuple[str, ...]):

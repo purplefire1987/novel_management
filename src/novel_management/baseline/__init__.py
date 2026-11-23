@@ -11,9 +11,9 @@ from datetime import datetime
 from pathlib import Path
 
 from ..audit import AUTHOR, now_iso
-from ..errors import SecurityError
-from ..paths import ProjectPaths
-from ..storage import iter_files, sha256_file, write_atomic
+from ..domain.errors import SecurityError
+from ..infrastructure.filesystem.paths import ProjectPaths
+from ..infrastructure.filesystem.storage import iter_files, sha256_file, write_atomic
 
 SCAN_SUFFIXES = {".md", ".markdown", ".yaml", ".yml", ".json", ".txt", ".csv"}
 

@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from novel_management import canonical as c
-from novel_management.errors import CanonicalError
+from novel_management.domain.errors import CanonicalError
 
 
 # ---- 字节规范化 ----------------------------------------------------------

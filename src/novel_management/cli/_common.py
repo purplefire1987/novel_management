@@ -7,13 +7,13 @@ import re
 from pathlib import Path
 
 from .. import config as cfg_mod
-from .. import frontmatter as fm
+from ..infrastructure.filesystem import frontmatter as fm
 from ..approvals import ApprovalStore
 from ..audit import OperationLog
-from ..backup import BackupStore
+from ..infrastructure.backup import BackupStore
 from ..baseline import AuthorBaseline
-from ..errors import NovelError, SecurityError, UsageError
-from ..paths import ProjectPaths
+from ..domain.errors import NovelError, SecurityError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..tasks import TaskStore
 
 
@@ -74,7 +74,7 @@ def read_meta(path: Path) -> dict:
     列表还是字符串）。两者混用会出两种错：拿快的那个去判结构 = 满屏假失败；
     拿全的那个去扫全库 = 慢到没人愿意跑。
     """
-    from .. import markdown as md
+    from ..infrastructure.filesystem import markdown as md
 
     try:
         return md.parse_bytes(path.read_bytes()).meta

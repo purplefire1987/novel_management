@@ -9,7 +9,7 @@ import pytest
 
 from novel_management.adapters.mock import MockLLM
 from novel_management.agents import prompts, registry, runner
-from novel_management.errors import UsageError
+from novel_management.domain.errors import UsageError
 
 
 def test_nine_required_sections_present() -> None:

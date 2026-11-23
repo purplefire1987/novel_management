@@ -26,7 +26,7 @@ from novel_management.agents import preflight as pf
 from novel_management.agents.budget import Budget
 from novel_management.agents.metering import Meter
 from novel_management.cli import main
-from novel_management.paths import ProjectPaths
+from novel_management.infrastructure.filesystem.paths import ProjectPaths
 from novel_management.schema import check as schema_check
 
 PLAN_ONE = """\

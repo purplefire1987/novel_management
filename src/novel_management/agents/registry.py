@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..errors import SecurityError, UsageError
+from ..domain.errors import SecurityError, UsageError
 
 # ---- 读范围 ----
 SCOPE_ALL = ""            # 全库 Canon 可读

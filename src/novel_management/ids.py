@@ -29,9 +29,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import frontmatter as fm
-from .errors import ConflictError, UsageError
-from .storage import iter_files
+from .infrastructure.filesystem import frontmatter as fm
+from .domain.errors import ConflictError, UsageError
+from .infrastructure.filesystem.storage import iter_files
 
 MIN_WIDTH = 6
 MAX_WIDTH = 6

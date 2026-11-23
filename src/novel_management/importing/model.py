@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..errors import UsageError
+from ..domain.errors import UsageError
 
 LOCATOR_RE = re.compile(r"^(?P<file>[^#\s][^#]*)#L(?P<start>\d+)(?:-L(?P<end>\d+))?$")
 

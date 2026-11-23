@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from ..storage import write_text_atomic
+from ..infrastructure.filesystem.storage import write_text_atomic
 
 OP_MODEL = "model"
 OP_TOOL = "tool"

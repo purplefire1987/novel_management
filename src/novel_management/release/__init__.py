@@ -23,8 +23,8 @@ from pathlib import Path
 
 from ..audit import now_iso
 from ..baseline import AuthorBaseline
-from ..errors import ApprovalError, ConflictError, SecurityError, UsageError
-from ..paths import ProjectPaths
+from ..domain.errors import ApprovalError, ConflictError, SecurityError, UsageError
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
 from ..tasks import TaskStore
 from .engine import (

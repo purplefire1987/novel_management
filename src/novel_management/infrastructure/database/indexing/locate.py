@@ -35,7 +35,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..errors import UsageError
+from ....domain.errors import UsageError
 
 POINTER_NAME = "active.json"
 MANIFEST_NAME = "index.json"

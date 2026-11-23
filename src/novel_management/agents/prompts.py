@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from . import registry
 from .budget import estimate_tokens
 from .tools import allowed_tools

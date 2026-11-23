@@ -21,11 +21,11 @@ from pathlib import Path
 
 from .. import config as cfg_mod
 from ..audit import ensure_actor
-from ..errors import UsageError
+from ..domain.errors import UsageError
 from ..importing import ImportStore, run_scan, stage_batch
 from ..importing.model import read_locator
 from ..importing.report import plan_batches
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ._common import fail, heading, info, ok, oplog, project, task_store, warn
 
 

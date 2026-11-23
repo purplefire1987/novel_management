@@ -10,8 +10,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..errors import ConflictError, UsageError
-from ..storage import dump_yaml, write_atomic
+from ..domain.errors import ConflictError, UsageError
+from ..infrastructure.filesystem.storage import dump_yaml, write_atomic
 
 # V1.0 §9.2 的前缀是 `task_`（小写、下划线、六位）。
 #

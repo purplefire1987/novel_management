@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .. import canonical
 from .. import config as cfg_mod
-from ..errors import CanonicalError, SchemaError, UsageError
+from ..domain.errors import CanonicalError, SchemaError, UsageError
 from ..schema import SchemaStore
 from ._common import fail, heading, info, ok, warn
 

@@ -32,13 +32,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .. import markdown as md
-from ..errors import ConflictError, SecurityError, UsageError
-from ..indexing import locate as locate_mod
-from ..indexing.search import connect as index_connect
-from ..indexing.search import index_metadata as index_metadata_of
-from ..indexing.search import search as index_search
-from ..paths import ProjectPaths
+from ..infrastructure.filesystem import markdown as md
+from ..domain.errors import ConflictError, SecurityError, UsageError
+from ..infrastructure.database.indexing import locate as locate_mod
+from ..infrastructure.database.indexing.search import connect as index_connect
+from ..infrastructure.database.indexing.search import index_metadata as index_metadata_of
+from ..infrastructure.database.indexing.search import search as index_search
+from ..infrastructure.filesystem.paths import ProjectPaths
 from ..timeline import query as timeline_query
 from ..timeline.query import MODE_AFTER, MODE_BEFORE
 from . import registry

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from novel_management.agents import registry, tools
-from novel_management.errors import SecurityError, UsageError
+from novel_management.domain.errors import SecurityError, UsageError
 
 ROOT = Path(__file__).resolve().parents[2]
 PERMISSIONS = ROOT / "agents" / "common" / "permissions.md"
