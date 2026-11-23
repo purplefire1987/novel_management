@@ -20,7 +20,7 @@ import logging
 
 import pytest
 
-from novel_management.logs import RedactingFormatter, redact
+from novel_management.audit.logs import RedactingFormatter, redact
 
 # 运行时拼接：源码里看到的都是碎片，扫描器不会命中。
 FAKE_SK = "sk-" + "a1b2c3d4e5f6g7h8i9j0k1l2"

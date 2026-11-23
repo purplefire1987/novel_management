@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 
 from .. import config as cfg_mod
-from .. import maps
+from novel_management.adapters import maps
 from ..domain.errors import UsageError
 from ._common import info, ok, project, warn
 
@@ -38,7 +38,7 @@ def cmd_maps(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
         return 0
 
     # 延迟导入：这两个模块带模块级可变状态，导入即要求先 configure。
-    from ..maps import admin, jiuzhou
+    from novel_management.adapters.maps import admin, jiuzhou
 
     paths = _configured(cfg, args)
     dry = not getattr(args, "confirm", False)

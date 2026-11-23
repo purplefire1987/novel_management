@@ -24,9 +24,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import config as cfg_mod
-from ..config import ConfigError
-from ..infrastructure.filesystem.paths import ProjectPaths
+from novel_management import config as cfg_mod
+from novel_management.config import ConfigError
+from novel_management.infrastructure.filesystem.paths import ProjectPaths
 
 LAYOUT_NAME = "jiuzhou_layout.yaml"
 MAPS_SUBDIR = ("全局仪表盘", "Maps")  # V1.0 §8：00_作者工作台/全局仪表盘（V4.0 的 `Dashboards`）

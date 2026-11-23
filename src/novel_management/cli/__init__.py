@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from .. import config as cfg_mod
-from .. import logs
+from novel_management.audit import logs
 from ..agents.budget import (
     DEFAULT_CONTEXT_LIMIT,
     DEFAULT_HARD_RESERVE,

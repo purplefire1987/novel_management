@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_management import logs
+from novel_management.audit import logs
 
 
 @pytest.fixture(autouse=True)
