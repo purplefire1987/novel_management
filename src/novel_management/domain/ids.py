@@ -243,6 +243,12 @@ def legacy_form(raw: str) -> str | None:
 
     分出代际是为了让报错能说清「这是上一轮迁移漏的」还是「这是更早的历史」
     ——两者的处置完全不同：前者是 bug，后者是要不要动的取舍。
+
+    **V4.0 形态必须校验前缀是不是真的前缀**。`V4_SEQ_RE` 只认形状，
+    而 `LORE-20261103-223926`、`ASSETS-20261103-224145` 这类**日期戳文件名**
+    形状完全一样。库里 `09_版本与变更记录` 就有 6 份这样的日志：不校验前缀，
+    它们会被报成「6 份旧 ID 未迁移」，而实际上那里一个字都不用改。
+    报假不符比漏报更消耗人——作者会去翻根本不存在的问题。
     """
     text = (raw or "").strip()
     if not text or split_id(text):
@@ -250,7 +256,9 @@ def legacy_form(raw: str) -> str | None:
     if V1_SEQ_RE.match(text):
         return "v1_seq"
     if V4_SEQ_RE.match(text):
-        return "v4_seq"
+        head = text.split("-")[0]
+        if head in PREFIXES or head in LEGACY_PREFIXES:
+            return "v4_seq"
     return None
 
 
@@ -505,6 +513,8 @@ class IdAllocator:
         self.actor = actor or "unknown"
         self.lock_timeout = lock_timeout
         self.areas = areas
+        # 本实例「以为释放了、其实没删掉」的锁。见 `_acquire` 里的说明。
+        self._unreleased: set[Path] = set()
 
     # ---- 锁 ----------------------------------------------------------
     def _lock_path(self) -> Path:
@@ -550,6 +560,17 @@ class IdAllocator:
             try:
                 fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
             except FileExistsError:
+                # 自己上一轮没删掉的锁：直接认领，不再等超时。
+                #
+                # 这不是为绕开某个环境——`_release` 的注释里写着「留下的锁里记着
+                # 自己的 pid，本进程退出后 `_holder_state` 会认出它已死，下次发号
+                # 自动接管」。那句话只覆盖**进程退出之后**，漏掉了**同一个进程内**：
+                # 只要 unlink 失败一次（权限、文件系统只读、被杀毒软件占用），
+                # 这个进程后面每一次发号都会撞上自己留下的锁，而 pid 还活着，
+                # 于是 `_holder_state` 判定「另一个进程在用」，一直等到超时报冲突。
+                # 实测就是两条测试挂在这里，报错信息还指向自己，很难看出是自锁。
+                if path in self._unreleased:
+                    return path
                 holder, dead = self._holder_state(path)
                 # 陈旧锁自动接管：进程已经不在，锁上的审计行谁都写不进去。
                 # 只接管一次，且必须确认 pid 已死——避免「两个进程互相判定对方陈旧」。
@@ -581,10 +602,12 @@ class IdAllocator:
     def _release(self, path: Path) -> None:
         try:
             path.unlink()
+            self._unreleased.discard(path)
         except OSError:
-            # 锁删不掉不该让已成功的分配变成失败。留下的锁里记着自己的 pid，
-            # 本进程退出后 `_holder_state` 会认出它已死，下次发号自动接管。
-            pass
+            # 锁删不掉不该让已成功的分配变成失败——号已经发出去并记了审计。
+            # 记进 `_unreleased`，本进程下一次 `_acquire` 会认领它；
+            # 本进程退出后 `_holder_state` 会认出 pid 已死，届时自动接管。
+            self._unreleased.add(path)
 
     # ---- 分配 --------------------------------------------------------
     def allocate(

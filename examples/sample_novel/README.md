@@ -29,8 +29,8 @@
 # 直接把整篇文件丢给 load_meta 会报「found another document」。
 python3 - <<'PY'
 from pathlib import Path
-from novel_system import frontmatter, markdown
-from novel_system.schema import SchemaStore
+from novel_management import frontmatter, markdown
+from novel_management.schema import SchemaStore
 store = SchemaStore(Path("schemas"))
 cases = [
     ("entity", "examples/sample_novel/02_世界知识库/人物与角色/ent_000001_林砚.md"),

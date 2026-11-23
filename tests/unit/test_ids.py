@@ -119,6 +119,23 @@ def test_legacy_form_tells_which_generation() -> None:
     assert legacy_form("") is None
 
 
+def test_legacy_form_ignores_datestamp_filenames() -> None:
+    """日期戳文件名与 V4.0 旧号形状相同，但不是 ID。
+
+    库里 `09_版本与变更记录` 有 `LORE-20261103-223926` 这类日志。不校验前缀的话，
+    它们会被报成「6 份旧 ID 未迁移」——作者要挨个打开确认「这个不用改」。
+    **报假不符比漏报更消耗人**：前者花的是逐条复核的时间，后者只要一次全量扫描。
+    """
+    for name in (
+        "ASSETS-20261103-224145",
+        "INGEST-20261104-144536",
+        "LORE-20261103-223926",
+        "OUTLINE-20261104-0044",
+        "RACE-20261108",
+    ):
+        assert legacy_form(name) is None, name
+
+
 def test_compound_detection() -> None:
     """复合号识别的是 V4.0 旧形态，与「不是 ID」是两回事。
 
@@ -417,15 +434,19 @@ def test_allocate_count(vault: Path, runtime: Path) -> None:
 def test_two_allocations_never_repeat(vault: Path, runtime: Path) -> None:
     """同一前缀连发两次，第二次不能给出第一次的值。
 
-    这是旧形态「删档后回填空号」那条测试在 V1.3 的对应物：序号会被复用，
+    这是旧形态「删档后回填空号」那条测试在 V1.3 的对应物：序号会复用，
     ULID 不会——但**「不会」是要被测的**，不能靠「随机数应该足够大」的直觉。
-    顺带把「删掉其中一份再发号」也走一遍，因为那正是旧实现翻车的现场。
+
+    原来这条还会「删掉其中一份再发号」，靠删文件模拟删档。现在去掉了：
+    ULID 的复用与否跟库里有没有那份文件无关（不读最大号），所以删不删都
+    测不出新东西；而删文件会让这条测试在禁止删除的环境里直接报 PermissionError，
+    那时看到的是「测试坏了」而不是「行为变了」——两种错误长得一样最费时间。
     """
     alloc = IdAllocator(vault, runtime, actor="test", lock_timeout=0.5)
     first = alloc.allocate("ENT", count=2)
-    (vault / "01_小说项目" / "novel-001_p1" / "02_世界知识库" / "人物与角色" / f"{uid('ENT', 2)}_乙.md").unlink()
     second = alloc.allocate("ENT", count=2)
     assert not set(first) & set(second)
+    assert len(set(first) | set(second)) == 4
 
 
 def test_allocate_records_audit_line(vault: Path, runtime: Path) -> None:
