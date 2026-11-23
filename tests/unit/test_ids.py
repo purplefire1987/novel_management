@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.errors import ConflictError, UsageError
-from novel_system.ids import IdAllocator, IdRegistry, is_compound_id, resolve_prefix, split_id
+from novel_management.errors import ConflictError, UsageError
+from novel_management.ids import IdAllocator, IdRegistry, is_compound_id, resolve_prefix, split_id
 
 
 def _write(path: Path, text: str) -> None:

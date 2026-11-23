@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
+from novel_management.cli import main
 
 
 def _write(path: Path, front: str, body: str = "占位。") -> None:

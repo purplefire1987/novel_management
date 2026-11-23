@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import pytest
 
-from novel_system.agents.budget import (
+from novel_management.agents.budget import (
     Budget,
     estimate_tokens,
     measure_item,
 )
-from novel_system.errors import UsageError
+from novel_management.errors import UsageError
 
 
 def test_estimate_tokens_counts_non_space() -> None:

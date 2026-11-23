@@ -20,14 +20,14 @@ from pathlib import Path
 import pytest
 import yaml
 
-from novel_system import config as cfg_mod
-from novel_system.adapters.mock import MockLLM
-from novel_system.agents import preflight as pf
-from novel_system.agents.budget import Budget
-from novel_system.agents.metering import Meter
-from novel_system.cli import main
-from novel_system.paths import ProjectPaths
-from novel_system.schema import check as schema_check
+from novel_management import config as cfg_mod
+from novel_management.adapters.mock import MockLLM
+from novel_management.agents import preflight as pf
+from novel_management.agents.budget import Budget
+from novel_management.agents.metering import Meter
+from novel_management.cli import main
+from novel_management.paths import ProjectPaths
+from novel_management.schema import check as schema_check
 
 PLAN_ONE = """\
 ---

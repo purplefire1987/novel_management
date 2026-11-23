@@ -38,7 +38,7 @@ python3 scripts/privacy_scan.py --repo .   # 隐私扫描
 1. `pytest` 全绿；
 2. `python3 scripts/selfcheck.py` 全绿；
 3. `python3 scripts/privacy_scan.py --repo .` 退出码 0；
-4. `python3 -m novel_system validate --vault <临时 Vault>` 通过。
+4. `python3 -m novel_management validate --vault <临时 Vault>` 通过。
 
 数据安全相关的改动（`storage/`、`release/`、`approvals/`、`paths.py`）必须同时补测试，
 并且测试要能**先失败再通过**——只加一条跟着实现走的断言不算。

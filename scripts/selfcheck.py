@@ -25,8 +25,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from novel_system.cli import main  # noqa: E402
-from novel_system.storage import sha256_file  # noqa: E402
+from novel_management.cli import main  # noqa: E402
+from novel_management.storage import sha256_file  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
 

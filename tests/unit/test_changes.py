@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.changes import (
+from novel_management.changes import (
     BLOCKER,
     NON_BLOCKING,
     APPROVED,
@@ -18,7 +18,7 @@ from novel_system.changes import (
     IssueStore,
     RETCON,
 )
-from novel_system.errors import ApprovalError, UsageError
+from novel_management.errors import ApprovalError, UsageError
 
 
 def _issues(tmp_path: Path) -> IssueStore:
@@ -168,7 +168,7 @@ def _index_conn():
     """
     import sqlite3
 
-    from novel_system.indexing.schema import create_schema
+    from novel_management.indexing.schema import create_schema
 
     conn = sqlite3.connect(":memory:")
     create_schema(conn)
@@ -203,7 +203,7 @@ def _entity(conn, entity_id: str, name: str, aliases: list[str]) -> None:
 
 def test_impact_finds_chapter_by_character_name():
     """正文只写人名、不写 ID 时，仍然要认出这一章受影响。"""
-    from novel_system.changes.impact import analyse
+    from novel_management.changes.impact import analyse
 
     conn = _index_conn()
     _entity(conn, "CHAR-0001", "张三", ["老张"])
@@ -217,7 +217,7 @@ def test_impact_finds_chapter_by_character_name():
 
 
 def test_impact_matches_alias_too():
-    from novel_system.changes.impact import analyse
+    from novel_management.changes.impact import analyse
 
     conn = _index_conn()
     _entity(conn, "CHAR-0001", "张三", ["老张"])
@@ -231,7 +231,7 @@ def test_impact_matches_alias_too():
 
 def test_impact_ignores_single_char_names():
     """单字名会命中一切，宁可不匹配也不能把全书报成受影响。"""
-    from novel_system.changes.impact import analyse
+    from novel_management.changes.impact import analyse
 
     conn = _index_conn()
     _entity(conn, "CHAR-0009", "砚", [])
@@ -245,7 +245,7 @@ def test_impact_ignores_single_char_names():
 
 def test_impact_treats_like_wildcards_as_literal():
     """名字里带 `%` 时不能当成通配符——那会把整库都算成受影响。"""
-    from novel_system.changes.impact import analyse
+    from novel_management.changes.impact import analyse
 
     conn = _index_conn()
     _entity(conn, "CHAR-0010", "百%胜", [])
@@ -257,7 +257,7 @@ def test_impact_treats_like_wildcards_as_literal():
 
 
 def test_impact_splits_planning_from_chapters():
-    from novel_system.changes.impact import analyse
+    from novel_management.changes.impact import analyse
 
     conn = _index_conn()
     _entity(conn, "CHAR-0001", "张三", [])

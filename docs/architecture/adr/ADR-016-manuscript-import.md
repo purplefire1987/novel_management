@@ -118,7 +118,7 @@ Schema 里 `additionalProperties: false`，顺手加个 `ok: true` 会被校验�
 
 ## 影响
 
-- 新增 `src/novel_system/importing/`（model / scanner / preserve / parser / extract /
+- 新增 `src/novel_management/importing/`（model / scanner / preserve / parser / extract /
   sampling / report）与 `cli/import_cmd.py`；命令行 27 → **28 条**（新增 `import`，
   含 `scan`/`report`/`stage`/`where`/`list` 五个子命令）。
 - `schemas/import_manifest.schema.json` 的 `files.items` 补上

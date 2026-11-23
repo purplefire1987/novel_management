@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import config as cfg_mod
-from novel_system.cli import main
+from novel_management import config as cfg_mod
+from novel_management.cli import main
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -300,7 +300,7 @@ def test_14_3_registry_matches_documented_matrix() -> None:
     """
     import re
 
-    from novel_system.agents import registry
+    from novel_management.agents import registry
 
     documented: dict[str, tuple[str, ...]] = {}
     text = (ROOT / "agents" / "common" / "permissions.md").read_text(encoding="utf-8")
@@ -322,8 +322,8 @@ def test_14_3_registry_matches_documented_matrix() -> None:
 
 def test_14_3_no_role_may_write_canon_or_publish() -> None:
     """执行层硬拦：不是「提示词说了」，是调用就抛。"""
-    from novel_system.agents import registry
-    from novel_system.errors import SecurityError
+    from novel_management.agents import registry
+    from novel_management.errors import SecurityError
 
     for role in registry.ROLES:
         assert role.canon_write is False
@@ -336,7 +336,7 @@ def test_14_3_no_role_may_write_canon_or_publish() -> None:
 
 def test_14_3_each_role_has_prompt_with_common_prefix() -> None:
     """PRD §6.4：九种职责各一份提示词，公共前缀九项齐全。"""
-    from novel_system.agents import prompts, registry
+    from novel_management.agents import prompts, registry
 
     for role_id in registry.ROLE_IDS:
         prompt = prompts.build(role_id)

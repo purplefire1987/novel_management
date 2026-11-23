@@ -93,7 +93,7 @@ return jiuzhou.main(argv)                              # ← 二次 argparse
 
 ### E. 库里的垃圾与空壳
 
-- `src/novel_system/maps/hy8j74o9`、`rs67h2x8`：各 4 字节 ASCII。
+- `src/novel_management/maps/hy8j74o9`、`rs67h2x8`：各 4 字节 ASCII。
   沙箱 `tempfile` 回退的产物，**进了源码目录**。`git status` 里是未跟踪，
   但会在 `find`/`grep` 结果里制造噪音。
 - `core/`：空包 + 28 字节 `__init__.py`，零引用，文档却说它是扩展位。
@@ -115,7 +115,7 @@ return jiuzhou.main(argv)                              # ← 二次 argparse
 | 1 | `cli/read.py` → `cli/inspect_cmd.py`（或 `health_cmd.py`） | `git mv` + 两处 import；`novel --help` 输出逐字不变 |
 | 2 | `validation/proposals.py` → `workflows/proposals.py` | 它依赖 `workflows` 与 `agents`，反向依赖已存在；移动后 `validation/` 只剩真校验 |
 | 3 | `frontmatter.py` docstring 改成「**顶层键值**的轻量解析；嵌套结构走 `markdown.load_meta`」 | 一个文件、一句话 |
-| 4 | 删 `core/` 与两个垃圾文件 | grep 零引用；`python -m novel_system --help` 不变 |
+| 4 | 删 `core/` 与两个垃圾文件 | grep 零引用；`python -m novel_management --help` 不变 |
 | 5 | `code_layout.md:82` 删掉「core/ 预留扩展位」 | 文档里不再承诺空气 |
 
 档 1 全部做完，第 A 节五条问题消掉四条。

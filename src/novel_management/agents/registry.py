@@ -112,7 +112,7 @@ PERMISSIONS_DOC = "common/permissions.md"
 def agents_dir() -> Path:
     """角色卡目录。
 
-    默认取仓库根的 `agents/`（本文件位于 `src/novel_system/agents/`，向上三级）。
+    默认取仓库根的 `agents/`（本文件位于 `src/novel_management/agents/`，向上三级）。
     找不到就让调用方去撞 `UsageError`——**不能返回一个空目录然后装作角色卡为空**。
     """
     import os

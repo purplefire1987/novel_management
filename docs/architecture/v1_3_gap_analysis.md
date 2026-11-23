@@ -27,7 +27,7 @@
 | 6 | 严重级别 §27.15 | `S0_blocker`—`S4_info`，禁止再用 `blocking`/`critical`/`severe` | `BLOCKER` `NON_BLOCKING` `SUGGESTION` | **B** | issue 模块 + 契约 + CLI |
 | 7 | 伏笔状态 §27.6.1 | `idea→planned→planted→reinforced→ready_to_payoff→paid_off`，另有 `abandoned` `invalidated` | `planned` `planted` `hinted` `triggered` `paid_off` `abandoned`（缺 4 值，多 2 值） | **B** | 契约 + 状态机 + 4 份存量 |
 | 8 | 工作流契约 §27.10 | 15 个顶层字段；每个 step 9 个字段 | 9 个顶层；step 无 schema ref / 幂等键 / checkpoint | **B** | 6 份 workflow.yaml + 校验器 |
-| 9 | 包结构与分层 §27.16 | `novel_management/` + 12 个顶层包（cli/adapters/application/domain/…） | `novel_system/` 单层，按功能平铺 | **A** | 96 个文件全量移动 + 全部 import |
+| 9 | 包结构与分层 §27.16 | `novel_management/` + 12 个顶层包（cli/adapters/application/domain/…） | `novel_management/` 单层，按功能平铺 | **A** | 96 个文件全量移动 + 全部 import |
 | 10 | CLI 命令族 §27.19 | 19 个命令族（`novel entity ...`） | 40 个平铺命令 | **B** | CLI 全量重组 + 文档 + 测试 |
 | 11 | 退出码 §27.19.2 | 0—11 共 12 个语义退出码 | 只有 `0/1/2` | **C** | 错误类型体系 |
 | 12 | SQLite 表 §27.4.3 | 21 张系统表 | 15 张索引表（`index_metadata`/`artifacts`/`entities`/…），缺运行态表（`task`/`workflow_run`/`approval`/`audit_event`/`lock_registry` 等） | **C** | 新增 9 张 + `novel_id` 列 |
@@ -60,7 +60,7 @@
 |---|---|---|
 | #1 ID 形态 | `ent_000001` → `ENT-01J…` | 所有引用者一起改；分批改会留下两种形态并存 |
 | #2 基础字段 | 补 5 个字段并回填 | `schema_id` 依赖类型注册表，`content_hash` 依赖写入器 |
-| #9 包结构 | `novel_system` → `novel_management` + 12 包 | 与 ID 改动同时做，避免两次全量 diff |
+| #9 包结构 | `novel_management` → `novel_management` + 12 包 | 与 ID 改动同时做，避免两次全量 diff |
 
 ### P-C：契约与命令面
 
@@ -96,7 +96,7 @@
 
 ### 裁定 2：包是否整包改名
 
-`novel_system` → `novel_management` 意味着 96 个文件路径全变、所有 `from novel_system import` 全改、`PYTHONPATH` 与测试配置全改。若改名，建议与 P-B 同批做，避免二次 diff；若不改名，在文档登记偏离。
+`novel_management` → `novel_management` 意味着 96 个文件路径全变、所有 `from novel_management import` 全改、`PYTHONPATH` 与测试配置全改。若改名，建议与 P-B 同批做，避免二次 diff；若不改名，在文档登记偏离。
 
 ### 裁定 3：Agent 命名是否第三次变动
 

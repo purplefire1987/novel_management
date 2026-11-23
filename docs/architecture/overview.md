@@ -34,7 +34,7 @@
 
 ## 路径解析
 
-CLI 不从代码里取路径，一律走 `novel_system.config.load()`：
+CLI 不从代码里取路径，一律走 `novel_management.config.load()`：
 
 优先级：CLI 参数 → 环境变量 → 用户级配置 → Vault 级配置 → 仓库默认值。
 

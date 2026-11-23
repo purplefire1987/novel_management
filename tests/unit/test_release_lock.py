@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.errors import ConflictError, UsageError
-from novel_system.release import lock as lock_mod
-from novel_system.release.lock import PublishLock, boot_id, read_holder
+from novel_management.errors import ConflictError, UsageError
+from novel_management.release import lock as lock_mod
+from novel_management.release.lock import PublishLock, boot_id, read_holder
 
 
 @pytest.fixture()

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import config as cfg_mod
+from novel_management import config as cfg_mod
 
 
 def test_defaults_are_loaded() -> None:

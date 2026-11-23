@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import logs
+from novel_management import logs
 
 
 @pytest.fixture(autouse=True)
@@ -80,7 +80,7 @@ def test_does_not_touch_stdout(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
 def test_cli_writes_one_pair_per_command(tmp_path: Path) -> None:
     """从 CLI 真跑一次，验证 start/done 成对，且退出码进了日志。"""
-    from novel_system.cli import main
+    from novel_management.cli import main
 
     vault, runtime = tmp_path / "vault", tmp_path / "runtime"
     assert main(["init-author", "--vault", str(vault), "--runtime", str(runtime), "--confirm"]) == 0

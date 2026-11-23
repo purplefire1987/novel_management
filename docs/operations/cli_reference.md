@@ -1198,7 +1198,7 @@ novel maps build --confirm                          # 连档案一起重跑（�
 ### `novel schema list [--schema-dir <目录>]`
 
 列出可校验的类型（当前 24 类）与每类的必填字段。schema 默认从**仓库根 `schemas/`**
-读取；装成包后可放 `novel_system/schemas/`，或用 `NOVEL_SCHEMAS` 环境变量指定。
+读取；装成包后可放 `novel_management/schemas/`，或用 `NOVEL_SCHEMAS` 环境变量指定。
 
 ### `novel schema check <类型> <文件…>`
 

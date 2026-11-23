@@ -30,8 +30,8 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
-from novel_system.storage import sha256_file
+from novel_management.cli import main
+from novel_management.storage import sha256_file
 
 # ---------------------------------------------------------------------------
 # 虚构素材
@@ -374,10 +374,10 @@ def test_approve_text_requires_review(env, capsys) -> None:
 
 def test_approve_text_binds_bytes(env, capsys) -> None:
     """批完之后草稿再被改，批准就失效——这是设计。"""
-    from novel_system import config as cfg_mod
-    from novel_system.approvals import ApprovalStore
-    from novel_system.paths import ProjectPaths
-    from novel_system.workflows import text_approval
+    from novel_management import config as cfg_mod
+    from novel_management.approvals import ApprovalStore
+    from novel_management.paths import ProjectPaths
+    from novel_management.workflows import text_approval
 
     task = _task(env)
     assert _write_draft(env, task) == 0
@@ -561,7 +561,7 @@ def test_closure_flag_absent_for_old_plans() -> None:
     无条件输出会让老计划算出新哈希，于是「已批准待执行」的发布突然变成
     「批准的是另一份计划」。
     """
-    from novel_system.release.model import ReleasePlan
+    from novel_management.release.model import ReleasePlan
 
     old = {
         "release_id": "REL-000001",

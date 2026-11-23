@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "novel-system"
-version = "0.15.10"
+version = "0.16.0"
 description = "Long-form fiction management system: explicit-path config, project isolation, staging-first writes."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,7 +22,7 @@ yaml = ["PyYAML>=6.0"]
 dev = ["pytest>=7.0"]
 
 [project.scripts]
-novel = "novel_system.cli:main"
+novel = "novel_management.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

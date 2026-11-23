@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from novel_system.cli import build_parser, main
+from novel_management.cli import build_parser, main
 
 GLOBALS = ("--vault", "/tmp/v", "--runtime", "/tmp/r", "--project", "p1", "--log-level", "DEBUG")
 

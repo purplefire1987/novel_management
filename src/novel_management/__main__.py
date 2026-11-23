@@ -1,4 +1,4 @@
-"""允许 `python -m novel_system`。"""
+"""允许 `python -m novel_management`。"""
 
 from .cli import main
 

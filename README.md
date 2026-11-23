@@ -240,7 +240,7 @@ novel agent prompt --role writer --task TASK-000001   # 主笔这次拿到的提
 ## 6. 目录
 
 ```text
-src/novel_system/
+src/novel_management/
   cli/            命令入口与分发（read / init / index_cmd / flow / release_cmd / import_cmd / backup_cmd / maps_cmd / schema_cmd / agent_cmd / work_cmd / id_cmd / note_cmd）
   config/         五级配置解析（含 V4.0 Vault_Config 写法兼容）
   paths.py        项目内目录解析与边界校验

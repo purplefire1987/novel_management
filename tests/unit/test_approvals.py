@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.approvals import ApprovalFile, ApprovalStore
-from novel_system.errors import ApprovalError
+from novel_management.approvals import ApprovalFile, ApprovalStore
+from novel_management.errors import ApprovalError
 
 
 def _store(tmp_path: Path) -> ApprovalStore:

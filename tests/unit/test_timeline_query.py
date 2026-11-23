@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
-from novel_system.indexing import connect
-from novel_system.indexing.locate import active_db
-from novel_system.timeline import (
+from novel_management.cli import main
+from novel_management.indexing import connect
+from novel_management.indexing.locate import active_db
+from novel_management.timeline import (
     AMBIGUOUS,
     DISPUTED,
     MODE_AFTER,

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.schema import SchemaStore
+from novel_management.schema import SchemaStore
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "schemas" / "samples.json"
 _TYPES = sorted(k for k in json.loads(FIXTURE.read_text(encoding="utf-8")) if not k.startswith("$"))

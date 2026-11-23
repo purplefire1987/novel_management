@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import canonical as c
-from novel_system.errors import CanonicalError
+from novel_management import canonical as c
+from novel_management.errors import CanonicalError
 
 
 # ---- 字节规范化 ----------------------------------------------------------
@@ -72,7 +72,7 @@ def test_chinese_hash_is_stable_across_processes(tmp_path: Path) -> None:
     """换一个进程算，结果必须一样——否则发布后对不上批准时的哈希。"""
     code = (
         "import json,sys;"
-        "from novel_system.canonical import package_hash;"
+        "from novel_management.canonical import package_hash;"
         "print(package_hash(json.loads(sys.argv[1])))"
     )
     obj = {"名称": "示例人物", "n": [1, 2, 3]}

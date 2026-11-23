@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from novel_system.timeline.graph import (
+from novel_management.timeline.graph import (
     COMPARE_AFTER,
     COMPARE_BEFORE,
     COMPARE_SAME,

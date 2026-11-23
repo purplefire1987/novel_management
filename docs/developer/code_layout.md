@@ -294,7 +294,7 @@ if r.verdict == "REVISE"})`：同一轮三个审核人都判 REVISE 只消耗一
 4. 跑 `pytest tests/unit/test_schema_contract.py`。少了样本它会直接说「缺样本」，
    不用等谁想起来补。
 
-校验器支持哪些关键字、哪些故意不支持，见 `src/novel_system/schema.py` 的模块
+校验器支持哪些关键字、哪些故意不支持，见 `src/novel_management/schema.py` 的模块
 docstring。写了不支持的 keyword 不会报错，只是**不生效**——这点必须自己确认。
 
 ## 加一个新目录

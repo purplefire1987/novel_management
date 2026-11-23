@@ -162,10 +162,10 @@ PRD 那句「一次 Top-K 返回不得视为完整知识」落实为两个可见
 
 ## 影响
 
-- 新增 `src/novel_system/agents/`：`registry`（九角色与矩阵）、`budget`（预算与截断）、
+- 新增 `src/novel_management/agents/`：`registry`（九角色与矩阵）、`budget`（预算与截断）、
   `tools`（能力位与七个工具）、`prompts`（九段装配）、`metering`（台账）、
   `runner`（信封与校验）、`preflight`（资料包主流程）。
-- 新增 `src/novel_system/cli/agent_cmd.py`；命令行 28 → **30 条**
+- 新增 `src/novel_management/cli/agent_cmd.py`；命令行 28 → **30 条**
   （新增 `preflight`；新增 `agent` 命令组，含 `list`/`prompt`/`usage`）。
 - 新增两份契约：`schemas/agent_envelope.schema.json`（PRD §6.3）、
   `schemas/preflight.schema.json`（PRD §13.4 十七项 + 预算/用量/索引）。

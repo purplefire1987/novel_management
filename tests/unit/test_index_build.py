@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
-from novel_system.indexing import GitRevisionSource, WorktreeSource, build_index
-from novel_system.indexing import schema
+from novel_management.cli import main
+from novel_management.indexing import GitRevisionSource, WorktreeSource, build_index
+from novel_management.indexing import schema
 
 
 def _vault(tmp_path: Path, project: str = "p1") -> tuple[Path, Path, Path]:
@@ -221,7 +221,7 @@ def test_vault_level_archive_is_skipped(tmp_path: Path) -> None:
 
 def test_skip_dirs_come_from_layout_not_hardcoded() -> None:
     """归档目录名由配置决定。改名后代码要跟着走，不能靠改源码。"""
-    from novel_system.indexing.source import skip_dirs_from_layout
+    from novel_management.indexing.source import skip_dirs_from_layout
 
     names = skip_dirs_from_layout({"vault_archive_dir": "ZZ_Old"})
     assert "ZZ_Old" in names
@@ -303,7 +303,7 @@ def test_worktree_source_does_not_confuse_outer_repo(tmp_path: Path) -> None:
     这是真出过的错：临时库建在公仓的 `.tmp/` 下，`git -C` 一路向上找到公仓，
     索引就绑定了一个跟内容毫无关系的提交，而输出一切正常。
     """
-    from novel_system.indexing import head_revision, is_dirty
+    from novel_management.indexing import head_revision, is_dirty
 
     outer = tmp_path / "outer"
     nested = outer / "vault"
@@ -325,7 +325,7 @@ def test_revision_must_be_a_commit(tmp_path: Path) -> None:
     vault, runtime, root = _vault(tmp_path)
     _init_repo(vault)
     _commit_all(vault)
-    from novel_system.errors import UsageError
+    from novel_management.errors import UsageError
 
     with pytest.raises(UsageError):
         GitRevisionSource(vault, "not-a-real-revision")

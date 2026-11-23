@@ -10,7 +10,7 @@ import sqlite3
 
 import pytest
 
-from novel_system.indexing import schema
+from novel_management.indexing import schema
 
 # --------------------------------------------------------------------------
 # 夹具

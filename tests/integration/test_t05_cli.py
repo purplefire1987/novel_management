@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
+from novel_management.cli import main
 
 TARGET = "01_Canon/Characters/CHAR-0001.md"
 CHAPTER_TARGET = "03_Manuscripts/Drafts/CH-0001.md"

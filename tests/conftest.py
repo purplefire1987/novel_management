@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
+from novel_management.cli import main
 
 # 完全虚构的正文样本。人名、地名均不指向任何真实作品。
 FICTIONAL_DRAFT = """\

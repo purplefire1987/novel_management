@@ -40,7 +40,7 @@ T01 的验收之一是「测试不需要 API Key」。保证方式不是「碰�
 而是所有模型调用都走 `adapters/mock.py` 的 `MockLLM`：
 
 ```python
-from novel_system.adapters import MockLLM
+from novel_management.adapters import MockLLM
 
 llm = MockLLM(script=["第一段", "第二段"])     # 按序返回，用完回落
 llm = MockLLM(responder=lambda msgs: "...")  # 按输入生成，确定性

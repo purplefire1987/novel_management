@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import config as cfg_mod
-from novel_system.errors import SecurityError
-from novel_system.paths import ProjectPaths
-from novel_system.release.model import Change
-from novel_system.validation import contract
+from novel_management import config as cfg_mod
+from novel_management.errors import SecurityError
+from novel_management.paths import ProjectPaths
+from novel_management.release.model import Change
+from novel_management.validation import contract
 
 PROJECT = "novel-001"
 

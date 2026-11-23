@@ -16,15 +16,15 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.errors import UsageError
-from novel_system.importing.model import (
+from novel_management.errors import UsageError
+from novel_management.importing.model import (
     ImportManifest,
     make_locator,
     parse_locator,
     read_locator,
 )
-from novel_system.importing.sampling import normalise, sample_indices, verify_sample
-from novel_system.schema import check as check_schema
+from novel_management.importing.sampling import normalise, sample_indices, verify_sample
+from novel_management.schema import check as check_schema
 
 RAW = "第一行\n第二行\n第三行\n第四行\n"
 

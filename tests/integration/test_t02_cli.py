@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
+from novel_management.cli import main
 
 
 @pytest.fixture()

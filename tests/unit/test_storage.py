@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import config as cfg_mod
-from novel_system.errors import ConflictError
-from novel_system.storage import dump_yaml, iter_files, sha256_bytes, sha256_file, write_new
+from novel_management import config as cfg_mod
+from novel_management.errors import ConflictError
+from novel_management.storage import dump_yaml, iter_files, sha256_bytes, sha256_file, write_new
 
 
 def test_dump_yaml_roundtrip_with_pyyaml() -> None:

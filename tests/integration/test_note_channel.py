@@ -22,7 +22,7 @@ def _today() -> str:
 
 
 def _note(vault: Path, runtime: Path, *extra: str, body: str = "一条审阅意见。") -> int:
-    from novel_system.cli import main
+    from novel_management.cli import main
 
     return main(
         [
@@ -97,8 +97,8 @@ def test_verdict_outside_enum_is_rejected_by_schema(vault_env) -> None:
 
 def test_reviews_are_not_in_formal_area(vault_env) -> None:
     """08_Reviews 不该进正式区：不是作品内容，也不该被算进签字基线。"""
-    from novel_system import config as cfg_mod
-    from novel_system.paths import PUBLISH_TARGETS, ProjectPaths
+    from novel_management import config as cfg_mod
+    from novel_management.paths import PUBLISH_TARGETS, ProjectPaths
 
     vault, runtime = vault_env
     cfg = cfg_mod.load(vault=vault, runtime=runtime, project=PROJECT)
@@ -116,7 +116,7 @@ def test_dry_run_writes_nothing(vault_env) -> None:
 
 
 def test_list_shows_written_notes(vault_env) -> None:
-    from novel_system.cli import main
+    from novel_management.cli import main
 
     vault, runtime = vault_env
     assert _note(vault, runtime, "--title", "能被列出来的审查") == 0

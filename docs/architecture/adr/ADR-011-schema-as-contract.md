@@ -28,7 +28,7 @@ PRD §8.4 要求提供「Pydantic 模型 + 导出的 JSON Schema + 每类有效/
 
 1. **JSON Schema 是唯一真源**，放在仓库根 `schemas/*.schema.json`。
    共享片段放 `schemas/_common.schema.json` 的 `$defs`，用 `$ref` 引用。
-2. **校验器自己实现**（`novel_system/schema.py`），覆盖 draft 2020-12 的实用子集：
+2. **校验器自己实现**（`novel_management/schema.py`），覆盖 draft 2020-12 的实用子集：
    `$ref/$defs/type/enum/const/pattern/format/长度/数值区间/items/required/properties/
    additionalProperties/oneOf/anyOf/allOf/not`。不支持的 keyword 当注解忽略，
    并在模块 docstring 里列明不支持清单——不假装支持。

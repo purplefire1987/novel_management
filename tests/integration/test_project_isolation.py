@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from novel_system.cli import main
+from novel_management.cli import main
 
 DRAFT = "---\nid: CH-0001\ntype: chapter\ntitle: 试稿\n---\n\n虚构正文。\n"
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
+from novel_management.cli import main
 
 
 def _env(tmp_path: Path) -> tuple[Path, Path, Path]:

@@ -18,7 +18,7 @@
 ### R-02 地图生成器已重编码（2026-11-20 关闭）
 
 - `build_jiuzhou_map.py` / `import_map_admin.py` 原先写死 `private/00_Canon/...`，已随旧公仓归档。
-- **已处置**：搬进 `src/novel_system/maps/`，路径由 `MapPaths` 注入，CLI 为
+- **已处置**：搬进 `src/novel_management/maps/`，路径由 `MapPaths` 注入，CLI 为
   `maps paths` / `maps import-admin` / `maps build`。
 - **验证**：真实 Vault 上两项预演均报「0 个文件改动」，节点数 108/111 与库内一致；
   说明换路径来源没有改变任何输出。
@@ -46,7 +46,7 @@
 - **位置**：`04_Story_Assets/Settings/ASSET-0001_*.md`（2026-11-04，
   `import_batch: OUTLINE-20261104-0044`）与 `04_Story_Assets/Battles/ASSET-0001_*.md`
   （2026-11-05，`canon_status: deprecated`）。两份的标题都已在本文档里隐去。
-- **成因**（旧系统 `99_Archive/legacy_v1/novel_system/src/novel_system/ids.py`）：
+- **成因**（旧系统 `99_Archive/legacy_v1/novel_management/src/novel_management/ids.py`）：
   `next_id()` 只做一件事——取索引里同 type 已有最大号 + 1（`next_serial`）。
   索引走 `entities_by_type()` 的 SQLite 查询，而 `entities` 表是 `PRIMARY KEY (id, type)`，
   **id 单列不唯一**，两条同 ID 记录能同时入表且无人报错。

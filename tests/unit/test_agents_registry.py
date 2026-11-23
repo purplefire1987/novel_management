@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.agents import registry, tools
-from novel_system.errors import SecurityError, UsageError
+from novel_management.agents import registry, tools
+from novel_management.errors import SecurityError, UsageError
 
 ROOT = Path(__file__).resolve().parents[2]
 PERMISSIONS = ROOT / "agents" / "common" / "permissions.md"
@@ -121,7 +121,7 @@ def test_tool_availability_follows_matrix() -> None:
 
 def test_scoped_reader_must_state_scope() -> None:
     """「R（限授权）」不是一句说明，是执行层的拦截。"""
-    from novel_system.agents.tools import ToolContext
+    from novel_management.agents.tools import ToolContext
 
     ctx = ToolContext(pp=None, runtime=Path("/nonexistent"), project="p")  # type: ignore[arg-type]
     with pytest.raises(SecurityError) as exc:
@@ -130,7 +130,7 @@ def test_scoped_reader_must_state_scope() -> None:
 
 
 def test_calling_forbidden_tool_raises() -> None:
-    from novel_system.agents.tools import ToolContext
+    from novel_management.agents.tools import ToolContext
 
     ctx = ToolContext(pp=None, runtime=Path("/nonexistent"), project="p")  # type: ignore[arg-type]
     with pytest.raises(SecurityError):
@@ -139,7 +139,7 @@ def test_calling_forbidden_tool_raises() -> None:
 
 def test_unknown_param_rejected() -> None:
     """拼错参数名必须报错，不能变成「查不到」。"""
-    from novel_system.agents.tools import ToolContext
+    from novel_management.agents.tools import ToolContext
 
     ctx = ToolContext(pp=None, runtime=Path("/nonexistent"), project="p")  # type: ignore[arg-type]
     with pytest.raises(UsageError) as exc:

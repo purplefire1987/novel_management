@@ -138,10 +138,10 @@
 
 | # | 动作 | 验收判据 | 风险 |
 |---|---|---|---|
-| 1 | 删 `src/novel_system/core/` | `grep -r "novel_system.core"` 为 0；`novel --help` 输出逐字不变 | 无（引用仅自身） |
+| 1 | 删 `src/novel_management/core/` | `grep -r "novel_management.core"` 为 0；`novel --help` 输出逐字不变 | 无（引用仅自身） |
 | 2 | 删仓库根 **79 个** 8 位垃圾目录 + `maps/hy8j74o9`、`maps/rs67h2x8` | 删前后 `git status --short` 只少 `??`；`pytest`（能跑时）不变 | 无（均为沙箱 tempfile 回退产物，每个含 1 个 4 字节文件） |
 | 3 | 删 `examples/sample_novel/` 或整体重写为现行契约 | 若重写：`markdown.load_meta` 不抛错 + `schema.check("entity")` 0 错 | 无（0 引用；当前版本连解析都失败） |
-| 4 | 删 `config/defaults.yaml` 的 `config_version`、`runtime_subdirs` | `PYTHONPATH=src python3 -m novel_system doctor` 不变 | 极低 |
+| 4 | 删 `config/defaults.yaml` 的 `config_version`、`runtime_subdirs` | `PYTHONPATH=src python3 -m novel_management doctor` 不变 | 极低 |
 | 5 | 改 `docs/developer/code_layout.md:293` 与 `README.md:272` 的模板描述 | 文档与 `init.py` 实际行为一致 | 无 |
 | 6 | 补 `cli_reference.md` 缺的 7 条命令 | 43 条与实现一一对应 | 无 |
 

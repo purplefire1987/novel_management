@@ -2,6 +2,25 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.16.0 — 2026-11-23
+
+**规范基线从 V1.0 升到 V1.3，包名随之改为 `novel_management`。**
+
+V1.3 §28.2 规定：第一至第二十六部分保留 V1.1 的业务背景，**第二十七部分是规范性
+覆盖**，冲突时以 §27 为准。因此 V1.3 的第十一部分（工作流系统）不再是数据规范，
+数据规范的整体判据看 §27。
+
+- 包名 `novel_system` → `novel_management`，与 §27.16.1 一致。67 个文件 / 156 处引用
+  同步改写，含 pytest 的 `pythonpath`、脚本、文档与 `-m` 调用方式。
+- `SPEC_VERSION` 由 `1.0.0` 改为 `1.3.0`。这个常量指的是「代码对齐哪份产品文档」，
+  写错比不写更误导——读代码的人会以为系统还在按 V1.0 实现。
+- **验证方式是失败集合逐条比对，不是看总数**：改名前 210 红，改名后 210 红，
+  `comm` 双向 diff 均为空。总数相同但换了一条的情况，只有逐条比才抓得出。
+- 新增 `docs/architecture/v1_3_gap_analysis.md`：13 项差距的实际测量值、
+  按依赖关系分的四批计划、三条需作者裁定的事项。
+
+迁移提示：外部脚本若调用 `python -m novel_system`，须改为 `-m novel_management`。
+
 ## 0.15.10 — 2026-11-23
 
 **测试停在 V4.0，把已裁定的 V1.0 形态判成错。** 全量 270 红，其中 60 条是
@@ -226,7 +245,7 @@ BREAKING CHANGE: `chapter.schema.json` 的字段名变更。对数据无影响�
   `tests/unit/test_release_lock.py`（9）全绿。
 - 临时 Vault 端到端：`init-author` → `init-project` → `task create` →
   `task list` → `task transition`（顺流/非法值/旧号三种）。
-- `import novel_system.workflows, novel_system.validation` 无循环依赖。
+- `import novel_management.workflows, novel_management.validation` 无循环依赖。
 
 ### 兼容性影响
 
@@ -298,7 +317,7 @@ README 里给了可复制的校验脚本，并写明一个**容易踩的坑**：
 
 | 动作 | 证据 |
 |---|---|
-| 删 `src/novel_system/core/` | 1 行空包，全库引用 1 处（自己） |
+| 删 `src/novel_management/core/` | 1 行空包，全库引用 1 处（自己） |
 | 删 **31 个**沙箱垃圾文件（顶层 + `maps/` 2 个） | 均为 8 位名、4 字节，`tempfile` 回退产物；顶层从近百项降到 18 项 |
 | 删 `defaults.yaml` 两个死键 | `config_version` / `runtime_subdirs` 在 `src/` 0 引用 |
 | 同步两份 `defaults.yaml` | 仓库根是 V4.0 旧副本、包内是 V1.0，**之前已分叉**；`test_config_defaults` 重新变绿 |
@@ -1771,7 +1790,7 @@ ID 却是**全库连续编号、不按分类分段**（素材卡模板原话）�
 
 ### 新增
 
-- `src/novel_system/maps/`：`jiuzhou.py`（重画地图页与两张 canvas）、`admin.py`（资产表 → 行政区划表）、
+- `src/novel_management/maps/`：`jiuzhou.py`（重画地图页与两张 canvas）、`admin.py`（资产表 → 行政区划表）、
   `__init__.py`（路径解析 `MapPaths`）
 - CLI 新增 `maps paths` / `maps import-admin` / `maps build`，命令总数 16 → 19
 - `tests/integration/test_maps.py`：4 条，覆盖「缺版式报错」「路径落在项目内」「默认预演不写盘」「落盘后二次运行为 0 改动」

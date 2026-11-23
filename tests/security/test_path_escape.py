@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system import config as cfg_mod
+from novel_management import config as cfg_mod
 
 
 def test_dotdot_in_any_position_rejected() -> None:

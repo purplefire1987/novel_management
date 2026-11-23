@@ -1,6 +1,6 @@
 # 旧系统 30 条命令的去向
 
-V4.0 重建后，旧 CLI（`novel_system/cli.py`，1215 行）随旧公仓归档到
+V4.0 重建后，旧 CLI（`novel_management/cli.py`，1215 行）随旧公仓归档到
 `99_Archive/legacy_v1/`。这里逐条记录它当初做什么、现在有没有对应实现、
 以及为什么值得或不值得迁移。
 

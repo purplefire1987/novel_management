@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.adapters.mock import MockLLM
-from novel_system.agents import prompts, registry, runner
-from novel_system.errors import UsageError
+from novel_management.adapters.mock import MockLLM
+from novel_management.agents import prompts, registry, runner
+from novel_management.errors import UsageError
 
 
 def test_nine_required_sections_present() -> None:

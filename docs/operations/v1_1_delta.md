@@ -93,14 +93,14 @@ V1.1 **不是 V1.0 的超集**。同一批决策在两版里颗粒度不同，�
 
 ### 4. 运行时位置：Vault 内还是 Vault 外
 
-- V1.1 §13.9「版本存储目录建议」：`Author_Vault/.novel_system/{database,version_store,audit,logs,cache}`，
+- V1.1 §13.9「版本存储目录建议」：`Author_Vault/.novel_management/{database,version_store,audit,logs,cache}`，
   并说「版本存储必须与工作 Vault 内容分离管理」。
 - V1.0 §8.1：版本存储、SQLite、日志、备份放 **Vault 之外的本地系统数据目录**。
 - 现状：`~/WorkBuddy/novel-runtime`（Vault 外），`doctor` 与 `paths.py` 把它当硬约束，`--runtime` 越界直接拒。
-- 这是**架构级**冲突：移进去要改 `paths.py`/`doctor`/`release`/测试的越界断言，并决定 `.novel_system` 是否入备份、
+- 这是**架构级**冲突：移进去要改 `paths.py`/`doctor`/`release`/测试的越界断言，并决定 `.novel_management` 是否入备份、
   是否被 Obsidian 索引、是否与「私库不入公仓」的检查交互。
 
-**待裁决**：保持 Vault 外 / 改为 `.novel_system/` / 两者都支持（默认外，允许显式内）。
+**待裁决**：保持 Vault 外 / 改为 `.novel_management/` / 两者都支持（默认外，允许显式内）。
 
 ### 5. 命令族命名：分组式 vs 平铺式
 
@@ -140,7 +140,7 @@ V1.1 §16.2 与 V1.0 §17 是**同一张表**（V1.1 只多一条 `version gc`�
    现状 `workflows/dimensions.py` 的十维**与 V1.1 不冲突，但失去原文依据**。
 2. **ID 与命名规范**：V1.0 §9 整节消失，只剩「所有正式实体文件必须具有唯一 ID」「不允许依赖文件名作为唯一身份标识」。
 3. **执行总则与首次执行指令**（V1.0 §0 §31 §32）：V1.1 无对家；现行 ADR 与 `Vault_Config.yaml` 继续有效。
-4. **模块布局**：V1.1 §2.4 画的是 `novel_management/core/{config,database,models,...}`；现状是 `src/novel_system/<domain>/`。
+4. **模块布局**：V1.1 §2.4 画的是 `novel_management/core/{config,database,models,...}`；现状是 `src/novel_management/<domain>/`。
    纯命名差异，按 §25.1「降低私人代码优先」不建议为对齐而搬迁 —— 记一条 ADR 说明不采纳即可。
 5. **`§25.1 私人代码优先序`**（Obsidian 原生 > 插件 > 模板/Schema > Prompt > 声明式工作流 > Python 增强 > 私人代码）：
    这是 V1.1 新加的**实施方针**，对第 4 项（仪表盘）与第 2 项（素材目录）有直接影响 —— 能用 Dataview + 模板做的不写 Python。

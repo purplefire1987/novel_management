@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.adapters import LLMClient, MockLLM
+from novel_management.adapters import LLMClient, MockLLM
 
 
 def test_returns_scripted_text_in_order() -> None:

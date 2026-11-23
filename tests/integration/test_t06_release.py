@@ -19,9 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from novel_system.cli import main
-from novel_system.release.engine import InjectedFault
-from novel_system.release.lock import PublishLock
+from novel_management.cli import main
+from novel_management.release.engine import InjectedFault
+from novel_management.release.lock import PublishLock
 
 CHAPTER = "03_Manuscripts/Drafts/CH-0001.md"
 CANON = "01_Canon/Characters/CHAR-0001.md"
@@ -418,7 +418,7 @@ def test_second_execute_is_idempotent(env, tmp_path, capsys):
 
 def test_written_records_satisfy_schemas(env, tmp_path, capsys):
     """落盘的四份记录必须满足 T02 定的契约（ADR-011：schema 是契约）。"""
-    from novel_system.schema import SchemaStore
+    from novel_management.schema import SchemaStore
 
     vault, runtime, _ = env
     _, release_id = _stage_release(vault, runtime, tmp_path, capsys, text="第一版\n")
