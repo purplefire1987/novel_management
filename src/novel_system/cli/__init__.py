@@ -612,11 +612,11 @@ def build_parser() -> argparse.ArgumentParser:
     plan_sub = p_plan.add_subparsers(dest="plan_command", required=True)
 
     p_ps = plan_sub.add_parser("show", help="逐项看 §10.2 的字段有没有、出处在哪", parents=[sub_common])
-    p_ps.add_argument("chapter", help="章节 ID，如 CH-0001")
+    p_ps.add_argument("chapter", help="章节 ID（ch_XXXXXX）或规划 ID（plan_XXXXXX）")
     p_ps.add_argument("--json", action="store_true")
 
     p_pc = plan_sub.add_parser("check", help="只判够不够开写（缺必需字段返回非零）", parents=[sub_common])
-    p_pc.add_argument("chapter")
+    p_pc.add_argument("chapter", help="章节 ID（ch_XXXXXX）或规划 ID（plan_XXXXXX）")
     p_pc.add_argument("--json", action="store_true")
 
     p_pd = plan_sub.add_parser(
@@ -628,6 +628,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_pd.add_argument("--write", action="store_true", help="写回章卡 frontmatter（只增不覆盖，正文不动）")
     p_pd.add_argument("--as", dest="actor", default=None, help="写回只接受 author")
     p_pd.add_argument("--json", action="store_true")
+
+    p_pcr = plan_sub.add_parser(
+        "create",
+        help="建一份章纲骨架：只放小节标题，不预填内容（预填会被 derive 当成作者原话）",
+        parents=[sub_common],
+    )
+    p_pcr.add_argument("--chapter", required=True, help="章节 ID，如 ch_000123")
+    p_pcr.add_argument("--title", required=True, help="章标题：用于文件名与 frontmatter 的 name/title")
+    p_pcr.add_argument("--volume", default="", help="所属卷的规划 ID，如 plan_000008")
+    p_pcr.add_argument("--confirm", action="store_true", help="落盘（默认只预演）")
+    p_pcr.add_argument("--as", dest="actor", default=None, help="执行角色，默认 author-local")
 
     # ---- write（T09 主笔写稿）----
     p_write = sub.add_parser(

@@ -30,6 +30,7 @@ from pathlib import Path
 from .. import markdown as md
 from ..errors import ConflictError, UsageError
 from ..paths import ProjectPaths
+from ..ids import IdAllocator
 from ..storage import dump_yaml, read_text, sha256_text, write_text_atomic
 
 # ---------------------------------------------------------------------------
@@ -51,7 +52,14 @@ class FieldSpec:
 
 
 PLAN_FIELDS: tuple[FieldSpec, ...] = (
-    FieldSpec("chapter_id", "对应章节", ("id",), (), required=True),
+    FieldSpec(
+        "chapter_id",
+        "对应章节",
+        ("chapter_id",),
+        (),
+        required=True,
+        note="规划自己的号是 plan_XXXXXX；对应哪一章写在 chapter_id，两者不是同一个号",
+    ),
     FieldSpec("pov", "POV", ("pov",), ("POV", "视角"), required=True),
     FieldSpec("story_anchor", "故事时间锚点", ("timeline", "story_anchor"), ("时间与地点", "时间锚点"), required=True),
     FieldSpec("entities", "参与实体", ("entities", "cast"), ("角色出场", "出场"), required=True),
@@ -139,14 +147,22 @@ def _is_design_draft(path: Path, root: Path) -> bool:
 
 
 def find_plan(pp: ProjectPaths, chapter_id: str) -> tuple[Path, dict, str]:
-    """按 frontmatter 的 `id` 找章卡。
+    """按 frontmatter 的 `id` 或 `chapter_id` 找章卡。
 
-    不按文件名匹配：文件名会改，`id` 是身份（known_risks R-26 的另一面）。
+    两个键都认，因为历史上有两种写法：
+      - `chapter_id`：规划与章节分开编号后的规范形态（`plan_000009` ↔ `ch_000123`）；
+      - `id`：早期把章号直接当规划 id 用，`novel plan show plan_000001` 依赖这条。
+
+    只认 `id` 会造成一条断链：`novel write --chapter ch_XXXXXX` 传给本函数的
+    是**章节**号，而真库 23 份规划的 `id` 全是 `plan_XXXXXX`，于是永远匹配不到、
+    永远拒绝开写。参数名叫 `--chapter`，实际要传规划号，这种接口本身就是陷阱。
+
+    不按文件名匹配：文件名会改，`id` 是身份。
     匹配到多份直接报错——同一章两份规划，先问作者哪份该留。
     """
     target = chapter_id.strip()
     if not target:
-        raise UsageError("必须给章节 ID，例如 CH-0001")
+        raise UsageError("必须给章节 ID 或规划 ID，例如 ch_000123 / plan_000009")
     hits: list[tuple[Path, dict, str]] = []
     wrong_type: list[str] = []
     for path in plan_files(pp):
@@ -155,7 +171,9 @@ def find_plan(pp: ProjectPaths, chapter_id: str) -> tuple[Path, dict, str]:
             doc = md.parse(text, str(path))
         except Exception:
             continue
-        if str(doc.meta.get("id") or "").strip() != target:
+        fid = str(doc.meta.get("id") or "").strip()
+        fch = str(doc.meta.get("chapter_id") or "").strip()
+        if target not in (fid, fch):
             continue
         kind = str(doc.meta.get("type") or "").strip()
         # `type` 缺失时放宽；写了别的类型（比如 scene_card）就不算章卡。
@@ -165,7 +183,11 @@ def find_plan(pp: ProjectPaths, chapter_id: str) -> tuple[Path, dict, str]:
         hits.append((path, doc.meta, doc.body))
     if not hits:
         hint = f"；同 ID 的档案存在但类型不是规划：{'、'.join(wrong_type)}" if wrong_type else ""
-        raise UsageError(f"找不到 {target} 的章节规划（02_Planning 里没有 frontmatter id 匹配的档案）{hint}")
+        raise UsageError(
+            f"找不到 {target} 的章节规划：{_rel(pp, pp.planning)} 下没有 frontmatter "
+            f"id 或 chapter_id 匹配的档案{hint}"
+            f"\n  还没建的话：novel plan create --chapter {target} --title <章标题>"
+        )
     if len(hits) > 1:
         names = "、".join(path.name for path, _, _ in hits)
         raise ConflictError(
@@ -551,3 +573,149 @@ def render_yaml(derivation: Derivation) -> str:
         "creative_scope": {"forbidden": [item.text for item in derivation.scope_forbidden]},
     }
     return dump_yaml(payload).rstrip()
+
+
+# ---------------------------------------------------------------------------
+# 建章卡
+# ---------------------------------------------------------------------------
+# 章纲落在 `03_故事规划/章节细纲/`。这个目录名与 `cli/init.py` 的 PLANNING_DIRS
+# 是同一份约定——两处必须同字符串，否则新项目骨架里不会有这个目录。
+CHAPTER_PLAN_DIR = "章节细纲"
+
+# 骨架只放小节标题，**不预填任何示例内容**。
+#
+# 原因：`derive()` 从「必须发生」表格第二列与「禁止」小节的禁令句里派生结构化约束。
+# 骨架里写一句示例（比如「主角拿到钥匙」），derive 会把它当成作者原话读进去，
+# 于是程序替作者做了决定——正是本模块开头那条边界要防的事。
+_SKELETON = """## POV
+
+## 时间与地点
+
+- 故事时间：
+- 场景：
+
+## 角色出场
+
+## 入场状态
+
+## 核心冲突
+
+## 章节目标
+
+## 章末变化
+
+## 必须发生
+
+## 禁止发生
+
+## 持久变化
+
+## 禁止提前揭示
+
+## 关联伏笔
+
+## 依赖
+"""
+
+_UNSAFE_NAME = re.compile(r'[\\/:*?"<>|\r\n\t]')
+
+
+@dataclass
+class CreatedPlan:
+    """一份新建的章纲。`dry_run` 时 `path` 是**将要**写入的位置。"""
+
+    plan_id: str
+    chapter_id: str
+    path: Path
+    rel: str
+    title: str
+    dry_run: bool
+
+    def as_dict(self) -> dict:
+        return {
+            "plan_id": self.plan_id,
+            "chapter_id": self.chapter_id,
+            "path": self.rel,
+            "title": self.title,
+            "dry_run": self.dry_run,
+        }
+
+
+def create(
+    pp: ProjectPaths,
+    runtime: Path,
+    *,
+    chapter_id: str,
+    title: str,
+    volume_id: str = "",
+    actor: str = "author-local",
+    confirm: bool = False,
+) -> CreatedPlan:
+    """建一份章纲骨架。只建不存在的，且只建空骨架。
+
+    两条拒绝写在这里而不是留给调用方：
+
+    1. **同一章已有规划 → 拒绝。** `find_plan()` 在多份匹配时报错，那时要作者
+       在两份之间挑，而两份都「看起来对」；在这里拦住，问题就不会发生。
+    2. **章号形态不对 → 拒绝。** 规划靠 `chapter_id` 被找到，写错一个字符，
+       这份章纲对 `novel write` 就等于不存在。
+
+    不发新号则返回「将要发」的那个号（`dry_run=True`），预演看到的号就是
+    落盘拿到的号——同一套取号逻辑。
+    """
+    cid = (chapter_id or "").strip()
+    if not re.fullmatch(r"ch_[0-9]{6}", cid):
+        raise UsageError(f"章节 ID 应为 ch_XXXXXX（六位数字），收到 {chapter_id!r}")
+
+    name = _UNSAFE_NAME.sub("", (title or "").strip())
+    if not name:
+        raise UsageError("--title 不能为空：文件名与 frontmatter 的 name 都要用它")
+
+    for path in plan_files(pp):
+        try:
+            doc = md.parse(read_text(path), str(path))
+        except Exception:
+            continue
+        keys = {
+            str(doc.meta.get("id") or "").strip(),
+            str(doc.meta.get("chapter_id") or "").strip(),
+        }
+        if cid in keys:
+            raise ConflictError(
+                f"{cid} 已经有章纲：{path.name}。"
+                "一章两份规划会让 preflight 与 write 读到不同的「必须发生」，"
+                "先确认哪份该留"
+            )
+
+    alloc = IdAllocator(pp.vault, runtime, actor=actor, areas=pp.area_roots())
+    issued = alloc.allocate("plan", count=1, reason=f"建章纲 {cid}", dry_run=not confirm)
+    plan_id = issued[0]
+
+    from ..audit import now_iso  # 与本模块其它处一致：延迟导入，避免顶层循环
+
+    stamp = now_iso()[:10]
+    meta: dict[str, object] = {
+        "id": plan_id,
+        "type": "chapter_outline",
+        "chapter_id": cid,
+        "name": name,
+        "title": name,
+        "created_at": stamp,
+        "updated_at": stamp,
+    }
+    if volume_id.strip():
+        meta["volume_id"] = volume_id.strip()
+
+    path = pp.planning / CHAPTER_PLAN_DIR / f"{plan_id}_{name}.md"
+    text = "---\n" + dump_yaml(meta).rstrip("\n") + "\n---\n\n" + _SKELETON
+    rel = _rel(pp, path)
+
+    if confirm:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            raise ConflictError(f"目标文件已存在：{rel}")
+        write_text_atomic(path, text)
+
+    return CreatedPlan(
+        plan_id=plan_id, chapter_id=cid, path=path, rel=rel, title=name, dry_run=not confirm
+    )

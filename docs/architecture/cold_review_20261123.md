@@ -161,6 +161,13 @@ novel plan {show, check, derive}
 
 对照：`entity create` / `event create` / `relation create` 都有（0.15.1 补的），唯独创作链路最上游的规划没有。
 
+> **处置状态：已在 0.15.7 修复。** 追这条时发现比「缺 create」更严重的问题：`find_plan()` 按
+> `frontmatter.id == 传入的 chapter_id` 匹配，而真库 23 份规划的 `id` 是 `plan_XXXXXX`，
+> 于是 `novel write --chapter ch_XXXXXX` 永远找不到规划、永远拒绝开写——**写新章这条链路
+> 在真库 100% 不可用**。参数名叫 `--chapter` 却要传规划号，靠文档提醒不管用。
+> 修法：`find_plan` 双键匹配（`id` 或 `chapter_id`）+ 新增 `plan create`（发号走 `IdAllocator`，
+> 骨架不预填示例，否则 `derive()` 会把示例当成作者原话读成「必须发生」）。
+
 ---
 
 ## 三、P2：一致性与可维护性
@@ -278,7 +285,7 @@ unit=25 文件  integration=16 文件  用例=579
 | # | 动作 | 为什么排这个位置 |
 |---|---|---|
 | 1 | ~~正文契约二选一~~ | **已做（0.15.6）**：错的是契约，改契约不动数据；28 份正文已入契约 |
-| 2 | 给 `plan` 加 `create` | 新人第二条命令就卡住，其余优化都轮不到 |
+| 2 | ~~给 `plan` 加 `create`~~ | **已做（0.15.7）**：顺带查出 `find_plan` 只认 `id`，`write` 在真库原本 100% 不可用 |
 | 3 | 重写 `known_risks.md`（或标注为历史归档） | 它是唯一的风险入口，过期比没有更坏 |
 | 4 | 明确 `publish` 与 `release` 的分工，改 `approve` 的提示语 | 提示语指向旁路，等于协议形同虚设 |
 | 5 | 备份加保留策略（保留最近 N 份 + 按天去重） | 189MB 且线性增长，越晚处理越贵 |

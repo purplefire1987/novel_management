@@ -85,6 +85,27 @@ def cmd_plan(cfg, args: argparse.Namespace) -> int:
             info(f"  - {spec.label}{suffix}")
         return 1
 
+    if action == "create":
+        actor = ensure_actor(getattr(args, "actor", None), "plan create")
+        created = plan_mod.create(
+            pp,
+            need_runtime(cfg),
+            chapter_id=args.chapter,
+            title=args.title,
+            volume_id=args.volume,
+            actor=actor,
+            confirm=args.confirm,
+        )
+        if created.dry_run:
+            heading(f"将建章纲 {created.plan_id}")
+            info(f"章节：{created.chapter_id}  {created.title}")
+            info(f"落点：{created.rel}")
+            info("预演不落盘；加 --confirm 执行")
+        else:
+            ok(f"已建章纲 {created.plan_id} → {created.rel}")
+            info(f"下一步：novel plan show {created.chapter_id}（看还缺哪些字段）")
+        return 0
+
     if action == "derive":
         result = plan_mod.derive(pp, args.chapter)
         if args.json:
