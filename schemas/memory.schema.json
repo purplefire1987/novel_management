@@ -22,7 +22,7 @@
         },
         "entities": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^(CHAR|LOC|ORG|ITEM|CREATURE)-[0-9]{4}$" }
+          "items": { "$ref": "_common.schema.json#/$defs/anyId" }
         }
       }
     },

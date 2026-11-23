@@ -2,15 +2,15 @@
   "$comment": "T02 字段契约样本（PRD §8.4：每类至少一个有效 fixture、一个无效 fixture）。tests/unit/test_schema_contract.py 逐条校验，并额外对每个 valid 派生『删必填键』『加未知字段』两种变体，确保三个验收项对每一类都成立。",
   "entity": {
     "valid": {
-      "id": "ent_0001",
+      "id": "ent_000001",
       "type": "character",
       "name": "示例人物",
       "subtype": "人物",
-      "canon_status": "confirmed",
+      "canon_status": "canon",
       "source_refs": [
         {
           "kind": "RAW",
-          "import_id": "src_0001",
+          "import_id": "src_000001",
           "file_sha256": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
           "locator": "sheet:角色库/row:2",
           "quote": "示例人物"
@@ -27,16 +27,16 @@
   },
   "event": {
     "valid": {
-      "id": "evt_0001",
+      "id": "evt_000001",
       "type": "event",
       "name": "示例事件",
-      "chapter_id": "ch_0001",
+      "chapter_id": "ch_000001",
       "sequence": 1,
-      "canon_status": "confirmed",
+      "canon_status": "canon",
       "participants": [
-        "ent_0001"
+        "ent_000001"
       ],
-      "location_id": "ent_0001",
+      "location_id": "ent_000001",
       "created_at": "2026-11-20T10:00:00Z"
     },
     "invalid": {
@@ -47,7 +47,7 @@
   },
   "artifact": {
     "valid": {
-      "id": "fs_0001",
+      "id": "fs_000001",
       "artifact_type": "FORESHADOWING",
       "artifact_status": "DRAFT",
       "schema_version": "2.1"
@@ -62,7 +62,7 @@
   "source_ref": {
     "valid": {
       "kind": "CANON",
-      "artifact_id": "ch_0001",
+      "artifact_id": "ch_000001",
       "source_revision": "abc1234",
       "block_id": "p0042",
       "quote": "示例引文"
@@ -78,7 +78,7 @@
       "artifact_type": "ASSERTION",
       "artifact_status": "APPROVED",
       "schema_version": "2.1",
-      "subject_id": "ent_0002",
+      "subject_id": "ent_000002",
       "predicate": "life_status",
       "value": "ALIVE",
       "epistemic_type": "OBJECTIVE_ASSERTION",
@@ -99,13 +99,13 @@
   },
   "state_change": {
     "valid": {
-      "id": "CHANGE-0001",
+      "id": "sc_000001",
       "artifact_type": "STATE_CHANGE",
-      "entity_id": "ent_0007",
+      "entity_id": "ent_000007",
       "field": "owner",
-      "old_value": "ent_0001",
-      "new_value": "ent_0003",
-      "effective_event": "evt_0231"
+      "old_value": "ent_000001",
+      "new_value": "ent_000003",
+      "effective_event": "evt_000231"
     },
     "invalid": {
       "id": "CHANGE-0001",
@@ -117,15 +117,15 @@
   },
   "knowledge": {
     "valid": {
-      "holder_id": "ent_0001",
+      "holder_id": "ent_000001",
       "epistemic_type": "CHARACTER_BELIEF",
       "attitude": "BELIEVES",
       "proposition": {
-        "subject_id": "ent_0002",
+        "subject_id": "ent_000002",
         "predicate": "life_status",
         "value": "DEAD"
       },
-      "valid_from_event": "evt_0102",
+      "valid_from_event": "evt_000102",
       "source_refs": []
     },
     "invalid": {
@@ -143,8 +143,8 @@
     "valid": {
       "proposition_ref": "prop_000001",
       "narrative_position": {
-        "chapter_id": "ch_0001",
-        "scene_id": "scene_0001",
+        "chapter_id": "ch_000001",
+        "scene_id": "scene_000001",
         "block_id": "p0032"
       },
       "revelation_mode": "EXPLICIT",
@@ -160,7 +160,7 @@
   },
   "foreshadowing": {
     "valid": {
-      "id": "fs_0001",
+      "id": "fs_000001",
       "type": "foreshadowing",
       "name": "示例伏笔",
       "state": "PLANNED",
@@ -168,8 +168,8 @@
       "true_meaning": "真实含义",
       "window_policy": "ADVISORY",
       "target_window": {
-        "from_chapter": "ch_0010",
-        "to_chapter": "ch_0020"
+        "from_chapter": "ch_000010",
+        "to_chapter": "ch_000020"
       }
     },
     "invalid": {
@@ -182,7 +182,7 @@
   },
   "dependency": {
     "valid": {
-      "artifact_id": "PLAN-ch_0102",
+      "artifact_id": "plan_000102",
       "depends_on": [
         {
           "artifact_id": "ent_000003",
@@ -209,7 +209,7 @@
       "severity": "BLOCKER",
       "category": "KNOWLEDGE_BOUNDARY",
       "target": {
-        "artifact_id": "ch_0102",
+        "artifact_id": "ch_000102",
         "block_id": "p0031"
       },
       "description": "人物使用了尚未获得的信息",
@@ -227,11 +227,11 @@
   },
   "approval": {
     "valid": {
-      "approval_id": "prop_0102",
+      "approval_id": "prop_000102",
       "actor_type": "AUTHOR",
-      "task_id": "task_0102",
+      "task_id": "task_000102",
       "target_type": "ARTIFACT",
-      "target_id": "ch_0102",
+      "target_id": "ch_000102",
       "target_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
       "decision": "APPROVE",
       "approved_scope": [
@@ -258,7 +258,7 @@
         "content_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d"
       },
       "impacted_text": [
-        "ch_0010"
+        "ch_000010"
       ],
       "required_approvals": [
         "AUTHOR"
@@ -273,7 +273,7 @@
   },
   "import_manifest": {
     "valid": {
-      "import_id": "src_0001",
+      "import_id": "src_000001",
       "created_at": "2026-11-20T10:00:00Z",
       "files": [
         {
@@ -299,8 +299,8 @@
   },
   "release_plan": {
     "valid": {
-      "release_id": "ver_0001",
-      "base_release": "ver_0000",
+      "release_id": "ver_000001",
+      "base_release": "ver_000000",
       "changes": [
         {
           "path": "01_Canon/Chapters/ch_0001.md",
@@ -309,7 +309,7 @@
         }
       ],
       "text_approvals": [
-        "prop_0102"
+        "prop_000102"
       ],
       "schema_version": "2.1"
     },
@@ -327,7 +327,7 @@
   },
   "release_manifest": {
     "valid": {
-      "release_id": "ver_0001",
+      "release_id": "ver_000001",
       "release_plan_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
       "canon_revision": "abc1234",
       "index_build_id": "src_000001",
@@ -353,8 +353,8 @@
   "transaction_journal": {
     "valid": {
       "txn_id": "src_000001",
-      "release_id": "ver_0001",
-      "base_release": "ver_0000",
+      "release_id": "ver_000001",
+      "base_release": "ver_000000",
       "state": "PREPARED",
       "steps": [
         {
@@ -386,7 +386,7 @@
   "execution_receipt": {
     "valid": {
       "receipt_id": "task_000001",
-      "release_id": "ver_0001",
+      "release_id": "ver_000001",
       "manifest_hash": "b27dbcaeb8ba012648c4e6da25ca8d38f756a3f8206d6cf476c76afc71477c8d",
       "canon_revision": "abc1234",
       "index_build_id": "src_000001",
@@ -466,16 +466,16 @@
       "scope": {
         "volume": 1,
         "chapter_range": [
-          "ch_0001"
+          "ch_000001"
         ],
         "entities": [
-          "ent_0001"
+          "ent_000001"
         ]
       },
       "facts": [
         {
           "statement": "示例事实",
-          "source_chapter": "ch_0001",
+          "source_chapter": "ch_000001",
           "confidence": "explicit"
         }
       ],
@@ -493,7 +493,7 @@
       "project_id": "novel-001",
       "author_id": "author-local",
       "task_type": "draft",
-      "status": "pending",
+      "status": "queued",
       "assigned_to": "writer",
       "write_mode": "staging",
       "created_at": "2026-11-20T10:00:00Z"
@@ -680,7 +680,7 @@
       "created_at": "2026-11-22",
       "author": "editor",
       "scope": "第一章场景卡",
-      "chapter_id": "ch_0001",
+      "chapter_id": "ch_000001",
       "verdict": "revise"
     },
     "invalid": {

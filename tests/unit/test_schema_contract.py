@@ -89,7 +89,7 @@ def test_unknown_field_is_rejected(store: SchemaStore, samples: dict, name: str)
 
 def test_extensions_is_the_only_escape_hatch(store: SchemaStore) -> None:
     """扩展只能进 extensions，不能就地加字段。"""
-    base = {"id": "CHAR-0001", "type": "character", "name": "示例"}
+    base = {"id": "ent_000001", "type": "character", "name": "示例"}
     assert store.check("entity", {**base, "extensions": {"我方扩展": 1}}) == []
     assert store.check("entity", {**base, "我方扩展": 1}) != []
 
@@ -129,12 +129,23 @@ def test_all_schemas_are_valid_json_and_declare_draft(store: SchemaStore) -> Non
         assert doc.get("title"), f"{name} 没有 title"
 
 
-def test_id_pattern_accepts_four_and_six_digits(store: SchemaStore) -> None:
-    """PRD 写六位、库内实为四位。两种都必须通过，否则等于宣布现有档案全错。"""
-    four = {"id": "CHAR-0001", "type": "character", "name": "四位数"}
-    six = {"id": "CHAR-000001", "type": "character", "name": "六位数"}
-    assert store.check("entity", four) == []
-    assert store.check("entity", six) == []
+def test_id_pattern_accepts_current_form_only(store: SchemaStore) -> None:
+    """当前形态是 `ent_000001`（下划线 + 六位 + 单前缀）。
+
+    这条测试原先守的是「四位数和六位数都必须通过」，理由是当时库内实为
+    `CHAR-0001`、PRD 写六位，两种并存。2026-11-22 作者裁定按 V1.0 §9.2 全库
+    重排，1046 份统一成 `ent_000001`，四位数形态已不存在——继续接受它等于
+    允许旧形态重新长回来。所以判据反过来：当前形态必须通过，V4.0 连字符形态
+    必须被拒。守卫的意图没变，仍是「不让存量数据被判非法」。
+    """
+    valid = {"id": "ent_000001", "type": "character", "name": "当前形态"}
+    prefixed = {"id": "asset_000001", "type": "character", "name": "同 schema 的另一前缀"}
+    assert store.check("entity", valid) == []
+    assert store.check("entity", prefixed) == []
+
+    for legacy in ("CHAR-0001", "CHAR-000001", "LOC-0001"):
+        bad = {"id": legacy, "type": "character", "name": "V4.0 旧形态"}
+        assert store.check("entity", bad) != [], f"{legacy} 是旧形态，不该通过"
 
 
 def test_compound_id_is_rejected(store: SchemaStore) -> None:
