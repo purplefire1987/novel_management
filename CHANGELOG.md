@@ -2,6 +2,82 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.15.5 — 2026-11-23
+
+**档 2 正名：五处「模块名与内容脱钩」一次改掉。** 依据
+`docs/architecture/legacy_inventory.md` §五档 2 的 8–12 条。判据统一为
+**CLI 表面零变化**——37 份 `--help` 输出改前改后逐字节 diff 为 0。
+
+### 一、`cli/read.py` → `cli/inspect_cmd.py`（B1）
+
+模块里没有 `read` 命令，装的是 `doctor`/`status`/`validate`/`diff`。找「读文件」
+实现的人会在这个文件里绕很久。`git mv` + `cli/__init__.py` 两处 import。
+
+**名字与 `novel inspect` 的关系写进了 docstring**：那条命令在 `approval_cmd.py`，
+看的是 staging 里待批的候选，不是这里的体检与结构校验。不写清楚，
+这次改名只是把一个歧义换成另一个。
+
+### 二、`validation/proposals.py` → `workflows/proposals.py`（B2）
+
+它做的是「从已批准正文提取 → 校验源哈希 → 批准」，是业务不是校验；而且它本来就
+`import workflows.review`——校验包反过来依赖业务包。移动后：
+
+- `validation/` 只剩 `closure`、`dependencies`、`contract`（三项都是真校验）；
+- 依赖方向掰正为 `validation → workflows`，反方向为零；
+- `validation/__init__.py` 与 `workflows/__init__.py` 的导出、三处 import 同步。
+
+### 三、`frontmatter.py` 不再自称「唯一解析实现」（B3）
+
+这句话误导过：真正的第二条路是 `markdown.load_meta`（走 PyYAML，能解嵌套）。
+两者分工是**能力**不同，不是新旧关系。docstring 现在给了一张对照表
+（依赖/能解什么/输入形状/谁在用），并写明「改这里只影响顶层解析，
+调用点数远少于 `markdown`——想改一处影响全库是错的」。
+
+### 四、删 `tasks` 的旧号与旧态兼容（C3）
+
+`_LEGACY_TASK_RE`、`LEGACY_STATUS`、`normalize_task_id`、`normalize_status` 全删。
+判据是**有没有东西可兼容**：真库 `runtime/tasks`、`staging`、`preflight` 至今 0 条，
+这条兼容从上线起就没有对象。代价不是几行代码，而是每个读任务的地方都要走两遍：
+`_paths()` 返回两份候选、`next_id()` glob 两遍、文件名反解两种形态——任何一处漏掉
+就变成「任务不存在」。
+
+- `schemas/task.schema.json` 的 `task_id` 同步收紧为 `^task_[0-9]{6}$`
+  （**契约必须跟着代码走**，否则旧号能过校验却过不了运行时）。
+- 实测：`task create` → `task_000001`；`task transition --to ready` 正常；
+  `--to done` 被 argparse 的 choices 拒掉；`task inspect TASK-000001` 报
+  「任务不存在」而不是崩。
+- 若将来真要导入旧 runtime，先在那边把号改成 `task_` 再进来——一次转换，
+  好过让运行时长期背着两套方言。
+
+### 五、`ids.LEGACY_PREFIXES` 去掉映射内容，保留拒绝能力（C4）
+
+11 条「前缀 → 中文去向」的描述删掉，改成纯名字集合（`frozenset`）：
+`resolve_prefix("FAC")` 照样报错，只是提示不再逐条写「势力（已并入 ent）」。
+理由两条：那 11 条是迁移期脚手架，全库 0 份旧号后它只会变成第二份要维护的真相
+（第一份是 `TYPE_TO_PREFIX`）；去向本来就能从 `TYPE_TO_PREFIX` 推出来。
+
+**审计报告的一条判据是错的，在此更正**：清单里写的是
+「`allocate-id --type CHAR` 仍报错」。实测不成立——`CHAR` 在 `TYPE_TO_PREFIX` 里
+映射到 `ent`，`resolve_prefix` 先命中它，**故意返回 `ent`**（这是 V1.0 的设计：
+类型归 `type` 字段，ID 只表达「这是个世界实体」）。真正走废弃分支的是
+`FAC`／`LOC`／`PLAN-VOL` 这类不在映射表里的。改前改后行为一致，拒绝能力未损。
+
+### 验证
+
+- 37 份 `--help` 与改前**逐字节一致**（含 `maps`、`release`、`task` 等长帮助）。
+- `tests/integration/test_maps.py`（5）、`tests/unit/test_config_defaults.py`（2）、
+  `tests/unit/test_release_lock.py`（9）全绿。
+- 临时 Vault 端到端：`init-author` → `init-project` → `task create` →
+  `task list` → `task transition`（顺流/非法值/旧号三种）。
+- `import novel_system.workflows, novel_system.validation` 无循环依赖。
+
+### 兼容性影响
+
+- 旧任务号 `TASK-000001` 不再被识别：`runtime/tasks` 为 0 条，无迁移成本；
+  若有外部脚本按旧号拼路径，需改 `task_`。
+- `validation.proposals` 模块路径变了：外部只应通过 CLI 使用；库内三处 import 已改。
+- 其余对外行为不变（CLI 参数、输出格式、契约除 `task_id` 外均未动）。
+
 ## 0.15.4 — 2026-11-23
 
 **修好 `maps`，清掉历史包袱。** 依据 `docs/architecture/legacy_inventory.md` 的裁定：

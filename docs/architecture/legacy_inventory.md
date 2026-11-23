@@ -218,7 +218,7 @@
 
 ---
 
-## 九、处置记录（2026-11-23，0.15.4）
+## 九、处置记录（2026-11-23，0.15.4 → 0.15.5）
 
 作者当日裁定并已执行。**本节随代码走，不留在「待办」状态**——否则这份清单自己会变成
 它批评的那种「说错了的地图」。
@@ -249,12 +249,30 @@
 - **契约在拒绝一切合法章节**：`chapter.schema.json` 的 `chapter_id` 仍是 `^CH-[0-9]{4}$`，
   `memory.schema.json` 同。已按 `foreshadowing` 的「新形态 + 历史豁免」写法修正。
 
+### 已处置：档 2 的 8–12 条（0.15.5）
+
+判据统一为**CLI 表面零变化**：37 份 `--help` 改前改后逐字节 diff 为 0。
+
+| # | 动作 | 执行结果 |
+|---|---|---|
+| 8 | `cli/read.py` → `cli/inspect_cmd.py` | `git mv` + 注册处 5 行；docstring 写明与 `novel inspect`（在 `approval_cmd.py`）的分工 |
+| 9 | `validation/proposals.py` → `workflows/proposals.py` | 依赖方向掰正为 `validation → workflows`（反向 0）；`validation/` 只剩三项真校验 |
+| 10 | `frontmatter.py` docstring | 不再自称「唯一实现」，改为与 `markdown.load_meta` 的**能力对照表** |
+| 11 | 删 `tasks` 的 `_LEGACY_TASK_RE` / `LEGACY_STATUS` 等四件 | 顺带删 `normalize_task_id` / `normalize_status`；契约 `task_id` 同步收紧为 `^task_[0-9]{6}$` |
+| 12 | `ids.LEGACY_PREFIXES` 去掉映射内容 | 改成 `frozenset` 纯名字集合，**拒绝能力保留**；`FAC`/`LOC`/`PLAN-VOL` 仍报错 |
+
+**更正本报告的一条判据。** #12 原来写的是「`allocate-id --type CHAR` 仍报错」——实测
+**不成立**：`CHAR` 在 `TYPE_TO_PREFIX` 里映射到 `ent`，`resolve_prefix` 先命中它，
+是**故意返回 `ent`**（V1.0 的设计：类型归 `type` 字段）。真正走废弃分支的是
+`FAC`／`LOC`／`PLAN-VOL` 这些不在映射表里的。判据写错比不写更糟：照着它验，
+会以为改坏了。
+
 ### 仍未处置（不在本轮范围）
 
 | 项 | 状态 | 归属 |
 |---|---|---|
-| 档 2 的六条「正名」（`read.py` → `inspect_cmd.py` 等） | 未动 | 需一次完整回归 |
-| `tasks` / `ids` 的无对象兼容层 | 未动 | 等作者决定是否导入旧 runtime |
+| 档 2 第 7 条：`maps` 从公仓剥离为私人脚本 | 未动 | 搬子系统，与「正名」性质不同，需单独一轮 |
 | 仓库根 `config/defaults.yaml` 从未被读取 | 仅消除分叉 | 要不要删这个副本，另定 |
 | `tests/unit` 121 项红（V4.0 假设） | 未动 | D6 |
 | 6 个英文遗产目录（`06_素材与研究` 等） | 未动 | D1 |
+| 提示词文件名与注册名不一致（七份） | 未动 | 需先清 Vault 里的陈旧 `index.lock` |

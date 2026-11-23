@@ -124,11 +124,11 @@ def cmd_task(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
     if action == "transition":
         # `TaskStore.transition()` 一直有实现、有迁移表、有跳步拒绝，却从没有命令入口。
         # 于是 §10.4 的状态机在代码里成立、在操作上不存在——作者只能手改 yaml。
-        from ..tasks import TRANSITIONS, normalize_status
+        from ..tasks import TRANSITIONS
 
         task = store.load(args.task_id)
         before = task.status
-        target = normalize_status(getattr(args, "to", "") or "")
+        target = (getattr(args, "to", "") or "").strip()
         actor = ensure_actor(getattr(args, "actor", None), "task")
         task = store.transition(
             task,

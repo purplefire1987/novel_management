@@ -1,4 +1,11 @@
-"""只读命令：doctor / status / validate / diff。"""
+"""只读命令：doctor / status / validate / diff。
+
+模块名原先叫 `read.py`，而里面没有 `read` 命令——找「读文件」实现的人会绕很久。
+现在按「查看类命令」命名。
+
+注意与 `novel inspect` 区分：那条命令在 `approval_cmd.py`，看的是**候选**
+（staging 里待批的产物），不是这里的环境体检与结构校验。
+"""
 
 from __future__ import annotations
 

@@ -31,7 +31,8 @@
 ```
 cli/          只做参数解析与输出格式化，不写业务判断
   ├── __init__.py   parser 与命令分发
-  ├── read.py       doctor / status / validate / diff
+  ├── inspect_cmd.py doctor / status / validate / diff（原 `read.py`：模块里没有 `read` 命令，
+  │                 找「读文件」实现的人会绕很久；与 `novel inspect` 不是一回事，那条在 approval_cmd.py）
   ├── init.py       init-author / init-project
   ├── index_cmd.py  rebuild-index / search
   ├── timeline_cmd.py state / knowledge / reveal
@@ -92,29 +93,37 @@ agents/       Agent 适配器与写前资料包（ADR-017）
   ├── runner.py    信封：去围栏 → 解析 → schema 校验 → 核对 role；失败不猜
   └── preflight.py 八级检索落成七次工具调用，出 PRD §13.4 结构，判 PASS/BLOCKED
 validation/ 发布前的语义校验（ADR-018）
-  ├── proposals.py     记忆提案：KINDS 十类、绑源哈希、模型失败退骨架、declare-none
   ├── dependencies.py  依赖四级判定（VALID/STALE/NEEDS_REVIEW）、传递只走一级
   ├── closure.py       共同发布闸：四种阻断码，供 deps closure 与 release prepare 共用
   └── contract.py      发布闸的契约校验（AC-11/12/13/49）：ID 形态与唯一、schema、
                        来源与双链目标存在、引文字节一致、被删块仍被引用；
                        只校验本次变更；新增产物严格、既有产物对历史形态豁免
+  （记忆提案 proposals.py 曾在这里，0.15.5 搬到 workflows/：它是提取业务不是校验，
+    而且本来就依赖 workflows.review——放在这个概念包里，方向是反的）
 workflows/  创作链路（ADR-018）
   ├── plan.py           §10.2 十六字段认法、八项必需、只派生确定性可读的两处、写回只增不覆盖
   ├── draft.py          两道前置（plan.check + preflight PASS）、目标路径结构性固定、
   │                     只落 staging；_target_rel() 拼完再校验不在 Canon 下
   ├── review.py         风险路由（只能升不能降）、按风险配角色、自审拒绝、返修预算、
   │                     规则检查只判形状；ReviewStore 在 <runtime>/reviews/
+  ├── proposals.py      记忆提案：从已批准正文提取 → 绑源哈希 → 批准（原 validation/）
+  ├── dimensions.py     十维审核清单：维度定义与打分口径的唯一来源
   └── text_approval.py  正文批准：审过 + 角色齐 + 无 BLOCKER 才批，绑整份字节 sha256
 ```
 
 依赖方向严格单向，越往下越不知道上层：
 
 ```
-cli → release / workflows / validation / importing / agents / backup / staging / tasks / approvals / changes / baseline
+cli → release / validation / workflows / importing / agents / backup / staging / tasks / approvals / changes / baseline
     → timeline / indexing
     → paths / storage / audit / config
     → errors
 ```
+
+`validation → workflows` 是单向的：`closure` 要看提案的**当前**状态，所以 import
+`workflows.proposals`；反过来 workflows 不 import validation。这条边以前是反的
+（proposals 在 validation 里却 import workflows.review），0.15.5 已掰正。
+同层的其余模块之间不互相依赖。
 
 `storage/` 与 `errors.py` 不 import 任何业务模块。这条约束让底层可以被单独测试，
 也让「换掉写入实现」不需要改动业务代码。

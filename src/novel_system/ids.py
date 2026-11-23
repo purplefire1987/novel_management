@@ -66,22 +66,19 @@ V1_PREFIXES: dict[str, str] = {
     "asset": "素材卡",
 }
 
-# V4.0 旧形态（`CHAR-000001`）。**只用于识别未迁移的残留，不再发号。**
-# 2026-11-22 全库已迁到 V1 形态，这里留着是为了让 `validate` 能明确指出
-# 「这几份还是旧号」而不是笼统地说「不合法」。
-LEGACY_PREFIXES: dict[str, str] = {
-    "CHAR": "人物／生物／命途（已并入 ent）",
-    "LOC": "地点（已并入 ent）",
-    "FAC": "势力（已并入 ent）",
-    "ITEM": "物品／技能（已并入 ent，素材改 asset）",
-    "RULE": "世界条目（已并入 ent）",
-    "CH": "章节（已改为 ch）",
-    "SCENE": "场景（已改为 scene）",
-    "EVT": "事件（已改为 evt）",
-    "FORESHADOW": "伏笔（已改为 fs）",
-    "PLAN-VOL": "卷规划（已改为 plan）",
-    "PLAN-CH": "章规划（已改为 plan）",
-}
+# V4.0 旧前缀（`CHAR-000001`）。**只留名字用于拒绝，不再记每个前缀的去向。**
+#
+# 以前这里是一张「前缀 → 中文去向」的映射表（11 条）。删掉的是**内容**，不是
+# 拒绝能力：名字集合还在，`resolve_prefix("FAC")` 照样报错，只是提示不再逐条写
+# 「势力（已并入 ent）」。理由有两条：
+#   1. 那 11 条描述是迁移期的脚手架。全库 0 份旧号之后，它只会在改号段时
+#      变成两份要同时维护的真相（另一份是 `TYPE_TO_PREFIX`）。
+#   2. 去向已经能从 `TYPE_TO_PREFIX` 推出来——能推的东西不该抄第二遍。
+#
+# **「拒绝发旧号」这一条不能丢**：数据面干净不等于守卫可以拆（见 ADR 里那条）。
+LEGACY_PREFIXES: frozenset[str] = frozenset(
+    {"CHAR", "LOC", "FAC", "ITEM", "RULE", "CH", "SCENE", "EVT", "FORESHADOW", "PLAN-VOL", "PLAN-CH"}
+)
 
 PREFIXES: dict[str, str] = dict(V1_PREFIXES)
 
@@ -180,7 +177,7 @@ def resolve_prefix(kind: str) -> str:
     if up in LEGACY_PREFIXES:
         tgt = TYPE_TO_PREFIX.get(up)
         hint = f"。改用 --type {tgt}" if tgt else ""
-        raise UsageError(f"前缀 {up} 已废弃（{LEGACY_PREFIXES[up]}）{hint}")
+        raise UsageError(f"前缀 {up} 是 V4.0 旧形态，已废弃{hint}")
     known = ", ".join(sorted(PREFIXES))
     raise UsageError(f"未知 ID 类型 {raw!r}。可用：{known}")
 

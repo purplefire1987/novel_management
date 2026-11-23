@@ -1,4 +1,18 @@
-"""frontmatter 的唯一解析实现。
+"""顶层键值（frontmatter）的轻量解析。
+
+**不是全库唯一的解析实现**——这句话以前写在这里，误导过好几次：
+真正的第二条路是 `markdown.load_meta`，走 PyYAML，能解嵌套映射与列表。
+两者分工是**能力**不同，不是新旧关系：
+
+| | `frontmatter`（本模块） | `markdown.load_meta` |
+|---|---|---|
+| 依赖 | 无（纯字符串） | PyYAML |
+| 能解 | 顶层 `key: value` | 任意 YAML |
+| 输入 | 只收 `---` 之间的块，先调 `split()` | 必须是纯 YAML 块（整篇丢进去报 `found another document`） |
+| 谁在用 | 索引、查重、ID 分配等只要 id/type/status 的地方 | 导入、契约校验等要完整元数据的地方 |
+
+改这里只影响前者。想「改一处影响全库」的期待是错的：调用点数 `frontmatter` 远少于
+`markdown`。真要动解析语义，两边都得看。
 
 此前只有 `cli/_common.py` 里一份简易解析，底层模块（如 ID 分配）要用就得反向
 依赖 CLI 层。这里把它挪到底层，CLI 改为转发。

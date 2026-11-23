@@ -20,22 +20,19 @@ from ..storage import dump_yaml, write_atomic
 # `TASK-000001`——两套方言并存，而 §9.2 明列 `task_`。当时真库 `tasks/` 是空的，
 # 所以换形态没有数据迁移成本，只改代码面。
 #
-# **旧形态仍然读得懂**（`_LEGACY_TASK_RE`）：旧的 runtime 目录不该因为这次改名
-# 突然变成「任务不存在」。认得出旧号、不再发旧号，这条与 `ids.LEGACY_PREFIXES` 同一思路。
+# 旧号 `TASK-000001` 的兼容**已删除**（2026-11-23，档 2 #11）。
+#
+# 判断依据是「有没有东西可兼容」：真库 `runtime/tasks`、`staging`、`preflight`
+# 至今都是 0 条，这条兼容从上线那天起就没有对象。留着它的代价不是几行代码，
+# 而是**每个读任务的地方都得走两遍路径**（`_paths()` 返回两份候选、`next_id()`
+# 要 glob 两遍、文件名要反解两种形态），而任何一处漏掉就变成「任务不存在」。
+# 若将来真要导入旧 runtime，先在那边把号改成 `task_` 再进来——一次转换，
+# 好过让运行时长期背着两套方言。
 _TASK_RE = re.compile(r"^task_(\d{6})$")
-_LEGACY_TASK_RE = re.compile(r"^TASK-(\d{6})$")
-
-
-def normalize_task_id(raw: str) -> str:
-    """把用户/旧代码给的 `TASK-000001` 归一成 `task_000001`；认不出的原样返回。"""
-    text = (raw or "").strip()
-    m = _LEGACY_TASK_RE.match(text)
-    return f"task_{m.group(1)}" if m else text
 
 
 def is_task_id(raw: str) -> bool:
-    text = (raw or "").strip()
-    return bool(_TASK_RE.match(text) or _LEGACY_TASK_RE.match(text))
+    return bool(_TASK_RE.match((raw or "").strip()))
 
 
 TASK_TYPES = (
@@ -64,14 +61,6 @@ TASK_TYPES = (
 #   - 没有 paused/failed：中断与失败只能记成 blocked，而 blocked 的语义是「等外部条件」；
 #     把「机器挂了」记成「等作者拍板」会让阻塞统计彻底失真，也让重试策略无从下手。
 #
-# **旧态仍然读得懂**（LEGACY_STATUS），与 `TASK-000001` 旧号同一思路：认得出、不再写。
-LEGACY_STATUS = {
-    "pending": "queued",
-    "in_progress": "running",
-    "awaiting_author": "waiting_review",
-    "done": "completed",
-}
-
 # 顺序即 §10.4 的正流顺序；CLI 的 --status 选项与状态表都按它排。
 TASK_STATUSES = (
     "queued",
@@ -120,12 +109,6 @@ TRANSITIONS = {
     "completed": set(),
     "cancelled": set(),
 }
-
-
-def normalize_status(raw: str) -> str:
-    """把旧态归一成 §10.4 的新态；认不出的原样返回（由调用方报错，不在这里猜）。"""
-    text = (raw or "").strip()
-    return LEGACY_STATUS.get(text, text)
 
 
 @dataclass
@@ -195,9 +178,7 @@ class Task:
             project_id=str(data.get("project_id") or ""),
             task_type=str(data.get("task_type") or ""),
             author_id=str(data.get("author_id") or ""),
-            # 读盘时归一旧态：旧 runtime 里的 pending/done 一读出来就是 queued/completed，
-            # 这样后续写入不会把两套方言混在同一个文件里。
-            status=normalize_status(str(data.get("status") or "queued")),
+            status=str(data.get("status") or "queued").strip(),
             assigned_to=str(data.get("assigned_to") or ""),
             input_files=as_list(data.get("input_files")),
             output_files=as_list(data.get("output_files")),
@@ -219,19 +200,14 @@ class TaskStore:
         return self.dir / f"{task_id}.yaml"
 
     def _paths(self, task_id: str) -> list[Path]:
-        """新号路径，兼容旧 `TASK-` 号的路径（旧号不重命名，只额外认一份）。"""
-        wanted = normalize_task_id(task_id)
-        out = [self.dir / f"{wanted}.yaml"]
-        legacy = "TASK-" + wanted.split("_")[-1] if wanted.startswith("task_") else ""
-        if legacy:
-            out.append(self.dir / f"{legacy}.yaml")
-        return out
+        """任务只有一个文件名：`<task_id>.yaml`。"""
+        return [self._path(task_id.strip())]
 
     def next_id(self) -> str:
         highest = 0
         if self.dir.is_dir():
-            for path in list(self.dir.glob("task_*.yaml")) + list(self.dir.glob("TASK-*.yaml")):
-                m = _TASK_RE.match(path.stem) or _LEGACY_TASK_RE.match(path.stem)
+            for path in self.dir.glob("task_*.yaml"):
+                m = _TASK_RE.match(path.stem)
                 if not m:
                     continue
                 try:
@@ -302,7 +278,7 @@ class TaskStore:
         out: list[Task] = []
         if not self.dir.is_dir():
             return out
-        for path in sorted(list(self.dir.glob("task_*.yaml")) + list(self.dir.glob("TASK-*.yaml"))):
+        for path in sorted(self.dir.glob("task_*.yaml")):
             task = Task.from_dict(cfg_mod.read_yaml(path))
             if project_id and task.project_id != project_id:
                 continue
@@ -325,7 +301,7 @@ class TaskStore:
         `reason` 只在非顺流迁移上强制（`NEEDS_REASON`）——正常推进也要编理由的话，
         理由字段很快会全是「继续」，那与不记没有区别。
         """
-        target = normalize_status(status)
+        target = (status or "").strip()
         if target not in TASK_STATUSES:
             raise UsageError(f"未知任务状态：{status}（可选 {', '.join(TASK_STATUSES)}）")
         if target in NEEDS_REASON and not reason.strip():

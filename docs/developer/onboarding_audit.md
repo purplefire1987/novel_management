@@ -100,6 +100,12 @@ return jiuzhou.main(argv)                              # ← 二次 argparse
 
 ## 三、简化方案
 
+> **执行状态（2026-11-23，0.15.4/0.15.5）**：本节 1–5 条全部执行完毕。
+> 逐条结果与判据见 `docs/architecture/legacy_inventory.md` §九——**那里是唯一
+> 权威的处置记录**，本文保留原样作为「当时怎么判断的」的存档。
+> 一处需注意：第 1 条的候选名 `health_cmd.py` 未采用，实际用 `inspect_cmd.py`，
+> 并在 docstring 里写明它与 `novel inspect` 命令的分工。
+
 按「收益 / 风险」排序。档 1 不改任何行为，档 2 改结构，档 3 要作者裁定。
 
 ### 档 1：零行为改动（半天，可当天验完）

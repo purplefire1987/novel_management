@@ -43,7 +43,7 @@ from ..paths import ProjectPaths
 from ..storage import dump_yaml, sha256_file, write_text_atomic
 from ..tasks import TaskStore
 from ..indexing.schema import SCHEMA_VERSION
-from ..workflows import review as review_mod
+from . import review as review_mod
 
 PROPOSAL_DIR = "proposals"
 PROPOSAL_PREFIX = "PROP"

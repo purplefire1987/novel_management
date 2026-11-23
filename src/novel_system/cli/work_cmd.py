@@ -25,7 +25,7 @@ from ..audit import AUTHOR, ensure_actor
 from ..errors import UsageError
 from ..validation import closure as closure_mod
 from ..validation import dependencies as dep_mod
-from ..validation import proposals as prop_mod
+from ..workflows import proposals as prop_mod
 from ..workflows import draft as draft_mod
 from ..workflows import plan as plan_mod
 from ..workflows import review as review_mod

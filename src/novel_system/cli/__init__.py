@@ -36,10 +36,10 @@ from . import (
     import_cmd,
     index_cmd,
     init,
+    inspect_cmd,
     maps_cmd,
     note_cmd,
     project_cmd,
-    read,
     release_cmd,
     schema_cmd,
     timeline_cmd,
@@ -51,10 +51,10 @@ from ..version import __version__ as __version__  # noqa: E402  版本只有一�
 
 
 HANDLERS = {
-    "doctor": read.cmd_doctor,
-    "status": read.cmd_status,
-    "validate": read.cmd_validate,
-    "diff": read.cmd_diff,
+    "doctor": inspect_cmd.cmd_doctor,
+    "status": inspect_cmd.cmd_status,
+    "validate": inspect_cmd.cmd_validate,
+    "diff": inspect_cmd.cmd_diff,
     "init-author": init.cmd_init_author,
     "init-project": init.cmd_init_project,
     "rebuild-index": index_cmd.cmd_rebuild_index,

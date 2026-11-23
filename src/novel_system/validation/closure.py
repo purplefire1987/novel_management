@@ -24,7 +24,7 @@ from ..paths import ProjectPaths
 from ..staging import StagingArea
 from ..tasks import TaskStore
 from . import dependencies as dep_mod
-from . import proposals as prop_mod
+from ..workflows import proposals as prop_mod
 
 BLOCKER = "BLOCKER"
 WARNING = "WARNING"

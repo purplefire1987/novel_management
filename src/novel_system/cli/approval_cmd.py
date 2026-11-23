@@ -41,7 +41,7 @@ from ..changes import IssueStore, ChangeStore
 from ..errors import ApprovalError, UsageError
 from ..staging import StagedFile, StagingArea, artifact_id_of
 from ..storage import sha256_file
-from ..tasks import is_task_id, normalize_task_id
+from ..tasks import is_task_id
 from ._common import approval_store, heading, info, ok, oplog, project, task_store, warn
 
 # 帮助文案里举的例子。写成常量是因为 `TASK-000001` 这种旧形态散落在十几条
@@ -80,8 +80,7 @@ def _split_candidate(candidate: str) -> tuple[str, str]:
         raise UsageError(
             f"候选 ID 形如 {TASK_ID_EXAMPLE} 或 {TASK_ID_EXAMPLE}:<目标相对路径>，收到：{candidate}"
         )
-    # 旧号 `TASK-000001` 归一成 `task_000001` 再往下走：认得出，但不再往文件名里写旧形态。
-    return normalize_task_id(task_id), target
+    return task_id.strip(), target
 
 
 def resolve_candidate(cfg: cfg_mod.Config, pp, candidate: str) -> tuple:
