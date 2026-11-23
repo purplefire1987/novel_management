@@ -422,21 +422,41 @@
       "schema_version": "4.0.0"
     }
   },
-  "chapter": {
+  "relationship": {
     "valid": {
-      "chapter_id": "ch_0001",
-      "project_id": "novel-001",
-      "stage": "final",
-      "status": "approved",
-      "word_count": 4200,
-      "approved_by": "author-local",
-      "approved_at": "2026-11-20T10:00:00Z"
+      "id": "rel_000001",
+      "type": "relationship",
+      "name": "林砚 → 灰石渡",
+      "from_entity_id": "ent_000001",
+      "to_entity_id": "ent_000002",
+      "relationship_type": "师承",
+      "status": "active",
+      "created_at": "2026-11-23"
     },
     "invalid": {
-      "chapter_id": "ch_0001",
-      "project_id": "novel-001",
-      "stage": "published",
-      "status": "approved"
+      "id": "rel_000002",
+      "type": "relationship",
+      "from_entity_id": "ent_0001",
+      "to_entity_id": "ent_000002",
+      "relationship_type": "师承"
+    }
+  },
+  "chapter": {
+    "valid": {
+      "id": "ch_000123",
+      "type": "chapter",
+      "title": "第三章 灰石渡口",
+      "status": "draft",
+      "word_count": 4200,
+      "base_release": "REL-000001",
+      "created_at": "2026-11-20",
+      "updated_at": "2026-11-20"
+    },
+    "invalid": {
+      "id": "ch_123",
+      "type": "chapter",
+      "title": "号段不合规：正文应为六位",
+      "status": "draft"
     }
   },
   "memory": {

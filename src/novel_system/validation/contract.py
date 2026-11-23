@@ -63,6 +63,12 @@ SCHEMA_BY_TYPE = {
     "story_asset": "entity",
     "event": "event",
     "foreshadowing": "foreshadowing",
+    # 正文两个 type 值共存：`chapter` 是 novel write 的产出，`manuscript` 是
+    # 2026-11-04 批量导入的 28 份旧稿。它们描述的是同一种产物（正文），
+    # 所以共映射到 chapter.schema.json，而不是为旧稿另造一份契约——
+    # 另造一份等于承认两套语义永久并存。
+    "chapter": "chapter",
+    "manuscript": "chapter",
 }
 
 # PRD §9 定义的「正式断言」类产物：它们必须有可定位来源（AC-11）。

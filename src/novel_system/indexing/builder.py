@@ -46,7 +46,10 @@ ENTITY_TYPES = frozenset(
         "destiny",
     }
 )
-NARRATIVE_TYPES = frozenset({"chapter", "scene"})
+# 正文有两个 type 值：`chapter`（novel write 产出）与 `manuscript`（2026-11-04
+# 批量导入的 28 份旧稿）。只认 chapter 的后果不是报错，是那 28 份不进叙事索引——
+# 时间线、场景、揭示三个视图对它们全空，而空视图和「没有正文」在界面上长得一样。
+NARRATIVE_TYPES = frozenset({"chapter", "manuscript", "scene"})
 
 # 伏笔档案。T08 的 Preflight 要查「未回收承诺」，必须先让它进索引——
 # 否则 `foreshadowing` 表永远是空的，「检查过伏笔」就成了一句空话

@@ -189,7 +189,7 @@ def analyse(conn, *, change_id: str, targets: list[str]) -> Impact:
         # 于是 RETCON 的「受影响正文」里混进还没写的章节。
         is_planning = path.startswith(PLANNING_PREFIX)
         is_manuscript = path.startswith(MANUSCRIPT_PREFIX) or (
-            not is_planning and artifact_type == "chapter"
+            not is_planning and artifact_type in ("chapter", "manuscript")
         )
         if is_manuscript:
             if artifact_id and str(artifact_id) not in chapters:

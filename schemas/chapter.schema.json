@@ -1,43 +1,94 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/novel-system/chapter.schema.json",
-  "title": "章节（草稿 / 修订 / 定稿）",
+  "title": "章节（正文）：草稿 / 修订 / 定稿",
   "type": "object",
   "additionalProperties": false,
-  "required": ["chapter_id", "project_id", "stage", "status"],
+  "$comment": "2026-11-23 重写。旧版要求 chapter_id / project_id / stage，而这三个字段在全系统没有任何生产者——novel write 的 render_document() 写的是 id + type: chapter + status: draft，索引与 validate 三处都读 meta['id']。契约与写入器各说一套，后果不是校验报错而是正文 28 份根本进不了契约体系（SCHEMA_BY_TYPE 里没有 manuscript 键）。现改为与写入器对齐：id 为唯一标识，type 接纳 chapter/manuscript 两值，status 承担生命周期。",
+  "required": ["id", "type", "title", "status"],
   "properties": {
-    "chapter_id": {
+    "id": {
       "type": "string",
       "pattern": "^(ch_[0-9]{6}|CH-[0-9]{3,4})$",
-      "description": "全局唯一；与卷、序号解耦，避免卷内重编号引发连锁改动"
+      "description": "全局唯一。索引（indexing/builder.py）、查重、validate（cli/inspect_cmd.py）三处都取 meta['id']，故此处不得改名为 chapter_id。号段：新正文 ch_000001–000999，2026-11 导入的旧稿 ch_001001–001028"
     },
-    "project_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-    "volume": { "type": "integer", "minimum": 1 },
-    "order_in_volume": { "type": "integer", "minimum": 1 },
-    "title": { "type": "string" },
-    "stage": {
+    "type": {
       "type": "string",
-      "enum": ["draft", "revision", "final"],
-      "description": "draft 在 03_Manuscripts/Drafts；final 必须经作者批准"
+      "enum": ["chapter", "manuscript"],
+      "description": "chapter 由 novel write（workflows/draft.py）产出；manuscript 是 2026-11-04 批量导入的 28 份旧稿。两者都是正文，语义相同，故共映射到本契约。新增产物一律写 chapter"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "name": {
+      "type": "string",
+      "description": "导入期旧稿与 title 同值；新稿不写。保留是为了不改动 28 份正典"
     },
     "status": {
       "type": "string",
-      "enum": ["planned", "drafting", "drafted", "revising", "approved", "published", "withdrawn"]
+      "enum": ["draft", "drafting", "drafted", "revising", "approved", "published", "withdrawn"],
+      "description": "生命周期。novel write 落盘时为 draft；旧稿导入时记为 published。与 canon_status 是两套：status 说「这份稿走到哪一步」，canon_status 说「它在正典里算什么」"
     },
-    "word_count": { "type": "integer", "minimum": 0 },
+    "canon_status": {
+      "type": "string",
+      "enum": ["idea", "proposal", "pending_review", "canon", "deprecated", "rejected"],
+      "description": "V1.1 §4.2 六值。正文只有「已发布并生效」才写 canon；导入的 28 份旧稿写 deprecated（已由新稿取代）"
+    },
+    "volume_id": {
+      "type": "string",
+      "pattern": "^plan_[0-9]{6}$",
+      "description": "所属卷的规划 ID。旧契约用整数 volume，实际数据一律写卷规划 ID，故以 volume_id 为准"
+    },
+    "volume": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "卷序号的旧写法，仅为兼容保留。新产物写 volume_id"
+    },
+    "order_in_volume": { "type": "integer", "minimum": 1 },
+    "word_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "非空白字符数，与 workflows/draft.py 的 count_words() 同口径"
+    },
+    "outline_ref": {
+      "type": "string",
+      "description": "对应章纲的 ID。空串表示导入时未关联——不补造，补出来就是编造"
+    },
+    "preflight_ref": {
+      "type": "string",
+      "description": "预检记录 ID。空串表示该稿从未过预检"
+    },
+    "preflight_id": {
+      "type": "string",
+      "description": "novel write 写出的预检 ID；与导入期的 preflight_ref 是同一件事的两种字段名"
+    },
+    "base_release": {
+      "type": "string",
+      "description": "写作基线（发布 ID），用于判断这份稿基于哪一版正典"
+    },
+    "created_by_task": {
+      "type": "string",
+      "pattern": "^task_[0-9]{6}$",
+      "description": "产出这份稿的任务 ID"
+    },
     "approved_by": {
       "type": "string",
-      "description": "只有作者可批准；Agent 自批无效"
+      "description": "只有作者可批准；Agent 自批无效（ADR-014）"
     },
-    "approved_at": { "type": "string", "format": "date-time" },
+    "approved_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
     "continuity_signoff": {
       "type": "object",
+      "additionalProperties": false,
       "description": "连续性签字绑正文 sha256；正文改一字节即失效",
       "properties": {
-        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "content_sha256": { "$ref": "_common.schema.json#/$defs/sha256" },
         "signer": { "type": "string" },
-        "signed_at": { "type": "string", "format": "date-time" }
+        "signed_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" }
       }
-    }
+    },
+    "created_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "updated_at": { "$ref": "_common.schema.json#/$defs/looseDateTime" },
+    "source_refs": {
+      "$ref": "_common.schema.json#/$defs/sourceRefList"
+    },
+    "tags": { "type": "array", "items": { "type": "string" } }
   }
 }

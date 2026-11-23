@@ -2,6 +2,39 @@
 
 格式：语义化版本。每条记录写明兼容性影响与迁移提示。
 
+## 0.15.6 — 2026-11-23
+
+**正文契约与写入器对齐。** 冷启动审查（`docs/architecture/cold_review_20261123.md` P0-1）量出：
+`chapter.schema.json` 要求 `chapter_id` / `project_id` / `stage`，而这三个字段在全系统**没有任何生产者**——
+`workflows/draft.py` 的 `render_document()` 写的是 `id` + `type: chapter` + `status: draft`，
+索引（`indexing/builder.py` 三处）与 `validate` 也都读 `meta['id']`。
+
+后果不是校验报错，而是**校验根本不发生**：`SCHEMA_BY_TYPE` 里没有 `manuscript` 键，
+真库 28 份正文全部落进「无契约」桶。系统最核心的产物在契约体系里是隐形的。
+
+- `chapter.schema.json` 重写：`id` 为唯一标识，`type` 接纳 `chapter`（新稿）/ `manuscript`
+  （2026-11-04 导入的 28 份旧稿），`status` 承担生命周期（`draft`…`published`），
+  `canon_status` 单独表达正典归属。旧版 `project_id` 删除——正文只存在于一个项目里，
+  由路径决定，再写进 frontmatter 是第三份真相。
+- `SCHEMA_BY_TYPE` 新增 `chapter` / `manuscript` 两键，同映射到 `chapter.schema.json`。
+  **不为旧稿另造契约**：另造一份等于承认两套语义永久并存。
+- `NARRATIVE_TYPES` 与 `changes/impact.py` 同步接纳 `manuscript`。此前那 28 份不进叙事索引，
+  时间线/场景/揭示三个视图对它们全空，而空视图和「没有正文」在界面上长得一样。
+- 样本修正：`chapter` 样本从旧字段名改为新形态；补上 0.15.1 新增 `relationship.schema.json`
+  时漏掉的样本（`test_every_schema_has_a_sample` 因此一直红着）。
+
+实测：真库 28 份正文**全部通过**契约；`novel write` 的实际产出通过契约；
+全库过契约 999 → **1027**，无契约 47 → **19**（剩余全是规划类：`scene_beat` 11 /
+`chapter_plan` 3 / `volume` 2 / `chapter_outline` 2 / `volume_design` 1）。
+`validate`（1046 档 / 重复 0 / 双链 5685 条 / 0 断链）与 `doctor` 无回归。
+
+测试基线：`test_schema_contract.py` 改前 27 红 → 改后 22 红，**无新增失败**；
+减少的 5 条正是本次修复的。剩余 22 条是同一类既有欠账——样本里的 4 位号
+（`ent_0002` / `fs_0001` / `prop_0102`）与六位契约冲突，属 D6。
+
+BREAKING CHANGE: `chapter.schema.json` 的字段名变更。对数据无影响（存量本就是 `id` 形态），
+但任何按旧契约（`chapter_id` / `stage`）生成的产物将被判为未知字段。
+
 ## 0.15.5 — 2026-11-23
 
 **档 2 正名：五处「模块名与内容脱钩」一次改掉。** 依据
