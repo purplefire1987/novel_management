@@ -125,7 +125,7 @@ def load_meta(raw: str, where: str = "<string>") -> dict:
 
 def decode(data: bytes) -> str:
     """按 UTF-8 解码并统一换行、去 BOM。非 UTF-8 直接报错，不猜编码。"""
-    from ...canonical import normalize_text
+    from novel_management.domain.canonical import normalize_text
 
     try:
         text = data.decode("utf-8")

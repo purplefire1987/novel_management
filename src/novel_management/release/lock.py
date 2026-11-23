@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..canonical import utc_now
+from novel_management.domain.canonical import utc_now
 from ..domain.errors import ConflictError, UsageError
 
 try:  # POSIX

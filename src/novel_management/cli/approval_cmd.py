@@ -36,7 +36,7 @@ import json
 from .. import config as cfg_mod
 from ..approvals import ApprovalFile
 from ..audit import ensure_actor
-from ..canonical import package_hash
+from novel_management.domain.canonical import package_hash
 from ..changes import IssueStore, ChangeStore
 from ..domain.errors import ApprovalError, UsageError
 from ..staging import StagedFile, StagingArea, artifact_id_of

@@ -32,14 +32,14 @@ from pathlib import Path
 
 from ..infrastructure.filesystem import markdown as md
 from ..adapters.mock import LLMClient
-from ..canonical import utc_now
+from novel_management.domain.canonical import utc_now
 from ..domain.errors import UsageError
 from ..infrastructure.database.indexing import locate as locate_mod
 from ..infrastructure.database.indexing.search import index_metadata as index_metadata_of
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ..schema import check as schema_check
 from ..infrastructure.filesystem.storage import dump_yaml, sha256_file, write_text_atomic
-from ..version import __version__
+from novel_management.domain.version import __version__
 from . import registry, runner, tools
 from .budget import Budget
 from .metering import Meter

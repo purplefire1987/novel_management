@@ -26,8 +26,8 @@ from pathlib import Path
 from ....infrastructure.filesystem import markdown as md
 from ....domain.errors import ParseError
 from ....infrastructure.filesystem.storage import sha256_text, write_text_atomic
-from ....timeline import EventGraph
-from ....timeline import extract as extract_semantics
+from novel_management.domain.timeline import EventGraph
+from novel_management.domain.timeline import extract as extract_semantics
 from . import schema
 
 # 进 `entities` 表的类型。章节/场景不是实体，它们去 `narrative_order`。

@@ -39,8 +39,8 @@ from ..infrastructure.database.indexing.search import connect as index_connect
 from ..infrastructure.database.indexing.search import index_metadata as index_metadata_of
 from ..infrastructure.database.indexing.search import search as index_search
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..timeline import query as timeline_query
-from ..timeline.query import MODE_AFTER, MODE_BEFORE
+from novel_management.domain.timeline import query as timeline_query
+from novel_management.domain.timeline.query import MODE_AFTER, MODE_BEFORE
 from . import registry
 from .registry import (
     SCOPE_ALL,

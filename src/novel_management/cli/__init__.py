@@ -47,7 +47,7 @@ from . import (
     workflow_cmd,
 )
 
-from ..version import __version__ as __version__  # noqa: E402  版本只有一处定义
+from novel_management.domain.version import __version__ as __version__  # noqa: E402  版本只有一处定义
 
 
 HANDLERS = {

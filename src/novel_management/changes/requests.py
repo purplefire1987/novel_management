@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..audit import now_iso
-from ..canonical import package_hash
+from novel_management.domain.canonical import package_hash
 from ..domain.errors import ApprovalError, UsageError
 from ..staging import artifact_id_of
 from ..infrastructure.filesystem.storage import write_atomic

@@ -26,10 +26,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..infrastructure.filesystem import markdown as md
-from ..canonical import utc_now
+from novel_management.domain.canonical import utc_now
 from ..changes import ChangeStore, IssueStore  # noqa: F401 - 类型提示用
 from ..domain.errors import ApprovalError, ConflictError, ParseError, SecurityError, UsageError
-from ..ids import IdRegistry
+from novel_management.domain.ids import IdRegistry
 from ..infrastructure.database.indexing import schema as index_schema
 from ..infrastructure.database.indexing.builder import build_index
 from ..infrastructure.database.indexing.source import WorktreeSource, skip_dirs_from_layout
@@ -37,7 +37,7 @@ from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
 from ..infrastructure.filesystem.storage import copy_verified, sha256_file, write_atomic
 from ..validation import contract as contract_mod
-from ..version import __version__
+from novel_management.domain.version import __version__
 from .gates import CANON_PREFIX, check_approval, check_gates
 from .lock import PublishLock
 from .model import (

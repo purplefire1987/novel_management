@@ -11,7 +11,7 @@ import argparse
 
 from .. import config as cfg_mod
 from ..domain.errors import ConflictError, SecurityError, UsageError
-from ..ids import BAND_LIMITS, MIN_WIDTH, IdAllocator, IdRegistry, resolve_prefix
+from novel_management.domain.ids import BAND_LIMITS, MIN_WIDTH, IdAllocator, IdRegistry, resolve_prefix
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ._common import fail, heading, info, ok, warn
 
@@ -87,7 +87,7 @@ def cmd_allocate_id(cfg: cfg_mod.Config, args: argparse.Namespace) -> int:
 
 
 def _next_of(issued: list[str]) -> int:
-    from ..ids import split_id
+    from novel_management.domain.ids import split_id
 
     last = split_id(issued[-1]) if issued else None
     return (last[1] + 1) if last else 1

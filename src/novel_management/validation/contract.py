@@ -39,7 +39,7 @@ from pathlib import Path, PurePosixPath
 
 from ..infrastructure.filesystem import markdown as md
 from .. import schema as schema_mod
-from ..ids import split_id
+from novel_management.domain.ids import split_id
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ..infrastructure.filesystem.storage import sha256_file
 

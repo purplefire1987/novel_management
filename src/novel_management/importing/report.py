@@ -17,9 +17,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..canonical import utc_now
+from novel_management.domain.canonical import utc_now
 from ..domain.errors import ConflictError, UsageError
-from ..ids import IdAllocator
+from novel_management.domain.ids import IdAllocator
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ..staging import StagingArea
 from ..infrastructure.filesystem.storage import write_atomic, write_new

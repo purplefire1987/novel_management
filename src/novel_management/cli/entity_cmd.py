@@ -24,7 +24,7 @@ from pathlib import Path
 from .. import config as cfg_mod
 from ..audit import ensure_actor, now_iso
 from ..domain.errors import ConflictError, UsageError
-from ..ids import IdAllocator, IdRegistry, resolve_prefix
+from novel_management.domain.ids import IdAllocator, IdRegistry, resolve_prefix
 from ..infrastructure.filesystem.paths import ProjectPaths
 from ..schema import SchemaStore, schema_name_for
 from ..infrastructure.filesystem.storage import dump_yaml, write_text_atomic

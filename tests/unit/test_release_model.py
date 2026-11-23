@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from novel_management.canonical import package_hash
+from novel_management.domain.canonical import package_hash
 from novel_management.domain.errors import UsageError
 from novel_management.release.model import (
     STEP_NAMES,

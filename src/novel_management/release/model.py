@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..canonical import package_bytes, package_hash
+from novel_management.domain.canonical import package_bytes, package_hash
 from ..domain.errors import UsageError
 
 # PRD §17.4 的 22 步。名字写在这里而不是引擎里，是为了让日志和文档用同一套说法。

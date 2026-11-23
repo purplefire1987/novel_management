@@ -30,7 +30,7 @@ from pathlib import Path
 from ..infrastructure.filesystem import markdown as md
 from ..domain.errors import ConflictError, UsageError
 from ..infrastructure.filesystem.paths import ProjectPaths
-from ..ids import IdAllocator
+from novel_management.domain.ids import IdAllocator
 from ..infrastructure.filesystem.storage import dump_yaml, read_text, sha256_text, write_text_atomic
 
 # ---------------------------------------------------------------------------

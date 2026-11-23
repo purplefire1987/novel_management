@@ -16,7 +16,7 @@ import json
 from .. import config as cfg_mod
 from ..infrastructure.database.indexing import connect, index_metadata
 from ..infrastructure.database.indexing.locate import active_db
-from ..timeline import (
+from novel_management.domain.timeline import (
     MODE_AFTER,
     MODE_BEFORE,
     knowledge_answer,

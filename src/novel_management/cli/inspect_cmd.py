@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from .. import config as cfg_mod
-from .. import ids as ids_mod
+from novel_management.domain import ids as ids_mod
 from ..approvals import ApprovalStore
 from ..audit import OperationLog
 from ..baseline import AuthorBaseline

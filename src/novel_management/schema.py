@@ -27,7 +27,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
-from .canonical import canonical_json, parse_iso
+from novel_management.domain.canonical import canonical_json, parse_iso
 from .domain.errors import SchemaError
 
 SCHEMA_SUFFIX = ".schema.json"

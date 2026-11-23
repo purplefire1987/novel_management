@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from .. import canonical
+from novel_management.domain import canonical
 from .. import config as cfg_mod
 from ..domain.errors import CanonicalError, SchemaError, UsageError
 from ..schema import SchemaStore
